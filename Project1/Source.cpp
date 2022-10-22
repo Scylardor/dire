@@ -1,11 +1,8 @@
 
 #include <any>
-#include <functional>
 #include <vector>
 #include <string>
-#include <unordered_map>
 #include <string_view>
-
 
 enum class Type
 {
@@ -188,13 +185,6 @@ struct TypeInfo2 : IntrusiveListNode<TypeInfo2>
 	std::ptrdiff_t	offset;
 };
 
-struct TypeErasedFunctionWrapper
-{
-
-
-};
-
-
 struct IFunctionTypeInfo
 {
 public:
@@ -225,10 +215,7 @@ struct FunctionInfo : IntrusiveListNode<FunctionInfo>, IFunctionTypeInfo
 	template <typename Ret, typename... Args>
 	Ret	TInvokeFunc(void* pCallerObject, Args... pFuncArgs) const
 	{
-		using ArgumentPackTuple = std::tuple<Args...>;
-		std::any packedArgs;
-		packedArgs.emplace<ArgumentPackTuple>(std::forward_as_tuple(pFuncArgs...));
-		std::any result = Invoke(pCallerObject, packedArgs);
+		std::any result = InvokeFunc(pCallerObject, pFuncArgs...);
 		return std::any_cast<Ret>(result);
 	}
 
@@ -424,50 +411,153 @@ class TypeInfoFunctor
 
 // This idea of storing a "COUNTER_BASE" has been stolen from https://stackoverflow.com/a/52770279/1987466
 #define LINEAR_ENUM(EnumName, UnderlyingType, ...) \
-	struct EnumName { \
-		using Underlying = UnderlyingType; \
-		enum LocalCounter_t { COUNTER_BASE = __COUNTER__, OFFSET = (COUNTER_BASE == 0 ? 0 : 1) };\
-		enum EnumName_t : UnderlyingType { \
-			VA_MACRO(COMMA_ARGS_MINUS_COUNTER, __VA_ARGS__)\
-		}; \
-		inline static std::pair<const char*, EnumName_t> nameEnumPairs[] {\
-			VA_MACRO(BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)\
-		};\
+	struct EnumName\
+	{\
+		private:\
+			using Underlying = UnderlyingType; \
+			enum LocalCounter_t { COUNTER_BASE = __COUNTER__, OFFSET = (COUNTER_BASE == 0 ? 0 : 1) };\
+		public:\
+			enum Type : UnderlyingType\
+			{\
+				VA_MACRO(COMMA_ARGS_MINUS_COUNTER, __VA_ARGS__)\
+			};\
+		private:\
+			inline static std::pair<const char*, Type> nameEnumPairs[] {\
+				VA_MACRO(BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)\
+			};\
+		public:\
+			/* We have the guarantee that linear enums values start from 0 and increase 1 by 1 so we can make this function O(1).*/ \
+			static char const* FromEnum(Type enumValue) \
+			{ \
+				if( (int)enumValue >= NARGS(__VA_ARGS__))\
+				{\
+					return nullptr;\
+				}\
+				return nameEnumPairs[(int)enumValue].first;\
+			}\
+			/* This one assumes that the parameter value is guaranteed to be within bounds and thus doesn't even bounds check. */\
+			static char const* FromSafeEnum(Type enumValue) \
+			{ \
+				return nameEnumPairs[(int)enumValue].first;\
+			}\
+			static Type const* FromString(char const* enumStr) \
+			{ \
+				/* TODO: add bounds check + return optional? */ \
+				for (auto const& pair : nameEnumPairs)\
+				{\
+					if (strcmp(pair.first, enumStr) == 0)\
+						return &pair.second;\
+				}\
+				return nullptr;\
+			}\
 	};
+
+
+#ifdef _MSC_VER // Microsoft compilers
+
+#pragma intrinsic(_BitScanForward)
+
+// https://learn.microsoft.com/en-us/cpp/intrinsics/bitscanforward-bitscanforward64?view=msvc-170
+template <typename T>
+constexpr std::enable_if_t<std::is_integral_v<T>, unsigned long>
+FindFirstSetBit(T value)
+{
+	unsigned long firstSetBitIndex = 0;
+	if constexpr (sizeof(T) > sizeof(unsigned long))
+	{
+		_BitScanForward64(&firstSetBitIndex, (unsigned __int64)value);
+	}
+	else
+	{
+		_BitScanForward(&firstSetBitIndex, (unsigned long)value);
+	}
+
+	return firstSetBitIndex;
+}
+#elif defined(__GNUG__) || defined(__clang__)
+// https://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html
+// https://clang.llvm.org/docs/LanguageExtensions.html
+// TODO: untested
+template <typename T>
+constexpr std::enable_if_t<std::is_integral_v<T>, unsigned long>
+FindFirstSetBit(T value)
+{
+	unsigned long firstSetBitIndex = 0;
+	if constexpr (sizeof(T) <= sizeof(int))
+	{
+		firstSetBitIndex = (unsigned long)__builtin_ffs((int)value);
+	}
+	else if constexpr (sizeof(T) <= sizeof(long)) // probably useless nowadays
+	{
+		firstSetBitIndex = (unsigned long)__builtin_ffsl((long)value);
+	}
+	else
+	{
+		firstSetBitIndex = (unsigned long)__builtin_ffsll((long long)value);
+	}
+
+	return firstSetBitIndex;
+}
+#endif
 
 #define BITFLAGS_ENUM(EnumName, UnderlyingType, ...) \
 	struct EnumName { \
-		using Underlying = UnderlyingType; \
-		enum LocalCounter_t { COUNTER_BASE = __COUNTER__, OFFSET = (COUNTER_BASE == 0 ? 0 : 1) };\
-		enum EnumName_t : UnderlyingType { \
-			VA_MACRO(COMMA_ARGS_LSHIFT_COUNTER, __VA_ARGS__)\
-		}; \
-		inline static std::pair<const char*, EnumName_t> nameEnumPairs[] {\
-			VA_MACRO(BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)\
-		};\
+			private:\
+			using Underlying = UnderlyingType; \
+			enum LocalCounter_t { COUNTER_BASE = __COUNTER__, OFFSET = (COUNTER_BASE == 0 ? 0 : 1) };\
+		public:\
+			enum Type : UnderlyingType\
+			{\
+				VA_MACRO(COMMA_ARGS_LSHIFT_COUNTER, __VA_ARGS__)\
+			};\
+		private:\
+			inline static std::pair<const char*, Type> nameEnumPairs[] {\
+				VA_MACRO(BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)\
+			};\
+		public:\
+			/* We have the guarantee that bitflags enums values are powers of 2 so we can make this function O(1).*/ \
+			static char const* FromEnum(Type enumValue) \
+			{ \
+				if( (int)enumValue >= NARGS(__VA_ARGS__))\
+				{\
+					return nullptr;\
+				}\
+				return nameEnumPairs[(int)enumValue].first;\
+			}\
+			/* This one assumes that the parameter value is guaranteed to be within bounds and thus doesn't even bounds check. */\
+			static char const* FromSafeEnum(Type enumValue) \
+			{ \
+				return nameEnumPairs[(int)enumValue].first;\
+			}\
+			static Type const* FromString(char const* enumStr) \
+			{ \
+				/* TODO: add bounds check + return optional? */ \
+				for (auto const& pair : nameEnumPairs)\
+				{\
+					if (strcmp(pair.first, enumStr) == 0)\
+						return &pair.second;\
+				}\
+				return nullptr;\
+			}\
 	};
 
 
 #define TYPED_ENUM(EnumName, UnderlyingType, ...) \
 	struct EnumName { \
 		using Underlying = UnderlyingType; \
-		enum EnumName_t : UnderlyingType { \
+		typedef enum Type : UnderlyingType { \
 			VA_MACRO(COMMA_ARGS, __VA_ARGS__)\
-		}; \
-		inline static std::pair<const char*, EnumName_t> nameEnumPairs[] {\
+		} Type; \
+		inline static std::pair<const char*, Type> nameEnumPairs[] {\
 			VA_MACRO(BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)\
 		};\
 	};
 
 #define ENUM(EnumName, ...) TYPED_ENUM(EnumName, int, __VA_ARGS__)
 
+LINEAR_ENUM(LinearEnum, int, un, deux);
 
 TYPED_ENUM(TestEnum, int, un, deux);
-struct TestEnum333 { using Underlying = int; enum EnumName_t : int { un , deux }; inline static std::pair<const char*, EnumName_t> nameEnumPairs[] { { "un" , un } , { "deux" , deux } , }; };;
-
-struct TestEnum3 { using Underlying = int; enum LocalCounter_t { COUNTER_BASE = 963855141, OFFSET = (COUNTER_BASE == 0 ? 0 : 1) }; enum EnumName_t : int { un= 963855142 - COUNTER_BASE-OFFSET , deux= 963855143 - COUNTER_BASE-OFFSET , troua= 963855144 - COUNTER_BASE-OFFSET }; inline static std::pair<const char*, EnumName_t> nameEnumPairs[] { { "un" , un } , { "deux" , deux } , { "troua" , troua } , }; };;
-
-struct BitFlags { using Underlying = int; enum LocalCounter_t { COUNTER_BASE = 963855141, OFFSET = (COUNTER_BASE == 0 ? 0 : 1) }; enum EnumName_t : int { un= 1 << (963855142 - COUNTER_BASE-OFFSET) , deux= 1 << (963855143 - COUNTER_BASE-OFFSET) , pouet= 1 << (963855144 - COUNTER_BASE-OFFSET) }; inline static std::pair<const char*, EnumName_t> nameEnumPairs[] { { "un" , un } , { "deux" , deux } , { "pouet" , pouet } , }; };;
 
 enum test : int
 {
@@ -784,8 +874,8 @@ struct EvalDelay
 
 
 //TODO LIST:
-//- BitflagsEnum
 //- enum fromString/fromEnum
+//- enum with values?
 //- SubclassOf
 //- Create/Clone
 //- class/structure members: du style SetProperty("maStruct.myInt", 1)
@@ -892,6 +982,8 @@ int main()
 	auto* funcInfo = tata.GetFunction("zdzdzdz");
 	int ret2 = funcInfo->TInvokeFunc<int>(&tata, 3.f);
 
+	int tets = 1;
+	int ffs = FindFirstSetBit(tets);
 	return 0;
 }
 
