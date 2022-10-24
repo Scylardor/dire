@@ -426,6 +426,11 @@ class TypeInfoFunctor
 				VA_MACRO(BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)\
 			};\
 		public:\
+			/* This one assumes that the parameter value is guaranteed to be within bounds and thus doesn't even bounds check. */\
+			static char const* FromSafeEnum(Type enumValue) \
+			{ \
+				return nameEnumPairs[(int)enumValue].first; \
+			}\
 			/* We have the guarantee that linear enums values start from 0 and increase 1 by 1 so we can make this function O(1).*/ \
 			static char const* FromEnum(Type enumValue) \
 			{ \
@@ -433,12 +438,7 @@ class TypeInfoFunctor
 				{\
 					return nullptr;\
 				}\
-				return nameEnumPairs[(int)enumValue].first;\
-			}\
-			/* This one assumes that the parameter value is guaranteed to be within bounds and thus doesn't even bounds check. */\
-			static char const* FromSafeEnum(Type enumValue) \
-			{ \
-				return nameEnumPairs[(int)enumValue].first;\
+				return FromSafeEnum(enumValue);\
 			}\
 			static Type const* FromString(char const* enumStr) \
 			{ \
@@ -510,28 +510,45 @@ FindFirstSetBit(T value)
 			{\
 				VA_MACRO(COMMA_ARGS_LSHIFT_COUNTER, __VA_ARGS__)\
 			};\
+			EnumName(Type const pVal) :\
+				Value(pVal)\
+			{}\
+			Type	Value{};\
 		private:\
 			inline static std::pair<const char*, Type> nameEnumPairs[] {\
 				VA_MACRO(BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)\
 			};\
 		public:\
-			/* We have the guarantee that bitflags enums values are powers of 2 so we can make this function O(1).*/ \
-			static char const* FromEnum(Type enumValue) \
+			void Set(Type pSetBit)\
+			{\
+				Value = (Type)((Underlying)Value | (Underlying)pSetBit);\
+			}\
+			void Clear(Type pClearedBit)\
+			{\
+				Value = (Type)((Underlying)Value & ~((Underlying)pClearedBit));\
+			}\
+			bool IsSet(Type pBit) const\
+			{\
+				return ((Underlying)Value & (Underlying)pBit) == 0;\
+			}\
+			/*This one assumes that the parameter value is guaranteed to be within bounds and thus doesn't even bounds check. */\
+			static char const* FromSafeEnum(Type pEnumValue) \
 			{ \
-				if( (int)enumValue >= NARGS(__VA_ARGS__))\
+				return nameEnumPairs[FindFirstSetBit((UnderlyingType)pEnumValue)].first; \
+			}\
+			/* We have the guarantee that bitflags enums values are powers of 2 so we can make this function O(1).*/ \
+			static char const* FromEnum(Type pEnumValue)\
+			{ \
+				/* If value is 0 OR not a power of 2 OR bigger than our biggest power of 2, it cannot be valid */\
+				const bool isPowerOf2 = ((UnderlyingType)pEnumValue & ((UnderlyingType)pEnumValue - 1)) == 0;\
+				if ((UnderlyingType)pEnumValue == 0 || !isPowerOf2 || (UnderlyingType)pEnumValue >= (1 << NARGS(__VA_ARGS__)))\
 				{\
 					return nullptr;\
 				}\
-				return nameEnumPairs[(int)enumValue].first;\
-			}\
-			/* This one assumes that the parameter value is guaranteed to be within bounds and thus doesn't even bounds check. */\
-			static char const* FromSafeEnum(Type enumValue) \
-			{ \
-				return nameEnumPairs[(int)enumValue].first;\
+				return FromSafeEnum(pEnumValue);\
 			}\
 			static Type const* FromString(char const* enumStr) \
 			{ \
-				/* TODO: add bounds check + return optional? */ \
 				for (auto const& pair : nameEnumPairs)\
 				{\
 					if (strcmp(pair.first, enumStr) == 0)\
@@ -556,6 +573,7 @@ FindFirstSetBit(T value)
 #define ENUM(EnumName, ...) TYPED_ENUM(EnumName, int, __VA_ARGS__)
 
 LINEAR_ENUM(LinearEnum, int, un, deux);
+BITFLAGS_ENUM(BitEnum, int, un, deux, quatre, seize);
 
 TYPED_ENUM(TestEnum, int, un, deux);
 
@@ -984,9 +1002,24 @@ int main()
 
 	int tets = 1;
 	int ffs = FindFirstSetBit(tets);
+
+	BitEnum be = BitEnum::un;
+
+	const char* seize = be.FromEnum((BitEnum::Type) 2);
+	auto isset = be.IsSet(BitEnum::un);
+	be.Set(BitEnum::seize);
+	isset = be.IsSet(BitEnum::un) && be.IsSet(BitEnum::seize) && !be.IsSet(BitEnum::deux);
+	be.Clear(BitEnum::seize);
+	isset = be.IsSet(BitEnum::un) && !be.IsSet(BitEnum::seize) && !be.IsSet(BitEnum::deux);
+	test333(1, 2, 3);
 	return 0;
 }
 
+/**
+ * \brief test
+ * \param tata 
+ * \return 
+ */
 int Test::tititest(int tata)
 {
 	return 0;
