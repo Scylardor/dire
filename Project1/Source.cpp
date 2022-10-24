@@ -194,6 +194,39 @@ public:
 };
 
 
+// Inspired by https://stackoverflow.com/a/59604594/1987466
+template<typename method_t>
+struct is_const_method;
+
+template<typename CClass, typename ReturnType, typename ...ArgType>
+struct is_const_method< ReturnType(CClass::*)(ArgType...)> {
+	static constexpr bool value = false;
+	using ClassType = CClass;
+
+};
+
+template<typename CClass, typename ReturnType, typename ...ArgType>
+struct is_const_method< ReturnType(CClass::*)(ArgType...) const> {
+	static constexpr bool value = true;
+	using ClassType = std::add_const_t<CClass>;
+};
+
+
+
+
+#define DECLARE_ATTORNEY(MemberFunc) \
+	struct Attorney\
+	{\
+		template <typename... Args>\
+		auto MemberFunc(is_const_method<decltype(&Myself::MemberFunc)>::ClassType& pClient, Args&&... pArgs)\
+		{\
+			return pClient.MemberFunc(std::forward<Args>(pArgs)...);\
+		}\
+	};\
+	friend Attorney;
+
+
+
 struct FunctionInfo : IntrusiveListNode<FunctionInfo>, IFunctionTypeInfo
 {
 
@@ -218,6 +251,9 @@ struct FunctionInfo : IntrusiveListNode<FunctionInfo>, IFunctionTypeInfo
 		std::any result = InvokeFunc(pCallerObject, pFuncArgs...);
 		return std::any_cast<Ret>(result);
 	}
+
+
+public:
 
 	std::string	name;
 	Type	returnType{ Type::Int };
@@ -474,7 +510,7 @@ FindFirstSetBit(T value)
 
 	return firstSetBitIndex;
 }
-#elif defined(__GNUG__) || defined(__clang__)
+#elif defined(__GNUG__) || defined(__clang__) // https://stackoverflow.com/questions/28166565/detect-gcc-as-opposed-to-msvc-clang-with-macro
 // https://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html
 // https://clang.llvm.org/docs/LanguageExtensions.html
 // TODO: untested
@@ -835,6 +871,7 @@ struct MethodTypeDecomposer
 	using ReturnType = Ret;
 	using ContainerPtr = ClassPtr;
 	using ArgumentPackType = std::tuple<Args...>;
+
 };
 
 template <typename Ret, typename... Args>
@@ -878,6 +915,14 @@ struct FunctionTypeDecomposer<void (Reflector::*)(int)>
 
 #define MOE_METHOD_TYPEINFO(Name) \
 	inline static FunctionTypeInfo<decltype(&Name)> Name##_TYPEINFO{ &Name, STRINGIZE(Name)}
+
+// https://stackoverflow.com/questions/64095320/mechanism-to-check-if-a-c-member-is-private#comment113453447_64095554
+
+struct Foo {
+	void operator,(bool) const { }
+};
+
+struct Bar { Foo foo; };
 
 template<typename T>
 constexpr auto has_public_foo(T const& t) -> decltype(t.foo, void(), true) { return true; }
@@ -1012,6 +1057,9 @@ int main()
 	be.Clear(BitEnum::seize);
 	isset = be.IsSet(BitEnum::un) && !be.IsSet(BitEnum::seize) && !be.IsSet(BitEnum::deux);
 	test333(1, 2, 3);
+
+
+
 	return 0;
 }
 
