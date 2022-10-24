@@ -212,8 +212,6 @@ struct is_const_method< ReturnType(CClass::*)(ArgType...) const> {
 };
 
 
-
-
 #define DECLARE_ATTORNEY(MemberFunc) \
 	struct Attorney\
 	{\
@@ -394,11 +392,11 @@ class TypeInfoFunctor
 #define GLUE_ARGS8(a1,a2,a3,a4,a5,a6,a7,a8) a1 a2 COMMA a3 a4  COMMA a5 a6 COMMA a8
 #define GLUE_ARGUMENT_PAIRS(...) EXPAND(CONCAT2(GLUE_ARGS, NARGS(__VA_ARGS__)))(EXPAND(__VA_ARGS__)) // TODO : on dirait que EXPAND(__VA_ARGS__) c'est pete avec plus d'1 argument. verifier si il y a des warning msvc
 
-#define COMMA_ARGS_MINUS_COUNTER1(a1) a1 = __COUNTER__ - COUNTER_BASE-OFFSET
-#define COMMA_ARGS_MINUS_COUNTER2(a1, a2, a3, a4) a1 = __COUNTER__ - COUNTER_BASE-OFFSET COMMA a2 = __COUNTER__ - COUNTER_BASE-OFFSET
-#define COMMA_ARGS_MINUS_COUNTER3(a1, a2, a3) a1= __COUNTER__ - COUNTER_BASE-OFFSET  COMMA a2= __COUNTER__ - COUNTER_BASE-OFFSET  COMMA a3= __COUNTER__ - COUNTER_BASE-OFFSET 
-#define COMMA_ARGS_MINUS_COUNTER4(a1, a2, a3, a4) a1= __COUNTER__ - COUNTER_BASE-OFFSET  COMMA a2= __COUNTER__ - COUNTER_BASE-OFFSET  COMMA a3= __COUNTER__ - COUNTER_BASE-OFFSET  COMMA a4= __COUNTER__ - COUNTER_BASE-OFFSET 
-#define COMMA_ARGS_MINUS_COUNTER5(a1, a2, a3, a4, a5) a1= __COUNTER__ - COUNTER_BASE-OFFSET COMMA a2= __COUNTER__ - COUNTER_BASE-OFFSET COMMA a3= __COUNTER__ - COUNTER_BASE-OFFSET COMMA a4= __COUNTER__ - COUNTER_BASE-OFFSET  COMMA a5= __COUNTER__ - COUNTER_BASE-OFFSET
+#define COMMA_ARGS_MINUS_COUNTER1(a1) a1 = __COUNTER__ - OFFSET
+#define COMMA_ARGS_MINUS_COUNTER2(a1, a2, a3, a4) a1 = __COUNTER__ - OFFSET COMMA a2 = __COUNTER__ - OFFSET
+#define COMMA_ARGS_MINUS_COUNTER3(a1, a2, a3) a1= __COUNTER__ - OFFSET  COMMA a2= __COUNTER__ - OFFSET  COMMA a3= __COUNTER__ - OFFSET
+#define COMMA_ARGS_MINUS_COUNTER4(a1, a2, a3, a4) a1= __COUNTER__ - OFFSET  COMMA a2= __COUNTER__ - OFFSET  COMMA a3= __COUNTER__ - OFFSET  COMMA a4= __COUNTER__ - OFFSET 
+#define COMMA_ARGS_MINUS_COUNTER5(a1, a2, a3, a4, a5) a1= __COUNTER__ - OFFSET COMMA a2= __COUNTER__ - OFFSET COMMA a3= __COUNTER__ - OFFSET COMMA a4= __COUNTER__ - OFFSET  COMMA a5= __COUNTER__ - OFFSET
 
 #define COMMA_ARGS_LSHIFT_COUNTER1(a1) a1 = 1 << (__COUNTER__ - COUNTER_BASE-OFFSET)
 #define COMMA_ARGS_LSHIFT_COUNTER2(a1, a2, a3, a4) a1 = 1 << (__COUNTER__ - COUNTER_BASE-OFFSET) COMMA a2 = 1 << (__COUNTER__ - COUNTER_BASE-OFFSET)
@@ -451,13 +449,48 @@ class TypeInfoFunctor
 	{\
 		private:\
 			using Underlying = UnderlyingType; \
-			enum LocalCounter_t { COUNTER_BASE = __COUNTER__, OFFSET = (COUNTER_BASE == 0 ? 0 : 1) };\
+			enum LocalCounter_t { COUNTER_BASE = __COUNTER__, OFFSET = COUNTER_BASE+1 };\
 		public:\
 			enum Type : UnderlyingType\
 			{\
 				VA_MACRO(COMMA_ARGS_MINUS_COUNTER, __VA_ARGS__)\
 			};\
-		private:\
+			Type Value{};\
+			EnumName() = default;\
+			EnumName(Type pInitVal) :\
+				Value(pInitVal)\
+			{}\
+			EnumName& operator=(EnumName const& pOther)\
+			{\
+				Value = pOther.Value;\
+				return *this;\
+			}\
+			EnumName& operator=(Type const pVal)\
+			{\
+				Value = pVal;\
+				return *this;\
+			}\
+			bool operator!=(EnumName const& pOther)\
+			{\
+				return (Value != pOther.Value);\
+			}\
+			bool operator!=(Type const pVal)\
+			{\
+				return (Value == pVal);\
+			}\
+			bool operator==(EnumName const& pOther)\
+			{\
+				return !(*this != pOther);\
+			}\
+			bool operator==(Type const pVal)\
+			{\
+				return (Value == pVal);\
+			}\
+			operator Type() const\
+			{\
+				return Value;\
+			}\
+			private:\
 			inline static std::pair<const char*, Type> nameEnumPairs[] {\
 				VA_MACRO(BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)\
 			};\
@@ -478,13 +511,21 @@ class TypeInfoFunctor
 			}\
 			static Type const* FromString(char const* enumStr) \
 			{ \
-				/* TODO: add bounds check + return optional? */ \
 				for (auto const& pair : nameEnumPairs)\
 				{\
 					if (strcmp(pair.first, enumStr) == 0)\
 						return &pair.second;\
 				}\
 				return nullptr;\
+			}\
+			static Type FromSafeString(char const* enumStr) \
+			{ \
+				for (auto const& pair : nameEnumPairs)\
+				{\
+					if (strcmp(pair.first, enumStr) == 0)\
+						return pair.second;\
+				}\
+				return Type(); /* should never happen!*/ \
 			}\
 	};
 
@@ -546,9 +587,40 @@ FindFirstSetBit(T value)
 			{\
 				VA_MACRO(COMMA_ARGS_LSHIFT_COUNTER, __VA_ARGS__)\
 			};\
-			EnumName(Type const pVal) :\
-				Value(pVal)\
+			EnumName() = default;\
+			EnumName(Type pInitVal) :\
+				Value(pInitVal)\
 			{}\
+			EnumName& operator=(EnumName const& pOther)\
+			{\
+				Value = pOther.Value;\
+				return *this;\
+			}\
+			EnumName& operator=(Type const pVal)\
+			{\
+				Value = pVal;\
+				return *this;\
+			}\
+			bool operator!=(EnumName const& pOther)\
+			{\
+				return (Value != pOther.Value);\
+			}\
+			bool operator!=(Type const pVal)\
+			{\
+				return (Value == pVal);\
+			}\
+			bool operator==(EnumName const& pOther)\
+			{\
+				return !(*this != pOther);\
+			}\
+			bool operator==(Type const pVal)\
+			{\
+				return (Value == pVal);\
+			}\
+			operator Type() const\
+			{\
+				return Value;\
+			}\
 			Type	Value{};\
 		private:\
 			inline static std::pair<const char*, Type> nameEnumPairs[] {\
@@ -592,6 +664,15 @@ FindFirstSetBit(T value)
 				}\
 				return nullptr;\
 			}\
+			static Type FromSafeString(char const* enumStr) \
+			{ \
+				for (auto const& pair : nameEnumPairs)\
+				{\
+					if (strcmp(pair.first, enumStr) == 0)\
+						return pair.second;\
+				}\
+				return Type(); /* should never happen!*/ \
+			}\
 	};
 
 
@@ -608,7 +689,10 @@ FindFirstSetBit(T value)
 
 #define ENUM(EnumName, ...) TYPED_ENUM(EnumName, int, __VA_ARGS__)
 
+LINEAR_ENUM(LinearEnum33, int, un, deux);
 LINEAR_ENUM(LinearEnum, int, un, deux);
+
+
 BITFLAGS_ENUM(BitEnum, int, un, deux, quatre, seize);
 
 TYPED_ENUM(TestEnum, int, un, deux);
@@ -1048,7 +1132,7 @@ int main()
 	int tets = 1;
 	int ffs = FindFirstSetBit(tets);
 
-	BitEnum be = BitEnum::un;
+	BitEnum be = BitEnum::seize;
 
 	const char* seize = be.FromEnum((BitEnum::Type) 2);
 	auto isset = be.IsSet(BitEnum::un);
@@ -1058,8 +1142,15 @@ int main()
 	isset = be.IsSet(BitEnum::un) && !be.IsSet(BitEnum::seize) && !be.IsSet(BitEnum::deux);
 	test333(1, 2, 3);
 
+	LinearEnum33 linear2 = LinearEnum33::deux;
+	LinearEnum linear;
+	linear.Value = LinearEnum::deux;
+	const char* ename = LinearEnum::FromEnum(linear.Value);
+	LinearEnum::Type fromStr = LinearEnum::FromSafeString("deux");
 
-
+	ename = LinearEnum33::FromEnum(linear2.Value);
+	linear2 = LinearEnum33::un;
+	ename = LinearEnum33::FromEnum(linear2.Value);
 	return 0;
 }
 
