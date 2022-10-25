@@ -384,7 +384,6 @@ class TypeInfoFunctor
 #define GLUE_ARGS1(a1) a1
 #define GLUE_ARGS2(a1, a2) a1 a2
 #define GLUE_ARGS3(a1, a2, a3) a1 a2 COMMA a3
-
 #define GLUE_ARGS4(a1,a2,a3,a4) a1 a2 COMMA a3 a4
 #define GLUE_ARGS5(a1,a2,a3,a4,a5) a1 a2 COMMA a3 a4 COMMA a5
 #define GLUE_ARGS6(a1,a2,a3,a4,a5,a6) a1 a2 COMMA a3 a4  COMMA a5 a6
@@ -786,12 +785,17 @@ private:
 	struct Typeinfo_##name {};
 
 
+#ifdef _MSC_VER // MSVC compilers
+#define FUNCTION_NAME() __FUNCTION__
+#else
+#define FUNCTION_NAME() __func__
+
+#endif
 
 template <typename T>
 struct Reflectable 
 {
 	using ContainerType = T;
-
 	static Reflector&	GetReflector()
 	{
 		static Reflector theClassReflector;
@@ -1013,16 +1017,132 @@ constexpr auto has_public_foo(T const& t) -> decltype(t.foo, void(), true) { ret
 constexpr auto has_public_foo(...) { return false; }
 
 
-template<class T>
-struct EvalDelay
+template<typename method_t>
+struct SelfTypeDetector;
+
+template<typename CClass, typename ReturnType, typename ...ArgType>
+struct SelfTypeDetector< ReturnType(CClass::*)(ArgType...)>
 {
-	using type = T;
+	using Self = CClass;
+};
+
+#define DECLARE_REFLECTABLE()\
+	static constexpr char const*	REFLECTABLE_UNIQUE_IDENTIFIER()\
+	{\
+		static char const* uid = FUNCTION_NAME();\
+		return uid;\
+	}\
+	using Self = SelfTypeDetector<decltype(&GetReflectableUniqueIdentifier)>::Self;
+
+
+// inspired by https://stackoverflow.com/a/9154394/1987466
+template<class>
+struct sfinae_true : std::true_type {};
+
+template<class T, class A0>
+static auto test_stream(int)
+->sfinae_true<decltype(std::declval<T>().REFLECTABLE_UNIQUE_IDENTIFIER())>;
+template<class, class A0>
+static auto test_stream(long)->std::false_type;
+
+template<class T, class Arg>
+struct has_stream : decltype(test_stream<T, Arg>(0)){};
+
+// should be singleton
+template <typename T, typename TID = unsigned int>
+struct AutomaticIDIncrementer
+{
+	using IDType = TID;
+	// TODO: constexpr may be useless
+	static AutomaticIDIncrementer& GetInstance()
+	{
+		static AutomaticIDIncrementer instance;
+		return instance;
+	}
+
+	IDType	GetNextID()
+	{
+		return s_CurrentID++;
+	}
+
+private:
+
+	AutomaticIDIncrementer() = default;
+
+	inline static IDType	s_CurrentID = 0;
+};
+
+struct refl
+{
+
+protected:
+	AutomaticIDIncrementer<refl>::IDType ObjectClassID;
 };
 
 
+struct a : refl
+{
+	using Self = a;
+	using Parent = Self;
+	using Super = void;
+	static AutomaticIDIncrementer<refl>::IDType StaticClassID;
+};
+
+struct b : a
+{
+	using Self = b;
+	using Parent = Self;
+	using Super = a;
+
+	//const char* REFLECTABLE_UNIQUE_IDENTIFIER()
+	//{
+	//	return nullptr;
+	//}
+
+	void Roger()
+	{}
+
+	void stream(int) {}
+
+};
+
+#define FIRST_TYPE_0() void
+#define FIRST_TYPE_1(a, ...) a
+#define FIRST_TYPE_2(a, ...) a
+#define FIRST_TYPE_3(a, ...) a
+#define FIRST_TYPE_4(a, ...) a
+
+#define INHERITANCE_LIST_0(...)
+#define INHERITANCE_LIST_1(...) : COMMA_ARGS1(__VA_ARGS__)
+#define INHERITANCE_LIST_2(...) : COMMA_ARGS2(__VA_ARGS__)
+#define INHERITANCE_LIST_3(...) : COMMA_ARGS3(__VA_ARGS__)
+#define INHERITANCE_LIST_4(...) : COMMA_ARGS4(__VA_ARGS__)
+#define INHERITANCE_LIST(...) VA_MACRO(INHERITANCE_LIST_, __VA_ARGS__)
+
+template <typename T>
+struct SuperFinder
+{};
+
+#define reflectable_class(classname, ...) class classname INHERITANCE_LIST(__VA_ARGS__)
+#define reflectable_struct(structname, ...) \
+	struct structname;\
+	template <>\
+	struct SuperFinder<structname>\
+	{\
+		using Super = VA_MACRO(FIRST_TYPE_, __VA_ARGS__);\
+	};\
+	struct structname INHERITANCE_LIST(__VA_ARGS__)
+
+reflectable_struct(c, b)
+{
+	void TypeInfoDetectorFunc() {}
+	using Self = SelfTypeDetector<decltype(&TypeInfoDetectorFunc)>::Self;
+	using Super = SuperFinder<Self>::Super;
+};
+
+
+
 //TODO LIST:
-//- enum fromString/fromEnum
-//- enum with values?
 //- SubclassOf
 //- Create/Clone
 //- class/structure members: du style SetProperty("maStruct.myInt", 1)
@@ -1031,8 +1151,6 @@ struct EvalDelay
 
 class Test : public Reflectable<Test>
 {
-	typedef Test Myself;
-
 	int titi = 4444;
 	int bobo;
 	float arrrr;
@@ -1083,7 +1201,8 @@ int k = __COUNTER__;
 
 int main()
 {
-
+	c::Self zfzfzfz;
+	c::Super efefe;
 	Property<int> test = 0;
 	test = 42;
 	Test tata;
@@ -1153,6 +1272,7 @@ int main()
 	ename = LinearEnum33::FromEnum(linear2.Value);
 	return 0;
 }
+
 
 /**
  * \brief test
