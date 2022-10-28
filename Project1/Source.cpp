@@ -47,7 +47,7 @@ public:
 		Next = pNext;
 	}
 
-	operator T*()
+	operator T* ()
 	{
 		return reinterpret_cast<T*>(this);
 	}
@@ -57,7 +57,7 @@ public:
 		return reinterpret_cast<T const*>(this);
 	}
 
-	IntrusiveListNode*	Next = nullptr;
+	IntrusiveListNode* Next = nullptr;
 };
 
 template <typename T>
@@ -68,86 +68,86 @@ public:
 	class iterator
 	{
 	public:
-		iterator(T* pItNode = nullptr) :
-			myPtr(pItNode)
+		iterator(IntrusiveListNode<T>* pItNode = nullptr) :
+			myNode(pItNode)
 		{}
 
 		iterator& operator ++()
 		{
-			myPtr = (T*)myPtr->Next;
+			myNode = myNode->Next;
 			return *this;
 		}
 
 		iterator operator ++(int)
 		{
-			iterator it(myPtr);
+			iterator it(myNode);
 			this->operator++();
 			return it;
 		}
 
 		operator bool() const
 		{
-			return (myPtr != nullptr);
+			return (myNode != nullptr);
 		}
 
 		bool operator!=(iterator& other) const
 		{
-			return myPtr != other.myPtr;
+			return myNode != other.myNode;
 		}
 
 		T& operator*() const
 		{
-			return *myPtr;
+			return *((T*)myNode);
 		}
 
 	private:
 
-		T* myPtr;
+		IntrusiveListNode<T>* myNode;
 	};
 
 	class const_iterator
 	{
 	public:
-		const_iterator(T const* pItNode = nullptr) :
-			myPtr(pItNode)
+		const_iterator(IntrusiveListNode<T> const* pItNode = nullptr) :
+			myNode(pItNode)
 		{}
 
 		const_iterator& operator ++()
 		{
-			myPtr = myPtr->Next;
+			myNode = myNode->Next;
 			return *this;
 		}
 
 		const_iterator operator ++(int)
 		{
-			const_iterator it(myPtr);
+			const_iterator it(myNode);
 			this->operator++();
 			return it;
 		}
 
 		operator bool() const
 		{
-			return (myPtr != nullptr);
+			return (myNode != nullptr);
 		}
 
 		bool operator!=(const_iterator& other) const
 		{
-			return myPtr != other.myPtr;
+			return myNode != other.myNode;
 		}
 
-		T const* operator*() const
+		T const& operator*() const
 		{
-			return myPtr;
+			return *((T const*)myNode);
 		}
 
 	private:
 
-		T const* myPtr;
+		IntrusiveListNode<T> const* myNode;
 	};
 
 	iterator begin()
 	{
-		return iterator((T*)Head);
+		return iterator(Head);
 	}
 
 	iterator end()
@@ -157,7 +157,7 @@ public:
 
 	const_iterator begin() const
 	{
-		return Head;
+		return const_iterator(Head);
 	}
 
 	const_iterator end() const
@@ -338,7 +338,7 @@ private:
 	inline static IDType theCounter = 0;
 };
 
-
+// TODO: replace all the unsigned by a unified typedef
 struct Reflector3 : Singleton<Reflector3>, AutomaticTypeCounter<Reflector3, unsigned>
 {
 public:
@@ -348,6 +348,16 @@ public:
 	[[nodiscard]] size_t	GetTypeInfoCount() const
 	{
 		return myReflectableTypeInfos.size();
+	}
+
+	ReflectableTypeInfo const* GetTypeInfo(unsigned classID) const
+	{
+		if (classID < myReflectableTypeInfos.size())
+		{
+			return myReflectableTypeInfos[classID];
+		}
+
+		return nullptr;
 	}
 
 
@@ -536,8 +546,8 @@ struct FunctionTypeInfo<Ret(Class::*)(Args...)> : FunctionInfo
 
 #define STRINGIZE(a) #a
 
-// Stolen from https://stackoverflow.com/questions/48710758/how-to-fix-variadic-macro-related-issues-with-macro-overloading-in-msvc-mic
-// It's the approach that works the best for our use case so far.
+ // Stolen from https://stackoverflow.com/questions/48710758/how-to-fix-variadic-macro-related-issues-with-macro-overloading-in-msvc-mic
+ // It's the approach that works the best for our use case so far.
 #define MSVC_BUG(MACRO, ARGS) MACRO ARGS  // name to remind that bug fix is due to MSVC :-)
 
 #define VA_MACRO(MACRO, ...) MSVC_BUG(CONCAT2, (MACRO, NARGS(__VA_ARGS__)))(__VA_ARGS__)
@@ -796,11 +806,6 @@ BITFLAGS_ENUM(BitEnum, int, un, deux, quatre, seize);
 
 TYPED_ENUM(TestEnum, int, un, deux);
 
-enum test : int
-{
-	test = 1 >0? 0 : 1,
-};
-
 
 template <typename Class, typename Ret, typename... Args >
 struct FunctionTypeInfo2
@@ -826,7 +831,7 @@ struct TypeInfo
 	using MeType = TypeInfo;
 
 	TypeInfo(const char* pName, Type pType, std::ptrdiff_t pOffset) :
-		 name(pName), type(pType), offset(pOffset)
+		name(pName), type(pType), offset(pOffset)
 	{}
 
 	std::string		name;
@@ -849,7 +854,7 @@ public:
 
 	void test(int)
 	{
-		
+
 	}
 
 	std::vector<TypeInfo>	Properties;
@@ -866,7 +871,7 @@ public:
 		myValue(std::forward<T>(defaultValue))
 	{}
 
-	operator T&()
+	operator T& ()
 	{
 		return myValue;
 	}
@@ -885,9 +890,17 @@ private:
 #define PROPERTY(type, name, value) \
 	struct Typeinfo_##name {};
 
+// This trick was inspired by https://stackoverflow.com/a/4938266/1987466
 #define DECLARE_PROPERTY(type, name, value) \
+	typedef struct name##_tag\
+	{ \
+		static ptrdiff_t Offset()\
+		{ \
+			return offsetof(Self, name); \
+		} \
+    }; \
 	type name = value;\
-	inline static ReflectProperty3<type> name_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, offsetof(Self, name)};
+	inline static ReflectProperty3<Self> name_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, name##_tag::Offset() };
 
 #ifdef _MSC_VER // MSVC compilers
 #define FUNCTION_NAME() __FUNCTION__
@@ -897,10 +910,10 @@ private:
 #endif
 
 template <typename T>
-struct Reflectable 
+struct Reflectable
 {
 	using ContainerType = T;
-	static Reflector&	GetReflector()
+	static Reflector& GetReflector()
 	{
 		static Reflector theClassReflector;
 		return theClassReflector;
@@ -926,7 +939,7 @@ struct Reflectable
 	}
 
 	template <typename U>
-	U const&	GetProperty(std::string_view pName) const
+	U const& GetProperty(std::string_view pName) const
 	{
 		Reflector& refl = T::GetReflector();
 		for (auto const& prop : refl.Properties)
@@ -971,7 +984,7 @@ struct Reflectable
 		// throw exception
 	}
 
-	FunctionInfo const*	GetFunction(std::string_view pMemberFuncName)
+	FunctionInfo const* GetFunction(std::string_view pMemberFuncName)
 	{
 		ReflectableTypeInfo& refl = T::GetReflector2();
 		for (FunctionInfo const& funcInfo : refl.MemberFunctions)
@@ -988,7 +1001,7 @@ struct Reflectable
 
 	template <typename Ret, typename... Args>
 	Ret
-	CallFunction(std::string_view pMemberFuncName, Args&&... args)
+		CallFunction(std::string_view pMemberFuncName, Args&&... args)
 	{
 		ReflectableTypeInfo& refl = T::GetReflector2();
 		for (FunctionInfo const& funcInfo : refl.MemberFunctions)
@@ -1035,7 +1048,6 @@ struct ReflectProperty3 : TypeInfo2
 	ReflectProperty3(const char* pName, Type pType, std::ptrdiff_t pOffset) :
 		TypeInfo2(pName, pType, pOffset)
 	{
-		typename T::EditClassReflectableTypeInfo_Attorney typeInfoEditer;
 		ReflectableTypeInfo& typeInfo = T::EditClassReflectableTypeInfo();
 		typeInfo.PushTypeInfo(*this);
 	}
@@ -1088,7 +1100,7 @@ template <typename Ty>
 struct FunctionTypeDecomposer2; /* not defined */
 
 template <typename Ret, typename Class, typename... Args>
-struct FunctionTypeDecomposer2<Ret (Class ::*)(Args...)> :  MethodRetArgs<Ret, Args...>
+struct FunctionTypeDecomposer2<Ret(Class ::*)(Args...)> : MethodRetArgs<Ret, Args...>
 {
 	using ReturnType = Ret;
 	using ContainerPtr = Class;
@@ -1179,6 +1191,16 @@ struct Reflectable2
 		return myReflectableClassID;
 	}
 
+	IntrusiveLinkedList<TypeInfo2> const& GetProperties() const
+	{
+		return Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID)->Properties;
+	}
+
+	IntrusiveLinkedList<FunctionInfo> const& GetMemberFunctions() const
+	{
+		return Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID)->MemberFunctions;
+	}
+
 protected:
 	void	SetReflectableClassID(ClassID newClassID)
 	{
@@ -1196,12 +1218,13 @@ private:
 template <typename T>
 struct ReflectableClassIDSetter
 {
-	//TODO: remove, doesn't compile
-	ReflectableClassIDSetter(T* pThisObject)
+	ReflectableClassIDSetter()
 	{
 		static_assert(std::is_base_of_v<Reflectable2, T>, "This class is only supposed to be used as a member variable of a Reflectable-derived class.");
+
+		Reflectable2* thisReflectable = reinterpret_cast<Reflectable2*>(this);
 		Reflectable2::SetReflectableClassID_Attorney setterAttorney;
-		setterAttorney.SetReflectableClassID(*pThisObject, T::theTypeInfo.ReflectableID);
+		setterAttorney.SetReflectableClassID(*thisReflectable, T::theTypeInfo.ReflectableID);
 	}
 };
 
@@ -1244,10 +1267,10 @@ struct b : a
 	using Parent = Self;
 	using Super = a;
 
-	
+
 	static char const* REFLECTABLE_UNIQUE_IDENTIFIER()
 	{
-		static char const* uid = FUNCTION_NAME(); 
+		static char const* uid = FUNCTION_NAME();
 		return uid;
 	}
 	struct _self_type_tag {};
@@ -1269,17 +1292,17 @@ struct b : a
 b::Self gloB;
 
 
-#define FIRST_TYPE_0() void
+#define FIRST_TYPE_0() Reflectable2
 #define FIRST_TYPE_1(a, ...) a
 #define FIRST_TYPE_2(a, ...) a
 #define FIRST_TYPE_3(a, ...) a
 #define FIRST_TYPE_4(a, ...) a
 
-#define INHERITANCE_LIST_0(...)
-#define INHERITANCE_LIST_1(...) : COMMA_ARGS1(__VA_ARGS__)
-#define INHERITANCE_LIST_2(...) : COMMA_ARGS2(__VA_ARGS__)
-#define INHERITANCE_LIST_3(...) : COMMA_ARGS3(__VA_ARGS__)
-#define INHERITANCE_LIST_4(...) : COMMA_ARGS4(__VA_ARGS__)
+#define INHERITANCE_LIST_1(declaredTypeName, ...) : Reflectable2 COMMA private ReflectableClassIDSetter<declaredTypeName>
+#define INHERITANCE_LIST_2(declaredTypeName, ...) : COMMA_ARGS1(__VA_ARGS__)
+#define INHERITANCE_LIST_3(declaredTypeName, ...) : COMMA_ARGS2(__VA_ARGS__)
+#define INHERITANCE_LIST_4(declaredTypeName, ...) : COMMA_ARGS3(__VA_ARGS__)
+#define INHERITANCE_LIST_5(declaredTypeName, ...) : COMMA_ARGS4(__VA_ARGS__)
 #define INHERITANCE_LIST(...) VA_MACRO(INHERITANCE_LIST_, __VA_ARGS__)
 
 template <typename T>
@@ -1295,8 +1318,7 @@ struct TypeInfoHelper
 		using Super = VA_MACRO(FIRST_TYPE_, __VA_ARGS__);\
 		inline static char const* TypeName = STRINGIZE(structname);\
 	};\
-	using ReflectableTypeInfoHelper = TypeInfoHelper<structname>;\
-	struct structname INHERITANCE_LIST(__VA_ARGS__)
+	struct structname INHERITANCE_LIST(structname, __VA_ARGS__)
 
 
 #define DECLARE_REFLECTABLE_INFO() \
@@ -1312,8 +1334,9 @@ struct TypeInfoHelper
 	static ReflectableTypeInfo&	EditClassReflectableTypeInfo()\
 	{\
 		return theTypeInfo;\
-	}\
-	ReflectableClassIDSetter<Self> myReflectableClassIDSetter{this};\
+	}
+
+
 
 
 reflectable_struct(c, Reflectable2)
@@ -1403,11 +1426,11 @@ int main()
 	auto const& myTiti2 = tata.GetProperty2<int>("titi");
 	tata.SetProperty<int>("titi", 42);
 	tata.SetProperty2<int>("titi", 1337);
-	 
-	int nbArgs = NARGS(1,2,3,4,5,6,7,8,9);
-	int nbArgs2 = NARGS(1,2);
+
+	int nbArgs = NARGS(1, 2, 3, 4, 5, 6, 7, 8, 9);
+	int nbArgs2 = NARGS(1, 2);
 	int nbArgs3 = NARGS();
-	EXTRACT_ODD_ARGUMENTS(int rrrr=42, prout,pppp=1111);
+	EXTRACT_ODD_ARGUMENTS(int rrrr = 42, prout, pppp = 1111);
 	// NARGS
 	printf("%d\n", NARGS());          // Prints 0
 	printf("%d\n", NARGS(1));         // Prints 1
@@ -1435,7 +1458,7 @@ int main()
 
 	BitEnum be = BitEnum::seize;
 
-	const char* seize = be.FromEnum((BitEnum::Type) 2);
+	const char* seize = be.FromEnum((BitEnum::Type)2);
 	auto isset = be.IsSet(BitEnum::un);
 	be.Set(BitEnum::seize);
 	isset = be.IsSet(BitEnum::un) && be.IsSet(BitEnum::seize) && !be.IsSet(BitEnum::deux);
@@ -1454,6 +1477,13 @@ int main()
 	ename = LinearEnum33::FromEnum(linear2.Value);
 
 	Reflector3& aaaaaaaaaa = Reflector3::EditSingleton();
+
+	c pouet;
+	for (auto it = c::GetClassReflectableTypeInfo().Properties.begin(); it; ++it)
+	{
+		printf("name: %s, type: %d, offset: %lu", (*it).name.c_str(), (*it).type, (*it).offset);
+	}
+
 	return 0;
 
 }
@@ -1461,8 +1491,8 @@ int main()
 
 /**
  * \brief test
- * \param tata 
- * \return 
+ * \param tata
+ * \return
  */
 int Test::tititest(int tata)
 {
