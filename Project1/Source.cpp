@@ -4,6 +4,8 @@
 #include <string>
 #include <string_view>
 
+class ReflectableTypeInfo;
+
 enum class Type
 {
 	Int,
@@ -211,17 +213,27 @@ struct is_const_method< ReturnType(CClass::*)(ArgType...) const> {
 	using ClassType = std::add_const_t<CClass>;
 };
 
+template<typename method_t>
+struct SelfTypeDetector;
 
+template<typename CClass, typename ReturnType, typename ...ArgType>
+struct SelfTypeDetector< ReturnType(CClass::*)(ArgType...)>
+{
+	using Self = CClass;
+};
+
+// Note: this macro does not support templates.
 #define DECLARE_ATTORNEY(MemberFunc) \
-	struct Attorney\
+	using ClientType = SelfTypeDetector<decltype(&MemberFunc)>::Self;\
+	struct CONCAT(MemberFunc, _Attorney)\
 	{\
 		template <typename... Args>\
-		auto MemberFunc(is_const_method<decltype(&Myself::MemberFunc)>::ClassType& pClient, Args&&... pArgs)\
+		auto MemberFunc(is_const_method<decltype(&ClientType::MemberFunc)>::ClassType& pClient, Args&&... pArgs)\
 		{\
 			return pClient.MemberFunc(std::forward<Args>(pArgs)...);\
 		}\
 	};\
-	friend Attorney;
+	friend CONCAT(MemberFunc, _Attorney);
 
 
 
@@ -267,28 +279,121 @@ protected:
 
 };
 
-class Reflector2
+
+
+template <class T>
+class Singleton
 {
 public:
-	Reflector2()
+
+	static T& EditSingleton()
 	{
-		printf("reflector initialized\n");
+		static T theSingleton; // Thread-safe since C++11!
+		return theSingleton;
+	}
+
+	static T const& GetSingleton()
+	{
+		return EditSingleton();
+	}
+
+	template <typename... Args>
+	T& ReinitializeSingleton(Args&&... pCtorParams)
+	{
+		EditSingleton() = T(std::forward<Args>(pCtorParams)...);
+		return EditSingleton();
+	}
+
+protected:
+	Singleton() = default;
+	~Singleton() = default;
+
+private:
+
+	Singleton(Singleton const&) = delete;   // Copy construct
+	Singleton(Singleton&&) = delete;   // Move construct
+	Singleton& operator=(Singleton const&) = delete;   // Copy assign
+	Singleton& operator=(Singleton&&) = delete;   // Move assign
+
+};
+
+
+template <typename T, typename IDType = int>
+class AutomaticTypeCounter
+{
+public:
+	AutomaticTypeCounter() = default;
+
+	static IDType	TakeNextID()
+	{
+		return theCounter++;
+	}
+
+	static IDType	PeekNextID()
+	{
+		return theCounter;
+	}
+
+private:
+	inline static IDType theCounter = 0;
+};
+
+
+struct Reflector3 : Singleton<Reflector3>, AutomaticTypeCounter<Reflector3, unsigned>
+{
+public:
+
+	Reflector3() = default;
+
+	[[nodiscard]] size_t	GetTypeInfoCount() const
+	{
+		return myReflectableTypeInfos.size();
+	}
+
+
+private:
+
+	friend ReflectableTypeInfo;
+
+	[[nodiscard]] unsigned	RegisterTypeInfo(ReflectableTypeInfo* pTypeInfo)
+	{
+		myReflectableTypeInfos.push_back(pTypeInfo);
+		return GetTypeInfoCount() - 1;
+	}
+
+	std::vector<ReflectableTypeInfo*>	myReflectableTypeInfos;
+};
+
+class ReflectableTypeInfo
+{
+public:
+
+	ReflectableTypeInfo() = default; // TODO: remove
+
+	ReflectableTypeInfo(char const* pTypename) :
+		Typename(pTypename)
+	{
+		ReflectableID = Reflector3::EditSingleton().RegisterTypeInfo(this);
 	}
 
 	void	PushTypeInfo(TypeInfo2& pNewTypeInfo)
 	{
-		Properties2.PushFrontNewNode(pNewTypeInfo);
+		Properties.PushFrontNewNode(pNewTypeInfo);
 	}
 
 	void	PushFrontFunctionInfo(FunctionInfo& pNewFunctionInfo)
 	{
-		Methods.PushFrontNewNode(pNewFunctionInfo);
+		MemberFunctions.PushFrontNewNode(pNewFunctionInfo);
 	}
 
-	IntrusiveLinkedList<TypeInfo2>		Properties2;
-	IntrusiveLinkedList<FunctionInfo>	Methods;
+	unsigned							ReflectableID;
+	std::string_view					Typename;
+	IntrusiveLinkedList<TypeInfo2>		Properties;
+	IntrusiveLinkedList<FunctionInfo>	MemberFunctions;
 
 };
+
+
 
 template <typename Ty >
 struct FunctionTypeInfo; // not defined
@@ -321,7 +426,7 @@ struct FunctionTypeInfo<Ret(Class::*)(Args...)> : FunctionInfo
 			AddParameters<Args...>();
 		}
 
-		Reflector2& theClassReflector = Class::GetReflector2();
+		ReflectableTypeInfo& theClassReflector = Class::GetReflector2();
 		theClassReflector.PushFrontFunctionInfo(*this);
 		//memberFunc;
 	}
@@ -345,11 +450,6 @@ struct FunctionTypeInfo<Ret(Class::*)(Args...)> : FunctionInfo
 };
 
 
-template <typename R, typename... Args>
-class TypeInfoFunctor
-{
-	
-};
 
 /* Stolen from https://stackoverflow.com/a/26685339/1987466 */
 /*
@@ -701,6 +801,7 @@ enum test : int
 	test = 1 >0? 0 : 1,
 };
 
+
 template <typename Class, typename Ret, typename... Args >
 struct FunctionTypeInfo2
 {
@@ -708,7 +809,7 @@ struct FunctionTypeInfo2
 
 	FunctionTypeInfo2(Ret(Class::* memberFnAddress)(Args...))
 	{
-		Reflector2& theClassReflector = Class::GetReflector2();
+		ReflectableTypeInfo& theClassReflector = Class::GetReflector2();
 		memberFnAddress;
 	}
 
@@ -784,6 +885,9 @@ private:
 #define PROPERTY(type, name, value) \
 	struct Typeinfo_##name {};
 
+#define DECLARE_PROPERTY(type, name, value) \
+	type name = value;\
+	inline static ReflectProperty3<type> name_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, offsetof(Self, name)};
 
 #ifdef _MSC_VER // MSVC compilers
 #define FUNCTION_NAME() __FUNCTION__
@@ -802,17 +906,17 @@ struct Reflectable
 		return theClassReflector;
 	}
 
-	static Reflector2& GetReflector2()
+	static ReflectableTypeInfo& GetReflector2()
 	{
-		static Reflector2 theClassReflector;
+		static ReflectableTypeInfo theClassReflector;
 		return theClassReflector;
 	}
 
 	template <typename U>
 	U const& GetProperty2(std::string_view pName) const
 	{
-		Reflector2& refl = T::GetReflector2();
-		for (TypeInfo2 const& prop : refl.Properties2)
+		ReflectableTypeInfo& refl = T::GetReflector2();
+		for (TypeInfo2 const& prop : refl.Properties)
 		{
 			if (prop.name == pName)
 				return *reinterpret_cast<U const*>(this + prop.offset);
@@ -854,8 +958,8 @@ struct Reflectable
 	template <typename U>
 	void SetProperty2(std::string_view pName, U&& pSetValue)
 	{
-		Reflector2& refl = T::GetReflector2();
-		for (TypeInfo2 const& prop : refl.Properties2)
+		ReflectableTypeInfo& refl = T::GetReflector2();
+		for (TypeInfo2 const& prop : refl.Properties)
 		{
 			if (prop.name == pName)
 			{
@@ -869,8 +973,8 @@ struct Reflectable
 
 	FunctionInfo const*	GetFunction(std::string_view pMemberFuncName)
 	{
-		Reflector2& refl = T::GetReflector2();
-		for (FunctionInfo const& funcInfo : refl.Methods)
+		ReflectableTypeInfo& refl = T::GetReflector2();
+		for (FunctionInfo const& funcInfo : refl.MemberFunctions)
 		{
 			if (funcInfo.name == pMemberFuncName)
 			{
@@ -886,8 +990,8 @@ struct Reflectable
 	Ret
 	CallFunction(std::string_view pMemberFuncName, Args&&... args)
 	{
-		Reflector2& refl = T::GetReflector2();
-		for (FunctionInfo const& funcInfo : refl.Methods)
+		ReflectableTypeInfo& refl = T::GetReflector2();
+		for (FunctionInfo const& funcInfo : refl.MemberFunctions)
 		{
 			if (funcInfo.name == pMemberFuncName)
 			{
@@ -920,11 +1024,22 @@ struct ReflectProperty2 : TypeInfo2
 	ReflectProperty2(const char* pName, Type pType, std::ptrdiff_t pOffset) :
 		TypeInfo2(pName, pType, pOffset)
 	{
-		Reflector2& reflector = T::GetReflector2();
+		ReflectableTypeInfo& reflector = T::GetReflector2();
 		reflector.PushTypeInfo(*this);
 	}
 };
 
+template <typename T>
+struct ReflectProperty3 : TypeInfo2
+{
+	ReflectProperty3(const char* pName, Type pType, std::ptrdiff_t pOffset) :
+		TypeInfo2(pName, pType, pOffset)
+	{
+		typename T::EditClassReflectableTypeInfo_Attorney typeInfoEditer;
+		ReflectableTypeInfo& typeInfo = T::EditClassReflectableTypeInfo();
+		typeInfo.PushTypeInfo(*this);
+	}
+};
 
 //
 //template <class Ty>
@@ -1017,23 +1132,6 @@ constexpr auto has_public_foo(T const& t) -> decltype(t.foo, void(), true) { ret
 constexpr auto has_public_foo(...) { return false; }
 
 
-template<typename method_t>
-struct SelfTypeDetector;
-
-template<typename CClass, typename ReturnType, typename ...ArgType>
-struct SelfTypeDetector< ReturnType(CClass::*)(ArgType...)>
-{
-	using Self = CClass;
-};
-
-#define DECLARE_REFLECTABLE()\
-	static constexpr char const*	REFLECTABLE_UNIQUE_IDENTIFIER()\
-	{\
-		static char const* uid = FUNCTION_NAME();\
-		return uid;\
-	}\
-	using Self = SelfTypeDetector<decltype(&GetReflectableUniqueIdentifier)>::Self;
-
 
 // inspired by https://stackoverflow.com/a/9154394/1987466
 template<class>
@@ -1072,27 +1170,89 @@ private:
 	inline static IDType	s_CurrentID = 0;
 };
 
-struct refl
+struct Reflectable2
 {
+	using ClassID = unsigned;
+
+	ClassID	GetReflectableClassID() const
+	{
+		return myReflectableClassID;
+	}
 
 protected:
-	AutomaticIDIncrementer<refl>::IDType ObjectClassID;
+	void	SetReflectableClassID(ClassID newClassID)
+	{
+		myReflectableClassID = newClassID;
+	}
+
+public:
+
+	DECLARE_ATTORNEY(SetReflectableClassID);
+
+private:
+	ClassID	myReflectableClassID{};
+};
+
+template <typename T>
+struct ReflectableClassIDSetter
+{
+	//TODO: remove, doesn't compile
+	ReflectableClassIDSetter(T* pThisObject)
+	{
+		static_assert(std::is_base_of_v<Reflectable2, T>, "This class is only supposed to be used as a member variable of a Reflectable-derived class.");
+		Reflectable2::SetReflectableClassID_Attorney setterAttorney;
+		setterAttorney.SetReflectableClassID(*pThisObject, T::theTypeInfo.ReflectableID);
+	}
 };
 
 
-struct a : refl
+// This was inspired by https://stackoverflow.com/a/70701479/1987466 and https://gcc.godbolt.org/z/rrb1jdTrK
+namespace SelfType
+{
+	template <typename T>
+	struct Reader
+	{
+		friend auto adl_GetSelfType(Reader<T>);
+	};
+
+	template <typename T, typename U>
+	struct Writer
+	{
+		friend auto adl_GetSelfType(Reader<T>) { return U{}; }
+	};
+
+	inline void adl_GetSelfType() {}
+
+	template <typename T>
+	using Read = std::remove_pointer_t<decltype(adl_GetSelfType(Reader<T>{})) > ;
+}
+
+struct a : Reflectable<a>
 {
 	using Self = a;
 	using Parent = Self;
 	using Super = void;
-	static AutomaticIDIncrementer<refl>::IDType StaticClassID;
+
+	int test()
+	{
+		return 42;
+	}
 };
 
 struct b : a
 {
-	using Self = b;
 	using Parent = Self;
 	using Super = a;
+
+	
+	static char const* REFLECTABLE_UNIQUE_IDENTIFIER()
+	{
+		static char const* uid = FUNCTION_NAME(); 
+		return uid;
+	}
+	struct _self_type_tag {};
+	constexpr auto _self_type_helper() -> decltype(::SelfType::Writer<_self_type_tag, decltype(this)>{});
+	using Self = ::SelfType::Read<_self_type_tag>;
 
 	//const char* REFLECTABLE_UNIQUE_IDENTIFIER()
 	//{
@@ -1105,6 +1265,9 @@ struct b : a
 	void stream(int) {}
 
 };
+
+b::Self gloB;
+
 
 #define FIRST_TYPE_0() void
 #define FIRST_TYPE_1(a, ...) a
@@ -1120,26 +1283,45 @@ struct b : a
 #define INHERITANCE_LIST(...) VA_MACRO(INHERITANCE_LIST_, __VA_ARGS__)
 
 template <typename T>
-struct SuperFinder
+struct TypeInfoHelper
 {};
 
 #define reflectable_class(classname, ...) class classname INHERITANCE_LIST(__VA_ARGS__)
 #define reflectable_struct(structname, ...) \
 	struct structname;\
 	template <>\
-	struct SuperFinder<structname>\
+	struct TypeInfoHelper<structname>\
 	{\
 		using Super = VA_MACRO(FIRST_TYPE_, __VA_ARGS__);\
+		inline static char const* TypeName = STRINGIZE(structname);\
 	};\
+	using ReflectableTypeInfoHelper = TypeInfoHelper<structname>;\
 	struct structname INHERITANCE_LIST(__VA_ARGS__)
 
-reflectable_struct(c, b)
-{
-	void TypeInfoDetectorFunc() {}
-	using Self = SelfTypeDetector<decltype(&TypeInfoDetectorFunc)>::Self;
-	using Super = SuperFinder<Self>::Super;
-};
 
+#define DECLARE_REFLECTABLE_INFO() \
+	struct _self_type_tag {}; \
+    constexpr auto _self_type_helper() -> decltype(::SelfType::Writer<_self_type_tag, decltype(this)>{}); \
+    using Self = ::SelfType::Read<_self_type_tag>;\
+	using Super = TypeInfoHelper<Self>::Super;\
+	inline static ReflectableTypeInfo theTypeInfo{TypeInfoHelper<Self>::TypeName};\
+	static ReflectableTypeInfo const&	GetClassReflectableTypeInfo()\
+	{\
+		return theTypeInfo;\
+	}\
+	static ReflectableTypeInfo&	EditClassReflectableTypeInfo()\
+	{\
+		return theTypeInfo;\
+	}\
+	ReflectableClassIDSetter<Self> myReflectableClassIDSetter{this};\
+
+
+reflectable_struct(c, Reflectable2)
+{
+	DECLARE_REFLECTABLE_INFO()
+
+	DECLARE_PROPERTY(int, toto, 0)
+};
 
 
 //TODO LIST:
@@ -1270,7 +1452,10 @@ int main()
 	ename = LinearEnum33::FromEnum(linear2.Value);
 	linear2 = LinearEnum33::un;
 	ename = LinearEnum33::FromEnum(linear2.Value);
+
+	Reflector3& aaaaaaaaaa = Reflector3::EditSingleton();
 	return 0;
+
 }
 
 
