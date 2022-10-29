@@ -361,7 +361,7 @@ public:
 		return myReflectableTypeInfos.size();
 	}
 
-	ReflectableTypeInfo const* GetTypeInfo(unsigned classID) const
+	[[nodiscard]] ReflectableTypeInfo const* GetTypeInfo(unsigned classID) const
 	{
 		if (classID < myReflectableTypeInfos.size())
 		{
@@ -371,6 +371,15 @@ public:
 		return nullptr;
 	}
 
+	[[nodiscard]] ReflectableTypeInfo* EditTypeInfo(unsigned classID)
+	{
+		if (classID < myReflectableTypeInfos.size())
+		{
+			return myReflectableTypeInfos[classID];
+		}
+
+		return nullptr;
+	}
 
 private:
 
@@ -407,14 +416,75 @@ public:
 		MemberFunctions.PushFrontNewNode(pNewFunctionInfo);
 	}
 
+	void	AddParentClass(ReflectableTypeInfo* pParent)
+	{
+		ParentClasses.push_back(pParent);
+	}
+
+	void	AddChildClass(ReflectableTypeInfo* pChild)
+	{
+		ChildrenClasses.push_back(pChild);
+	}
+
+	[[nodiscard]] bool	IsParentOf(unsigned pChildClassID) const
+	{
+		return (std::find_if(ChildrenClasses.begin(), ChildrenClasses.end(),
+			[pChildClassID](ReflectableTypeInfo* pChildTypeInfo)
+			{
+				return pChildTypeInfo->ReflectableID == pChildClassID;
+			}) != ChildrenClasses.end());
+	}
+
+	[[nodiscard]] virtual std::any	InvokeConstructor(std::any const& pCtorParams) const = 0;
+
 	unsigned							ReflectableID;
 	std::string_view					Typename;
 	IntrusiveLinkedList<TypeInfo2>		Properties;
 	IntrusiveLinkedList<FunctionInfo>	MemberFunctions;
-
+	std::vector<ReflectableTypeInfo*>	ParentClasses;
+	std::vector<ReflectableTypeInfo*>	ChildrenClasses;
 };
 
+template <typename T>
+struct TypedReflectableTypeInfo;
 
+template <typename T>
+struct TypeInfoHelper
+{};
+
+struct Reflectable2;
+
+template <typename T, typename Parent>
+void RecursiveRegisterParentClasses(TypedReflectableTypeInfo<T>& pRegisteringClass)
+{
+	if constexpr (!std::is_same_v<Parent, Reflectable2>)
+	{
+		ReflectableTypeInfo& parentTypeInfo = Parent::EditClassReflectableTypeInfo();
+		parentTypeInfo.AddChildClass(&pRegisteringClass);
+		pRegisteringClass.AddParentClass(&parentTypeInfo);
+		RecursiveRegisterParentClasses<T, Parent::Super>(pRegisteringClass);
+	}
+}
+
+template <typename T>
+struct TypedReflectableTypeInfo : ReflectableTypeInfo
+{
+public:
+	TypedReflectableTypeInfo(char const* pTypename) :
+		ReflectableTypeInfo(pTypename)
+	{
+		RecursiveRegisterParentClasses <T, typename T::Super>(*this);
+	}
+
+	std::any	InvokeConstructor(std::any const& pCtorParams) const override
+	{
+		return { };
+		//using ArgumentPackTuple = std::tuple<Args...>;
+		//std::any packedArgs(std::in_place_type<ArgumentPackTuple>, std::forward_as_tuple(pFuncArgs...));
+		//std::any result = Invoke(pCallerObject, packedArgs);
+		//return result;
+	}
+};
 
 template <typename Ty >
 struct FunctionTypeInfo; // not defined
@@ -1411,9 +1481,6 @@ struct ReflectableClassIDSetter2 final
 #define FORWARD_INERHITANCE_LIST4(a1, a2, a3, a4) a1 COMMA a2 COMMA a3 COMMA a4
 #define FORWARD_INERHITANCE_LIST5(a1, a2, a3, a4, a5) a1 COMMA a2 COMMA a3 COMMA a5
 
-template <typename T>
-struct TypeInfoHelper
-{};
 
 #define reflectable_class(classname, ...) class classname INHERITANCE_LIST(__VA_ARGS__)
 #define reflectable_struct(structname, ...) \
@@ -1431,7 +1498,7 @@ struct TypeInfoHelper
     constexpr auto _self_type_helper() -> decltype(::SelfType::Writer<_self_type_tag, decltype(this)>{}); \
     using Self = ::SelfType::Read<_self_type_tag>;\
 	using Super = TypeInfoHelper<Self>::Super;\
-	inline static ReflectableTypeInfo theTypeInfo{TypeInfoHelper<Self>::TypeName};\
+	inline static TypedReflectableTypeInfo<Self> theTypeInfo{TypeInfoHelper<Self>::TypeName};\
 	static ReflectableTypeInfo const&	GetClassReflectableTypeInfo()\
 	{\
 		return theTypeInfo;\
@@ -1516,6 +1583,45 @@ reflectable_struct(c,yolo)
 
 };
 
+template <typename T>
+struct Subclass
+{
+	Subclass() = default;
+
+	[[nodiscard]] bool	IsValid() const
+	{
+		ReflectableTypeInfo const& parentTypeInfo = T::GetReflectableTypeInfo();
+		return (parentTypeInfo.IsParentOf(SubClassID));
+	}
+
+	void	SetClass(unsigned pNewID)
+	{
+		SubClassID = pNewID;
+	}
+
+	unsigned	GetClassID() const
+	{
+		return SubClassID;
+	}
+
+	template <typename... Args>
+	[[nodiscard]] T*	Instantiate(Args&&... pCtorArgs)
+	{
+		if (!IsValid())
+		{
+			return nullptr;
+		}
+
+		auto const* targetTypeInfo = Reflector3::EditSingleton().GetTypeInfo(SubClassID);
+		ReflectableTypeInfo const& parentTypeInfo = T::GetReflectableTypeInfo();
+
+
+	}
+
+private:
+
+	unsigned	SubClassID{};
+};
 
 //TODO LIST:
 //- SubclassOf
@@ -1557,6 +1663,9 @@ int k = __COUNTER__;
 
 int main()
 {
+	auto& info = a::GetClassReflectableTypeInfo();
+	auto& info2 = yolo::GetClassReflectableTypeInfo();
+	auto& info3 = c::GetClassReflectableTypeInfo();
 	Property<int> test = 0;
 	test = 42;
 	Test tata;
