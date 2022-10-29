@@ -1,5 +1,7 @@
 
 #include <any>
+#include <cassert>
+#include <stdexcept>
 #include <vector>
 #include <string>
 #include <string_view>
@@ -8,6 +10,7 @@ class ReflectableTypeInfo;
 
 enum class Type
 {
+	Void,
 	Int,
 	Float,
 	Bool,
@@ -32,6 +35,7 @@ struct FromActualTypeToEnumType;
 		static const Type EnumType = TheEnumType; \
 	};
 
+DECLARE_TYPE_TRANSLATOR(Type::Void, void)
 DECLARE_TYPE_TRANSLATOR(Type::Int, int)
 DECLARE_TYPE_TRANSLATOR(Type::Float, float)
 DECLARE_TYPE_TRANSLATOR(Type::Bool, bool)
@@ -247,19 +251,26 @@ struct FunctionInfo : IntrusiveListNode<FunctionInfo>, IFunctionTypeInfo
 	// Not using perfect forwarding here because std::any cannot hold references: https://stackoverflow.com/questions/70239155/how-to-cast-stdtuple-to-stdany
 	// Sad but true, gotta move forward with our lives.
 	template <typename... Args>
-	std::any	InvokeFunc(void* pCallerObject, Args... pFuncArgs) const
+	std::any	InvokeWithArgs(void* pCallerObject, Args... pFuncArgs) const
 	{
 		using ArgumentPackTuple = std::tuple<Args...>;
-		std::any packedArgs;
-		packedArgs.emplace<ArgumentPackTuple>(std::forward_as_tuple(pFuncArgs...));
+		std::any packedArgs(std::in_place_type<ArgumentPackTuple>, std::forward_as_tuple(pFuncArgs...));
 		std::any result = Invoke(pCallerObject, packedArgs);
 		return result;
 	}
 	template <typename Ret, typename... Args>
-	Ret	TInvokeFunc(void* pCallerObject, Args... pFuncArgs) const
+	Ret	TypedInvokeWithArgs(void* pCallerObject, Args... pFuncArgs) const
 	{
-		std::any result = InvokeFunc(pCallerObject, pFuncArgs...);
-		return std::any_cast<Ret>(result);
+		if constexpr (std::is_void_v<Ret>)
+		{
+			InvokeWithArgs(pCallerObject, pFuncArgs...);
+			return;
+		}
+		else
+		{
+			std::any result = InvokeWithArgs(pCallerObject, pFuncArgs...);
+			return std::any_cast<Ret>(result);
+		}
 	}
 
 
@@ -408,10 +419,24 @@ public:
 template <typename Ty >
 struct FunctionTypeInfo; // not defined
 
+// TODO: figure out the proper constructor/operator rain dance
 template <typename Class, typename Ret, typename ... Args >
 struct FunctionTypeInfo<Ret(Class::*)(Args...)> : FunctionInfo
 {
 	using MemberFunctionSignature = Ret(Class::*)(Args...);
+
+	FunctionTypeInfo(MemberFunctionSignature memberFunc, const char* methodName) :
+		FunctionInfo(methodName, FromActualTypeToEnumType<Ret>::EnumType),
+		myMemberFunctionPtr(memberFunc)
+	{
+		if constexpr (sizeof...(Args) > 0)
+		{
+			AddParameters<Args...>();
+		}
+
+		ReflectableTypeInfo& theClassReflector = Class::EditClassReflectableTypeInfo();
+		theClassReflector.PushFrontFunctionInfo(*this);
+	}
 
 	template <typename Last>
 	void	AddParameters()
@@ -426,34 +451,31 @@ struct FunctionTypeInfo<Ret(Class::*)(Args...)> : FunctionInfo
 		AddParameters<Second, Rest...>();
 	}
 
-
-	FunctionTypeInfo(MemberFunctionSignature memberFunc, const char* methodName) :
-		FunctionInfo(methodName, FromActualTypeToEnumType<Ret>::EnumType),
-		myMemberFunctionPtr(memberFunc)
-	{
-		if constexpr (sizeof...(Args) > 0)
-		{
-			AddParameters<Args...>();
-		}
-
-		ReflectableTypeInfo& theClassReflector = Class::GetReflector2();
-		theClassReflector.PushFrontFunctionInfo(*this);
-		//memberFunc;
-	}
-
 	// The idea of using std::apply has been stolen from here : https://stackoverflow.com/a/36656413/1987466
 	std::any	Invoke(void* pObject, std::any const& pInvokeParams) const override
 	{
 		using ArgumentsTuple = std::tuple<Args...>;
 		ArgumentsTuple const* argPack = std::any_cast<ArgumentsTuple>(&pInvokeParams);
+		if (argPack == nullptr)
+		{
+			return {}; // what we have been sent is actually not a tuple of the expected argument types...
+		}
 
-		auto f = [this, pObject](Args... pMemFunArgs)
+		auto f = [this, pObject](Args... pMemFunArgs) -> Ret
 		{
 			Class* theActualObject = static_cast<Class*>(pObject);
 			return (theActualObject->*myMemberFunctionPtr)(pMemFunArgs...);
 		};
-		std::any result = std::apply(f, *argPack);
-		return result;
+		if constexpr (std::is_void_v<Ret>)
+		{
+			std::apply(f, *argPack);
+			return {};
+		}
+		else
+		{
+			std::any result = std::apply(f, *argPack);
+			return result;
+		}
 	}
 
 	MemberFunctionSignature	myMemberFunctionPtr = nullptr;
@@ -890,8 +912,8 @@ private:
 #define PROPERTY(type, name, value) \
 	struct Typeinfo_##name {};
 
-// This trick was inspired by https://stackoverflow.com/a/4938266/1987466
-#define DECLARE_PROPERTY(type, name, value) \
+// This offset trick was inspired by https://stackoverflow.com/a/4938266/1987466
+#define DECLARE_VALUED_PROPERTY(type, name, value) \
 	typedef struct name##_tag\
 	{ \
 		static ptrdiff_t Offset()\
@@ -900,7 +922,19 @@ private:
 		} \
     }; \
 	type name = value;\
-	inline static ReflectProperty3<Self> name_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, name##_tag::Offset() };
+	inline static ReflectProperty3<Self> name##_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, name##_tag::Offset() };
+
+#define DECLARE_PROPERTY(type, name) \
+	typedef struct name##_tag\
+	{ \
+		static ptrdiff_t Offset()\
+		{ \
+			return offsetof(Self, name); \
+		} \
+    }; \
+	type name{};\
+	inline static ReflectProperty3<Self> name##_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, name##_tag::Offset() };
+
 
 #ifdef _MSC_VER // MSVC compilers
 #define FUNCTION_NAME() __FUNCTION__
@@ -925,18 +959,7 @@ struct Reflectable
 		return theClassReflector;
 	}
 
-	template <typename U>
-	U const& GetProperty2(std::string_view pName) const
-	{
-		ReflectableTypeInfo& refl = T::GetReflector2();
-		for (TypeInfo2 const& prop : refl.Properties)
-		{
-			if (prop.name == pName)
-				return *reinterpret_cast<U const*>(this + prop.offset);
-		}
 
-		return U();
-	}
 
 	template <typename U>
 	U const& GetProperty(std::string_view pName) const
@@ -967,7 +990,18 @@ struct Reflectable
 		// throw exception
 	}
 
+	template <typename U>
+	U const& GetProperty2(std::string_view pName) const
+	{
+		ReflectableTypeInfo& refl = T::GetReflector2();
+		for (TypeInfo2 const& prop : refl.Properties)
+		{
+			if (prop.name == pName)
+				return *reinterpret_cast<U const*>(this + prop.offset);
+		}
 
+		return U();
+	}
 	template <typename U>
 	void SetProperty2(std::string_view pName, U&& pSetValue)
 	{
@@ -1053,15 +1087,6 @@ struct ReflectProperty3 : TypeInfo2
 	}
 };
 
-//
-//template <class Ty>
-//class Test; /* not defined */
-//template <class Ret, class Arg0>
-//class Test<Ret(Arg0)> { /* whatever */ };
-//template <class Ret, class Arg0, class Arg1>
-//class Test<Ret(Arg0, Arg1)> { /* whatever */ };
-//template <class Ret, class Arg0, class Arg1, class Arg2>
-//class Test<Ret(Arg0, Arg1, Arg2)> { /* whatever */ };
 
 template <typename T>
 struct ArgumentUnpacker
@@ -1122,11 +1147,11 @@ struct FunctionTypeDecomposer<void (Reflector::*)(int)>
 
 #define MOE_METHOD_NAMED_PARAMS(RetType, Name, ...) \
 	RetType Name(GLUE_ARGUMENT_PAIRS(__VA_ARGS__)); \
-	inline static FunctionTypeInfo<RetType LPAREN ContainerType::* RPAREN LPAREN EXTRACT_ODD_ARGUMENTS(__VA_ARGS__) RPAREN> Name##_TYPEINFO{&Name, STRINGIZE(Name)}
+	inline static FunctionTypeInfo<decltype(&Name)> Name##_TYPEINFO{&Name, STRINGIZE(Name)}
 
 #define MOE_METHOD(RetType, Name, ...) \
 	RetType Name(GLUE_ARGUMENT_PAIRS(__VA_ARGS__)); \
-	inline static FunctionTypeInfo<RetType LPAREN ContainerType::* RPAREN LPAREN EXTRACT_ODD_ARGUMENTS(__VA_ARGS__) RPAREN> Name##_TYPEINFO{&Name, STRINGIZE(Name)}
+	inline static FunctionTypeInfo<decltype(&Name)> Name##_TYPEINFO{&Name, STRINGIZE(Name)}
 
 #define MOE_METHOD_TYPEINFO(Name) \
 	inline static FunctionTypeInfo<decltype(&Name)> Name##_TYPEINFO{ &Name, STRINGIZE(Name)}
@@ -1186,20 +1211,124 @@ struct Reflectable2
 {
 	using ClassID = unsigned;
 
-	ClassID	GetReflectableClassID() const
+	[[nodiscard]] ClassID	GetReflectableClassID() const
 	{
 		return myReflectableClassID;
 	}
 
-	IntrusiveLinkedList<TypeInfo2> const& GetProperties() const
+	[[nodiscard]] IntrusiveLinkedList<TypeInfo2> const& GetProperties() const
 	{
 		return Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID)->Properties;
 	}
 
-	IntrusiveLinkedList<FunctionInfo> const& GetMemberFunctions() const
+	[[nodiscard]] IntrusiveLinkedList<FunctionInfo> const& GetMemberFunctions() const
 	{
 		return Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID)->MemberFunctions;
 	}
+
+	template <typename T>
+	T const*	GetMemberAtOffset(ptrdiff_t pOffset) const
+	{
+		return reinterpret_cast<T const*>(reinterpret_cast<std::byte const*>(this) + pOffset);
+	}
+
+	template <typename T>
+	T* EditMemberAtOffset(ptrdiff_t pOffset)
+	{
+		return reinterpret_cast<T*>(reinterpret_cast<std::byte*>(this) + pOffset);
+	}
+
+
+	template <typename TProp>
+	[[nodiscard]] TProp const* GetProperty(std::string_view pName) const
+	{
+		for (TypeInfo2 const& prop : Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID)->Properties)
+		{
+			if (prop.name == pName)
+			{
+				return GetMemberAtOffset<TProp>(prop.offset);
+			}
+		}
+
+		return nullptr;
+	}
+
+	/* Version that returns a reference for when you are 100% confident this property exists */
+	template <typename TProp>
+	[[nodiscard]] TProp const& GetSafeProperty(std::string_view pName) const
+	{
+		for (TypeInfo2 const& prop : Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID)->Properties)
+		{
+			if (prop.name == pName)
+			{
+				return *GetMemberAtOffset<TProp>(prop.offset);
+			}
+		}
+
+		// throw exception, or assert
+		// TODO: check if exceptions are enabled and allow to customize assert macro
+		assert(false);
+		throw std::runtime_error("bad");
+	}
+
+	template <typename TProp>
+	bool SetProperty(std::string_view pName, TProp&& pSetValue)
+	{
+		for (TypeInfo2 const& prop : Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID)->Properties)
+		{
+			if (prop.name == pName)
+			{
+				auto* theEditedProp = EditMemberAtOffset<TProp>(prop.offset);
+				*theEditedProp = std::forward<TProp>(pSetValue);
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	[[nodiscard]] FunctionInfo const* GetFunction(std::string_view pMemberFuncName) const
+	{
+		for (FunctionInfo const& aFuncInfo : Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID)->MemberFunctions)
+		{
+			if (aFuncInfo.name == pMemberFuncName)
+			{
+				return &aFuncInfo;
+			}
+		}
+
+		return nullptr;
+	}
+
+	template <typename... Args>
+	std::any	InvokeFunction(std::string_view pMemberFuncName, Args... pFuncArgs)
+	{
+		FunctionInfo const* theFunction = GetFunction(pMemberFuncName);
+		if (theFunction == nullptr)
+		{
+			return {};
+		}
+
+		return theFunction->InvokeWithArgs(this, pFuncArgs...);
+	}
+
+	template <typename Ret, typename... Args>
+	Ret	TypedInvokeFunction(std::string_view pMemberFuncName, Args... pFuncArgs)
+	{
+		if constexpr (std::is_void_v<Ret>)
+		{
+			InvokeFunction(pMemberFuncName, pFuncArgs...);
+			return;
+		}
+		else
+		{
+			std::any result = InvokeFunction(pMemberFuncName, pFuncArgs...);
+			return std::any_cast<Ret>(result);
+		}
+	}
+
+	template <typename T>
+	friend struct ReflectableClassIDSetter2;
 
 protected:
 	void	SetReflectableClassID(ClassID newClassID)
@@ -1212,21 +1341,107 @@ public:
 	DECLARE_ATTORNEY(SetReflectableClassID);
 
 private:
-	ClassID	myReflectableClassID{};
+	ClassID	myReflectableClassID{0x2a2a};
 };
 
-template <typename T>
+template<typename... TypeList>
+constexpr size_t SizeofSumOfAllTypes()
+{
+	return (0 + ... + sizeof(TypeList));
+}
+
+// https://stackoverflow.com/a/56720174/1987466
+template<class T1, class... Ts>
+constexpr bool IsOneOf() noexcept {
+	return (std::is_same_v<T1, Ts> || ...);
+}
+
+template <typename T, typename... TOtherBases>
 struct ReflectableClassIDSetter
 {
 	ReflectableClassIDSetter()
 	{
 		static_assert(std::is_base_of_v<Reflectable2, T>, "This class is only supposed to be used as a member variable of a Reflectable-derived class.");
 
-		Reflectable2* thisReflectable = reinterpret_cast<Reflectable2*>(this);
-		Reflectable2::SetReflectableClassID_Attorney setterAttorney;
-		setterAttorney.SetReflectableClassID(*thisReflectable, T::theTypeInfo.ReflectableID);
+		const size_t theReflectableOffset = (
+			IsOneOf<Reflectable2, TOtherBases...>() ?
+			SizeofSumOfAllTypes<TOtherBases...>() :
+			SizeofSumOfAllTypes<TOtherBases...>()
+			);
+		std::byte* ptr = reinterpret_cast<std::byte*>(this) - theReflectableOffset;
+		unsigned* theClassID = reinterpret_cast<unsigned*>(ptr);
+		unsigned myClassID = T::theTypeInfo.ReflectableID;
+		*theClassID = myClassID;
+		//Reflectable2* thisReflectable = 
+		//Reflectable2::SetReflectableClassID_Attorney setterAttorney;
+		//setterAttorney.SetReflectableClassID(*thisReflectable, T::theTypeInfo.ReflectableID);
 	}
 };
+
+
+template <typename T>
+struct ReflectableClassIDSetter2 final
+{
+	ReflectableClassIDSetter2(T* pOwner)
+	{
+		static_assert(std::is_base_of_v<Reflectable2, T>, "This class is only supposed to be used as a member variable of a Reflectable-derived class.");
+		pOwner->SetReflectableClassID(T::theTypeInfo.ReflectableID);
+	}
+};
+
+
+
+#define FIRST_TYPE_0() Reflectable2
+#define FIRST_TYPE_1(a, ...) a
+#define FIRST_TYPE_2(a, ...) a
+#define FIRST_TYPE_3(a, ...) a
+#define FIRST_TYPE_4(a, ...) a
+
+#define INHERITANCE_LIST_0(...) Reflectable2
+#define INHERITANCE_LIST_1(...) COMMA_ARGS1(__VA_ARGS__)
+#define INHERITANCE_LIST_2(...) COMMA_ARGS2(__VA_ARGS__)
+#define INHERITANCE_LIST_3(...) COMMA_ARGS3(__VA_ARGS__)
+#define INHERITANCE_LIST_4(...) COMMA_ARGS4(__VA_ARGS__)
+#define INHERITANCE_LIST_5(...) COMMA_ARGS5(__VA_ARGS__)
+
+#define FORWARD_INERHITANCE_LIST0() Reflectable2
+#define FORWARD_INERHITANCE_LIST1(a1) a1
+#define FORWARD_INERHITANCE_LIST2(a1, a2, a3, a4) a1 COMMA a2
+#define FORWARD_INERHITANCE_LIST3(a1, a2, a3) a1 COMMA a2 COMMA a3
+#define FORWARD_INERHITANCE_LIST4(a1, a2, a3, a4) a1 COMMA a2 COMMA a3 COMMA a4
+#define FORWARD_INERHITANCE_LIST5(a1, a2, a3, a4, a5) a1 COMMA a2 COMMA a3 COMMA a5
+
+template <typename T>
+struct TypeInfoHelper
+{};
+
+#define reflectable_class(classname, ...) class classname INHERITANCE_LIST(__VA_ARGS__)
+#define reflectable_struct(structname, ...) \
+	struct structname;\
+	template <>\
+	struct TypeInfoHelper<structname>\
+	{\
+		using Super = VA_MACRO(FIRST_TYPE_, __VA_ARGS__);\
+		inline static char const* TypeName = STRINGIZE(structname);\
+	};\
+	struct structname : VA_MACRO(INHERITANCE_LIST_, __VA_ARGS__)
+
+#define DECLARE_REFLECTABLE_INFO() \
+	struct _self_type_tag {}; \
+    constexpr auto _self_type_helper() -> decltype(::SelfType::Writer<_self_type_tag, decltype(this)>{}); \
+    using Self = ::SelfType::Read<_self_type_tag>;\
+	using Super = TypeInfoHelper<Self>::Super;\
+	inline static ReflectableTypeInfo theTypeInfo{TypeInfoHelper<Self>::TypeName};\
+	static ReflectableTypeInfo const&	GetClassReflectableTypeInfo()\
+	{\
+		return theTypeInfo;\
+	}\
+	static ReflectableTypeInfo&	EditClassReflectableTypeInfo()\
+	{\
+		return theTypeInfo;\
+	}\
+	ReflectableClassIDSetter2<Self> const structname##_TYPEINFO_ID_SETTER{this};
+
 
 
 // This was inspired by https://stackoverflow.com/a/70701479/1987466 and https://gcc.godbolt.org/z/rrb1jdTrK
@@ -1250,100 +1465,55 @@ namespace SelfType
 	using Read = std::remove_pointer_t<decltype(adl_GetSelfType(Reader<T>{})) > ;
 }
 
-struct a : Reflectable<a>
+reflectable_struct(a)
 {
-	using Self = a;
-	using Parent = Self;
-	using Super = void;
+	DECLARE_REFLECTABLE_INFO()
 
 	int test()
 	{
 		return 42;
 	}
+
+	virtual ~a() = default;
+
+	virtual void print()
+	{
+		printf("a\n");
+	}
+
+	bool titi;
+	float toto;
 };
 
-struct b : a
+reflectable_struct(yolo,a)
 {
-	using Parent = Self;
-	using Super = a;
-
-
-	static char const* REFLECTABLE_UNIQUE_IDENTIFIER()
-	{
-		static char const* uid = FUNCTION_NAME();
-		return uid;
-	}
-	struct _self_type_tag {};
-	constexpr auto _self_type_helper() -> decltype(::SelfType::Writer<_self_type_tag, decltype(this)>{});
-	using Self = ::SelfType::Read<_self_type_tag>;
-
-	//const char* REFLECTABLE_UNIQUE_IDENTIFIER()
-	//{
-	//	return nullptr;
-	//}
-
+	DECLARE_REFLECTABLE_INFO()
 	void Roger()
 	{}
 
 	void stream(int) {}
 
-};
-
-b::Self gloB;
-
-
-#define FIRST_TYPE_0() Reflectable2
-#define FIRST_TYPE_1(a, ...) a
-#define FIRST_TYPE_2(a, ...) a
-#define FIRST_TYPE_3(a, ...) a
-#define FIRST_TYPE_4(a, ...) a
-
-#define INHERITANCE_LIST_1(declaredTypeName, ...) : Reflectable2 COMMA private ReflectableClassIDSetter<declaredTypeName>
-#define INHERITANCE_LIST_2(declaredTypeName, ...) : COMMA_ARGS1(__VA_ARGS__)
-#define INHERITANCE_LIST_3(declaredTypeName, ...) : COMMA_ARGS2(__VA_ARGS__)
-#define INHERITANCE_LIST_4(declaredTypeName, ...) : COMMA_ARGS3(__VA_ARGS__)
-#define INHERITANCE_LIST_5(declaredTypeName, ...) : COMMA_ARGS4(__VA_ARGS__)
-#define INHERITANCE_LIST(...) VA_MACRO(INHERITANCE_LIST_, __VA_ARGS__)
-
-template <typename T>
-struct TypeInfoHelper
-{};
-
-#define reflectable_class(classname, ...) class classname INHERITANCE_LIST(__VA_ARGS__)
-#define reflectable_struct(structname, ...) \
-	struct structname;\
-	template <>\
-	struct TypeInfoHelper<structname>\
-	{\
-		using Super = VA_MACRO(FIRST_TYPE_, __VA_ARGS__);\
-		inline static char const* TypeName = STRINGIZE(structname);\
-	};\
-	struct structname INHERITANCE_LIST(structname, __VA_ARGS__)
-
-
-#define DECLARE_REFLECTABLE_INFO() \
-	struct _self_type_tag {}; \
-    constexpr auto _self_type_helper() -> decltype(::SelfType::Writer<_self_type_tag, decltype(this)>{}); \
-    using Self = ::SelfType::Read<_self_type_tag>;\
-	using Super = TypeInfoHelper<Self>::Super;\
-	inline static ReflectableTypeInfo theTypeInfo{TypeInfoHelper<Self>::TypeName};\
-	static ReflectableTypeInfo const&	GetClassReflectableTypeInfo()\
-	{\
-		return theTypeInfo;\
-	}\
-	static ReflectableTypeInfo&	EditClassReflectableTypeInfo()\
-	{\
-		return theTypeInfo;\
+	 void print() override
+	{
+		printf("yolo\n");
 	}
 
+	 double zedouble;
+	char pouiet[10];
 
+};
 
-
-reflectable_struct(c, Reflectable2)
+reflectable_struct(c,yolo)
 {
 	DECLARE_REFLECTABLE_INFO()
 
 	DECLARE_PROPERTY(int, toto, 0)
+
+	void print() override
+	{
+		printf("c\n");
+	}
+
 };
 
 
@@ -1353,39 +1523,20 @@ reflectable_struct(c, Reflectable2)
 //- class/structure members: du style SetProperty("maStruct.myInt", 1)
 //- fonctions virtuelles
 //- IsA
-
-class Test : public Reflectable<Test>
+//- inline methods
+//-hint file for reflectable_struct and friends
+reflectable_struct(Test)
 {
-	int titi = 4444;
-	int bobo;
-	float arrrr;
-	friend Reflectable<Test>;
+	DECLARE_REFLECTABLE_INFO()
+
+	DECLARE_VALUED_PROPERTY(int, titi, 4444);
+	DECLARE_VALUED_PROPERTY(int, bobo, 1234);
+	DECLARE_VALUED_PROPERTY(float, arrrr, 42.f);
 
 	MOE_METHOD_NAMED_PARAMS(int, tititest, int, tata);
 	MOE_METHOD(int, grostoto, bool);
-	int zdzdzdz(float bibi);
+	void zdzdzdz(float bibi);
 	MOE_METHOD_TYPEINFO(zdzdzdz);
-	//using zdzdzdz_FUNCTYPE = decltype(&Reflectable<Test>::ContainerType::zdzdzdz);
-	//zdzdzdz_FUNCTYPE test;
-	//std::tuple<Test*> tri;
-	//using MTD = MethodTypeDecomposer<void, Test*, float >::ReturnType;
-	////using Ptr = FTD::ReturnType;
-	////inline static FunctionTypeInfo<ContainerType, FunctionTypeDecomposer<Test>>::ReturnType, FunctionTypeDecomposer<zdzdzdz_FUNCTYPE>::ArgumentPackType> zdzdzdz_TYPEINFO{ &zdzdzdz };
-	//FunctionTypeInfo2<Test, void, float> aaaaaaa;
-
-	//using MRA = FunctionTypeDecomposer2<decltype(&Test::zdzdzdz)>;
-	//inline static FunctionTypeInfo<decltype(&zdzdzdz)> zdzdzdz_TYPEINFO{ &zdzdzdz};
-	//int tititest(GLUE_ARGUMENT_PAIRS(int, dzdefezfze)); inline static FunctionTypeInfo<ContainerType, int, EXTRACT_ODD_ARGUMENTS(int, tata)> Name_TYPEINFO{&tititest};
-	//int grostoto(bool);
-	//inline static FunctionTypeInfo<ContainerType, int, int> Name_TYPEINFO{ &tititest };;
-
-//	int tititest(GLUE_ARGUMENT_PAIRS(int, tata)); inline static FunctionTypeInfo< int> Name_TYPEINFO{&tititest};
-	//int tititest(int tata)
-	//{
-	//	return 0;
-	//}
-	//inline static FunctionTypeInfo < Test, int, int > Name_TYPEINFO{ &tititest };
-
 
 };
 
@@ -1406,8 +1557,6 @@ int k = __COUNTER__;
 
 int main()
 {
-	c::Self zfzfzfz;
-	c::Super efefe;
 	Property<int> test = 0;
 	test = 42;
 	Test tata;
@@ -1416,16 +1565,16 @@ int main()
 	{
 		printf("yes\n");
 	}
-	auto& refl = Test::GetReflector();
+	auto& refl = Test::GetClassReflectableTypeInfo();
 	for (auto const& t : refl.Properties)
 	{
 		printf("t : %s\n", t.name.c_str());
 	}
-
-	auto const& myTiti = tata.GetProperty<int>("titi");
-	auto const& myTiti2 = tata.GetProperty2<int>("titi");
+	auto sz = sizeof(Reflectable2);
+	auto const& myTiti = tata.GetSafeProperty<int>("titi");
+	auto const& myTiti2 = tata.GetSafeProperty<int>("titi");
 	tata.SetProperty<int>("titi", 42);
-	tata.SetProperty2<int>("titi", 1337);
+	tata.SetProperty<int>("titi", 1337);
 
 	int nbArgs = NARGS(1, 2, 3, 4, 5, 6, 7, 8, 9);
 	int nbArgs2 = NARGS(1, 2);
@@ -1445,13 +1594,10 @@ int main()
 	printf("%d\n", NARGS_1(1, 2, 3)); // Prints 2
 #endif
 
-	std::tuple<FunctionTypeDecomposer<decltype(test333)>::ArgumentPackType> testTuple;
-
-	auto& refl2 = Test::GetReflector2();
-	int ret = tata.CallFunction<int, float>("zdzdzdz", 3.f);
+	tata.TypedInvokeFunction<void, float>("zdzdzdz", 3.f);
 
 	auto* funcInfo = tata.GetFunction("zdzdzdz");
-	int ret2 = funcInfo->TInvokeFunc<int>(&tata, 3.f);
+	funcInfo->TypedInvokeWithArgs<void>(&tata, 3.f);
 
 	int tets = 1;
 	int ffs = FindFirstSetBit(tets);
@@ -1479,9 +1625,14 @@ int main()
 	Reflector3& aaaaaaaaaa = Reflector3::EditSingleton();
 
 	c pouet;
+	Reflectable2* aRefl = &pouet;
 	for (auto it = c::GetClassReflectableTypeInfo().Properties.begin(); it; ++it)
 	{
-		printf("name: %s, type: %d, offset: %lu", (*it).name.c_str(), (*it).type, (*it).offset);
+		printf("name: %s, type: %d, offset: %lu\n", (*it).name.c_str(), (*it).type, (*it).offset);
+	}
+	for (auto it = aRefl->GetProperties().begin(); it; ++it)
+	{
+		printf("name: %s, type: %d, offset: %lu\n", (*it).name.c_str(), (*it).type, (*it).offset);
 	}
 
 	return 0;
@@ -1505,7 +1656,8 @@ int Test::grostoto(bool)
 }
 
 
-int Test::zdzdzdz(float bibi)
+void Test::zdzdzdz(float bibi)
 {
-	return 42;
+	bibi;
+	printf("bonjour\n");
 }
