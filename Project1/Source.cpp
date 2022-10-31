@@ -1,6 +1,7 @@
 
 #include <any>
 #include <cassert>
+#include <iostream>
 #include <stdexcept>
 #include <vector>
 #include <string>
@@ -16,6 +17,7 @@ enum class Type
 	Int,
 	Float,
 	Bool,
+	Double,
 	Class,
 	Class2
 };
@@ -42,6 +44,7 @@ DECLARE_TYPE_TRANSLATOR(Type::Void, void)
 DECLARE_TYPE_TRANSLATOR(Type::Int, int)
 DECLARE_TYPE_TRANSLATOR(Type::Float, float)
 DECLARE_TYPE_TRANSLATOR(Type::Bool, bool)
+DECLARE_TYPE_TRANSLATOR(Type::Double, double)
 
 
 template <typename T>
@@ -491,7 +494,82 @@ public:
 			}) != ChildrenClasses.end());
 	}
 
-	[[nodiscard]] virtual std::any	InvokeConstructor(std::any const& pCtorParams) const = 0;
+	using ParentPropertyInfo = std::pair< ReflectableTypeInfo const*, TypeInfo2 const*>;
+	[[nodiscard]] ParentPropertyInfo	FindParentClassProperty(std::string_view const& pName) const
+	{
+		for (ReflectableTypeInfo const* parentClass : ParentClasses)
+		{
+			TypeInfo2 const* foundProp = parentClass->FindProperty(pName);
+			if (foundProp != nullptr)
+			{
+				return { parentClass, foundProp };
+			}
+		}
+
+		return { nullptr, nullptr };
+	}
+
+	[[nodiscard]] TypeInfo2 const*	FindProperty(std::string_view const& pName) const
+	{
+		for (auto const& prop : Properties)
+		{
+			if (prop.name == pName)
+			{
+				return &prop;
+			}
+		}
+
+		return nullptr;
+	}
+
+	[[nodiscard]] TypeInfo2 const* FindPropertyInHierarchy(std::string_view const& pName) const
+	{
+		for (auto const& prop : Properties)
+		{
+			if (prop.name == pName)
+			{
+				return &prop;
+			}
+		}
+
+		// Maybe in the parent classes?
+		auto [parentClass, parentProperty] = FindParentClassProperty(pName);
+		if (parentClass != nullptr && parentProperty != nullptr) // A parent property was found
+		{
+			return parentProperty;
+		}
+
+		return nullptr;
+	}
+
+	[[nodiscard]] FunctionInfo const* FindFunction(std::string_view const& pFuncName) const
+	{
+		for (FunctionInfo const& aFuncInfo : MemberFunctions)
+		{
+			if (aFuncInfo.name == pFuncName)
+			{
+				return &aFuncInfo;
+			}
+		}
+
+		return nullptr;
+	}
+
+	using ParentFunctionInfo = std::pair< ReflectableTypeInfo const*, FunctionInfo const*>;
+	[[nodiscard]] ParentFunctionInfo	FindFunctionInHierarchy(std::string_view const& pFuncName) const
+	{
+		for (ReflectableTypeInfo const* parentClass : ParentClasses)
+		{
+			FunctionInfo const* foundFunc = parentClass->FindFunction(pFuncName);
+			if (foundFunc != nullptr)
+			{
+				return { parentClass, foundFunc };
+			}
+		}
+
+		return {};
+	}
+
 
 	unsigned							ReflectableID;
 	std::string_view					Typename;
@@ -541,14 +619,6 @@ public:
 		}
 	}
 
-	std::any	InvokeConstructor(std::any const& pCtorParams) const override
-	{
-		return { };
-		//using ArgumentPackTuple = std::tuple<Args...>;
-		//std::any packedArgs(std::in_place_type<ArgumentPackTuple>, std::forward_as_tuple(pFuncArgs...));
-		//std::any result = Invoke(pCallerObject, packedArgs);
-		//return result;
-	}
 };
 
 template <typename Ty >
@@ -681,7 +751,7 @@ struct FunctionTypeInfo<Ret(Class::*)(Args...)> : FunctionInfo
 #define COMMA_ARGS_LSHIFT_COUNTER5(a1, a2, a3, a4, a5) a1= 1 << (__COUNTER__ - COUNTER_BASE-OFFSET) COMMA a2= 1 << (__COUNTER__ - COUNTER_BASE-OFFSET) COMMA a3= 1 << (__COUNTER__ - COUNTER_BASE-OFFSET) COMMA a4= 1 << (__COUNTER__ - COUNTER_BASE-OFFSET)  COMMA a5= 1 << (__COUNTER__ - COUNTER_BASE-OFFSET)
 
 #define COMMA_ARGS1(a1) a1
-#define COMMA_ARGS2(a1, a2, a3, a4) a1 COMMA a2
+#define COMMA_ARGS2(a1, a2) a1 COMMA a2
 #define COMMA_ARGS3(a1, a2, a3) a1 COMMA a2 COMMA a3
 #define COMMA_ARGS4(a1, a2, a3, a4) a1 COMMA a2 COMMA a3 COMMA a4
 #define COMMA_ARGS5(a1, a2, a3, a4, a5) a1 COMMA a2 COMMA a3 COMMA a5
@@ -1365,7 +1435,15 @@ struct Reflectable2
 	[[nodiscard]] bool	IsA() const
 	{
 		static_assert(std::is_base_of_v<Reflectable2, TRefl>, "IsA only works with Reflectable-derived class types.");
-		return (myReflectableClassID == TRefl::GetClassReflectableTypeInfo().ReflectableID);
+
+		// Special case to manage IsA<Reflectable>, because since all Reflectable are derived from it *implicitly*, IsParentOf would return false.
+		if constexpr (std::is_same_v<TRefl, Reflectable2>)
+		{
+			return true;
+		}
+
+		ReflectableTypeInfo const& parentTypeInfo = TRefl::GetClassReflectableTypeInfo();
+		return (parentTypeInfo.ReflectableID == myReflectableClassID || parentTypeInfo.IsParentOf(myReflectableClassID));
 	}
 
 	[[nodiscard]] IntrusiveLinkedList<TypeInfo2> const& GetProperties() const
@@ -1393,12 +1471,21 @@ struct Reflectable2
 	template <typename TProp>
 	[[nodiscard]] TProp const* GetProperty(std::string_view pName) const
 	{
-		for (TypeInfo2 const& prop : Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID)->Properties)
+		ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
+
+		for (TypeInfo2 const& prop : thisTypeInfo->Properties)
 		{
 			if (prop.name == pName)
 			{
 				return GetMemberAtOffset<TProp>(prop.offset);
 			}
+		}
+
+		// Maybe in the parent classes?
+		auto [parentClass, parentProperty] = thisTypeInfo->FindParentClassProperty(pName);
+		if (parentClass != nullptr && parentProperty != nullptr) // A parent property was found
+		{
+			return GetMemberAtOffset<TProp>(parentProperty->offset);
 		}
 
 		return nullptr;
@@ -1408,12 +1495,19 @@ struct Reflectable2
 	template <typename TProp>
 	[[nodiscard]] TProp const& GetSafeProperty(std::string_view pName) const
 	{
-		for (TypeInfo2 const& prop : Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID)->Properties)
+		ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
+
+		TypeInfo2 const* propTypeInfo = thisTypeInfo->FindProperty(pName);
+		if (propTypeInfo != nullptr)
 		{
-			if (prop.name == pName)
-			{
-				return *GetMemberAtOffset<TProp>(prop.offset);
-			}
+			return *GetMemberAtOffset<TProp>(propTypeInfo->offset);
+		}
+
+		// Maybe in the parent classes?
+		auto [parentClass, parentProperty] = thisTypeInfo->FindParentClassProperty(pName);
+		if (parentClass != nullptr && parentProperty != nullptr)
+		{
+			return *GetMemberAtOffset<TProp>(parentProperty->offset);
 		}
 
 		// throw exception, or assert
@@ -1425,14 +1519,23 @@ struct Reflectable2
 	template <typename TProp>
 	bool SetProperty(std::string_view pName, TProp&& pSetValue)
 	{
-		for (TypeInfo2 const& prop : Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID)->Properties)
+		ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
+
+		TypeInfo2 const* propTypeInfo = thisTypeInfo->FindProperty(pName);
+		if (propTypeInfo != nullptr)
 		{
-			if (prop.name == pName)
-			{
-				auto* theEditedProp = EditMemberAtOffset<TProp>(prop.offset);
-				*theEditedProp = std::forward<TProp>(pSetValue);
-				return true;
-			}
+			auto* theEditedProp = EditMemberAtOffset<TProp>(propTypeInfo->offset);
+			*theEditedProp = std::forward<TProp>(pSetValue);
+			return true;
+		}
+
+		// Maybe in the parent classes?
+		auto [parentClass, parentProperty] = thisTypeInfo->FindParentClassProperty(pName);
+		if (parentClass != nullptr && parentProperty != nullptr)
+		{
+			auto* theEditedProp = EditMemberAtOffset<TProp>(parentProperty->offset);
+			*theEditedProp = std::forward<TProp>(pSetValue);
+			return true;
 		}
 
 		return false;
@@ -1440,6 +1543,28 @@ struct Reflectable2
 
 	[[nodiscard]] FunctionInfo const* GetFunction(std::string_view pMemberFuncName) const
 	{
+		ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
+		for (FunctionInfo const& aFuncInfo : thisTypeInfo->MemberFunctions)
+		{
+			if (aFuncInfo.name == pMemberFuncName)
+			{
+				return &aFuncInfo;
+			}
+		}
+
+		// Maybe in parent classes?
+		auto [_, functionInfo] = thisTypeInfo->FindFunctionInHierarchy(pMemberFuncName);
+		if (functionInfo != nullptr)
+		{
+			return functionInfo;
+		}
+
+		return nullptr;
+	}
+
+	[[nodiscard]] FunctionInfo const* GetFunctionInParents(std::string_view const& pMemberFuncName) const
+	{
+
 		for (FunctionInfo const& aFuncInfo : Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID)->MemberFunctions)
 		{
 			if (aFuncInfo.name == pMemberFuncName)
@@ -1578,12 +1703,14 @@ struct ClassInstantiator final
 #define FIRST_TYPE_3(a, ...) a
 #define FIRST_TYPE_4(a, ...) a
 
+// TODO: maybe try to use IF_ELSE here
+// Important to use VA_MACRO here otherwise MSVC will expand whole va_args in a single argument
 #define INHERITANCE_LIST_0(...) Reflectable2
-#define INHERITANCE_LIST_1(...) COMMA_ARGS1(__VA_ARGS__)
-#define INHERITANCE_LIST_2(...) COMMA_ARGS2(__VA_ARGS__)
-#define INHERITANCE_LIST_3(...) COMMA_ARGS3(__VA_ARGS__)
-#define INHERITANCE_LIST_4(...) COMMA_ARGS4(__VA_ARGS__)
-#define INHERITANCE_LIST_5(...) COMMA_ARGS5(__VA_ARGS__)
+#define INHERITANCE_LIST_1(...) VA_MACRO(COMMA_ARGS, __VA_ARGS__)
+#define INHERITANCE_LIST_2(...) VA_MACRO(COMMA_ARGS, __VA_ARGS__)
+#define INHERITANCE_LIST_3(...) VA_MACRO(COMMA_ARGS, __VA_ARGS__)
+#define INHERITANCE_LIST_4(...) VA_MACRO(COMMA_ARGS, __VA_ARGS__)
+#define INHERITANCE_LIST_5(...) VA_MACRO(COMMA_ARGS, __VA_ARGS__)
 
 #define FORWARD_INERHITANCE_LIST0() Reflectable2
 #define FORWARD_INERHITANCE_LIST1(a1) a1
@@ -1621,7 +1748,7 @@ struct ClassInstantiator final
 	{\
 		return theTypeInfo;\
 	}\
-	ReflectableClassIDSetter2<Self> const structname##_TYPEINFO_ID_SETTER{this};
+	ReflectableClassIDSetter2<Self> const structname##_TYPEINFO_ID_SETTER{this}; // TODO: fix this "structname"
 
 
 
@@ -1652,8 +1779,10 @@ reflectable_struct(a)
 
 	int test()
 	{
+		printf("I'm just a test!\n");
 		return 42;
 	}
+	MOE_METHOD_TYPEINFO(test);
 
 	virtual ~a() = default;
 
@@ -1662,15 +1791,23 @@ reflectable_struct(a)
 		printf("a\n");
 	}
 
-	bool titi;
-	float toto;
+	DECLARE_PROPERTY(bool, atiti, 0)
+	DECLARE_PROPERTY(float, atoto, 0)
 };
 
-reflectable_struct(yolo,a)
+struct FatOfTheLand
+{
+	float fat[4];
+};
+
+reflectable_struct(yolo, a, FatOfTheLand) // an example of multiple inheritance
 {
 	DECLARE_REFLECTABLE_INFO()
 	void Roger()
-	{}
+	{
+		printf("Roger that sir\n");
+	}
+	MOE_METHOD_TYPEINFO(Roger);
 
 	void stream(int) {}
 
@@ -1679,8 +1816,9 @@ reflectable_struct(yolo,a)
 		printf("yolo\n");
 	}
 
-	double zedouble;
-	char pouiet[10];
+	DECLARE_PROPERTY(double, bdouble, 0)
+
+	char bpouiet[10];
 
 };
 
@@ -1688,7 +1826,7 @@ reflectable_struct(c,yolo)
 {
 	DECLARE_REFLECTABLE_INFO()
 
-	DECLARE_PROPERTY(int, toto, 0)
+	DECLARE_PROPERTY(int, ctoto, 0)
 
 	c() = default;
 
@@ -1770,7 +1908,7 @@ public:
 
 };
 
-
+// TODO: fix this
 DECLARE_TYPE_TRANSLATOR(Type::Class, int&)
 
 DECLARE_TYPE_TRANSLATOR(Type::Class2, noncopyable&)
@@ -1778,7 +1916,7 @@ DECLARE_TYPE_TRANSLATOR(Type::Class2, noncopyable&)
 //- Clone
 //- class/structure members: du style SetProperty("maStruct.myInt", 1)
 //- fonctions virtuelles
-//- inline methods
+//- inline methods 
 //-hint file for reflectable_struct and friends
 reflectable_struct(Test)
 {
@@ -1922,8 +2060,29 @@ int main()
 	c* anotherInstance = aSubClass.Instantiate<c>(42, true); // TODO: try that with noncopyable...
 	aSubClass.SetClass(yolo::GetClassReflectableTypeInfo().ReflectableID);
 	a* aYolo = aSubClass.Instantiate();
-	bool isAYolo = aYolo->IsA<float>();
+	bool isAYolo = anotherInstance->IsA<yolo>();
 
+	a* myA = static_cast<a*>(anotherInstance);
+	yolo* myB = static_cast<yolo*>(anotherInstance);
+	FatOfTheLand* myF = static_cast<FatOfTheLand*>(anotherInstance);
+	printf("a: %p b: %p f: %p c: %p\n", myA, myB, myF, anotherInstance);
+
+	auto ap1 = anotherInstance->GetClassReflectableTypeInfo().FindPropertyInHierarchy("atiti");
+	auto bp1 = anotherInstance->GetClassReflectableTypeInfo().FindPropertyInHierarchy("bdouble");
+	auto cp1 = anotherInstance->GetClassReflectableTypeInfo().FindPropertyInHierarchy("ctoto");
+
+	class Interface {};
+	class Parent : public Interface { int a; };
+	class Child { int b; };
+	struct GrandChild : public Parent, public Child { int a, b, c; };
+
+	GrandChild GC;
+	std::cout << "GrandChild's address is at : " << &GC << std::endl;
+	std::cout << "Child's address is at : " << static_cast<Child*>(&GC) << std::endl;
+	std::cout << "Parent's address is at : " << static_cast<Parent*>(&GC) << std::endl;
+	std::cout << "Child's Interface address is at : " << reinterpret_cast<Interface*>(static_cast<Child*>(&GC)) << std::endl;
+
+	aYolo->InvokeFunction("test");
 	return 0;
 
 }
