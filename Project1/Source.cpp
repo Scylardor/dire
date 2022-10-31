@@ -5,7 +5,9 @@
 #include <vector>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 
+struct Reflectable2;
 class ReflectableTypeInfo;
 
 enum class Type
@@ -14,7 +16,8 @@ enum class Type
 	Int,
 	Float,
 	Bool,
-	Class
+	Class,
+	Class2
 };
 
 template <Type T>
@@ -39,6 +42,7 @@ DECLARE_TYPE_TRANSLATOR(Type::Void, void)
 DECLARE_TYPE_TRANSLATOR(Type::Int, int)
 DECLARE_TYPE_TRANSLATOR(Type::Float, float)
 DECLARE_TYPE_TRANSLATOR(Type::Bool, bool)
+
 
 template <typename T>
 class IntrusiveListNode
@@ -251,24 +255,24 @@ struct FunctionInfo : IntrusiveListNode<FunctionInfo>, IFunctionTypeInfo
 	// Not using perfect forwarding here because std::any cannot hold references: https://stackoverflow.com/questions/70239155/how-to-cast-stdtuple-to-stdany
 	// Sad but true, gotta move forward with our lives.
 	template <typename... Args>
-	std::any	InvokeWithArgs(void* pCallerObject, Args... pFuncArgs) const
+	std::any	InvokeWithArgs(void* pCallerObject, Args&&... pFuncArgs) const
 	{
 		using ArgumentPackTuple = std::tuple<Args...>;
-		std::any packedArgs(std::in_place_type<ArgumentPackTuple>, std::forward_as_tuple(pFuncArgs...));
+		std::any packedArgs(std::in_place_type<ArgumentPackTuple>, std::forward<Args>(pFuncArgs)...);
 		std::any result = Invoke(pCallerObject, packedArgs);
 		return result;
 	}
 	template <typename Ret, typename... Args>
-	Ret	TypedInvokeWithArgs(void* pCallerObject, Args... pFuncArgs) const
+	Ret	TypedInvokeWithArgs(void* pCallerObject, Args&&... pFuncArgs) const
 	{
 		if constexpr (std::is_void_v<Ret>)
 		{
-			InvokeWithArgs(pCallerObject, pFuncArgs...);
+			InvokeWithArgs(pCallerObject, std::forward<Args>(pFuncArgs)...);
 			return;
 		}
 		else
 		{
-			std::any result = InvokeWithArgs(pCallerObject, pFuncArgs...);
+			std::any result = InvokeWithArgs(pCallerObject, std::forward<Args>(pFuncArgs)...);
 			return std::any_cast<Ret>(result);
 		}
 	}
@@ -349,6 +353,39 @@ private:
 	inline static IDType theCounter = 0;
 };
 
+class ReflectableFactory
+{
+public:
+	using InstantiateFunction = Reflectable2 * (*)(std::any const&);
+
+	ReflectableFactory() = default;
+
+	void	RegisterInstantiator(unsigned pID, InstantiateFunction pFunc)
+	{
+		// Replace the existing one, if any.
+		auto [it, inserted] = myInstantiators.try_emplace(pID, pFunc);
+		if (!inserted)
+		{
+			it->second = pFunc;
+		}
+	}
+
+	InstantiateFunction	GetInstantiator(unsigned pID) const
+	{
+		auto it = myInstantiators.find(pID);
+		if (it == myInstantiators.end())
+		{
+			return nullptr;
+		}
+
+		return it->second;
+	}
+
+private:
+
+	std::unordered_map<unsigned, InstantiateFunction>	myInstantiators;
+};
+
 // TODO: replace all the unsigned by a unified typedef
 struct Reflector3 : Singleton<Reflector3>, AutomaticTypeCounter<Reflector3, unsigned>
 {
@@ -381,6 +418,24 @@ public:
 		return nullptr;
 	}
 
+
+	void	RegisterInstantiateFunction(unsigned pClassID, ReflectableFactory::InstantiateFunction pInstantiateFunction)
+	{
+		myInstantiateFactory.RegisterInstantiator(pClassID, pInstantiateFunction);
+	}
+
+	[[nodiscard]] Reflectable2*	TryInstantiate(unsigned pClassID, std::any const& pAnyParameterPack) const
+	{
+		ReflectableFactory::InstantiateFunction anInstantiateFunc = myInstantiateFactory.GetInstantiator(pClassID);
+		if (anInstantiateFunc == nullptr)
+		{
+			return nullptr;
+		}
+
+		Reflectable2* newInstance = anInstantiateFunc(pAnyParameterPack);
+		return newInstance;
+	}
+
 private:
 
 	friend ReflectableTypeInfo;
@@ -392,6 +447,7 @@ private:
 	}
 
 	std::vector<ReflectableTypeInfo*>	myReflectableTypeInfos;
+	ReflectableFactory	myInstantiateFactory;
 };
 
 class ReflectableTypeInfo
@@ -445,7 +501,7 @@ public:
 	std::vector<ReflectableTypeInfo*>	ChildrenClasses;
 };
 
-template <typename T>
+template <typename T, bool>
 struct TypedReflectableTypeInfo;
 
 template <typename T>
@@ -454,26 +510,35 @@ struct TypeInfoHelper
 
 struct Reflectable2;
 
-template <typename T, typename Parent>
-void RecursiveRegisterParentClasses(TypedReflectableTypeInfo<T>& pRegisteringClass)
+template <typename T, bool B, typename Parent>
+void RecursiveRegisterParentClasses(TypedReflectableTypeInfo <T, B> & pRegisteringClass)
 {
 	if constexpr (!std::is_same_v<Parent, Reflectable2>)
 	{
 		ReflectableTypeInfo& parentTypeInfo = Parent::EditClassReflectableTypeInfo();
 		parentTypeInfo.AddChildClass(&pRegisteringClass);
 		pRegisteringClass.AddParentClass(&parentTypeInfo);
-		RecursiveRegisterParentClasses<T, Parent::Super>(pRegisteringClass);
+		RecursiveRegisterParentClasses<T, B, Parent::Super>(pRegisteringClass);
 	}
 }
 
-template <typename T>
+template <typename T, bool UseDefaultCtorForInstantiate>
 struct TypedReflectableTypeInfo : ReflectableTypeInfo
 {
 public:
 	TypedReflectableTypeInfo(char const* pTypename) :
 		ReflectableTypeInfo(pTypename)
 	{
-		RecursiveRegisterParentClasses <T, typename T::Super>(*this);
+		RecursiveRegisterParentClasses <T, UseDefaultCtorForInstantiate, typename T::Super>(*this);
+		if constexpr (UseDefaultCtorForInstantiate && std::is_default_constructible_v<T>)
+		{
+			static_assert(std::is_base_of_v<Reflectable2, T>, "This class is only supposed to be used as a member variable of a Reflectable-derived class.");
+			Reflector3::EditSingleton().RegisterInstantiateFunction(T::GetClassReflectableTypeInfo().ReflectableID,
+				[](std::any const&) -> Reflectable2*
+				{
+					return new T();
+				});
+		}
 	}
 
 	std::any	InvokeConstructor(std::any const& pCtorParams) const override
@@ -524,7 +589,7 @@ struct FunctionTypeInfo<Ret(Class::*)(Args...)> : FunctionInfo
 	// The idea of using std::apply has been stolen from here : https://stackoverflow.com/a/36656413/1987466
 	std::any	Invoke(void* pObject, std::any const& pInvokeParams) const override
 	{
-		using ArgumentsTuple = std::tuple<Args...>;
+		using ArgumentsTuple = std::tuple<Args&&...>;
 		ArgumentsTuple const* argPack = std::any_cast<ArgumentsTuple>(&pInvokeParams);
 		if (argPack == nullptr)
 		{
@@ -582,15 +647,25 @@ struct FunctionTypeInfo<Ret(Class::*)(Args...)> : FunctionInfo
 #define GLUE3(a,b,c)
 #define COMMA ,
 
+
+#define GLUE_UNDERSCORE_ARGS1(a1) a1##_INSTANTIATOR
+#define GLUE_UNDERSCORE_ARGS2(a1, a2) a1##_##a2##_INSTANTIATOR
+#define GLUE_UNDERSCORE_ARGS3(a1, a2, a3) a1##_##a2##_##a3##_INSTANTIATOR
+#define GLUE_UNDERSCORE_ARGS4(a1,a2,a3,a4) a1##_##a2##_##a3##_##a4##_INSTANTIATOR
+#define GLUE_UNDERSCORE_ARGS5(a1,a2,a3,a4,a5) a1##_##a2##_##a3##_##a4##_##a5##_INSTANTIATOR
+#define GLUE_UNDERSCORE_ARGS6(a1,a2,a3,a4,a5,a6) a1##_##a2##_##a3##_##a4##_##a5##_##a6##_INSTANTIATOR
+#define GLUE_UNDERSCORE_ARGS7(a1,a2,a3,a4,a5,a6,a7) a1##_##a2##_##a3##_##a4##_##a5##_##a6##_##a7##_INSTANTIATOR
+#define GLUE_UNDERSCORE_ARGS8(a1,a2,a3,a4,a5,a6,a7,a8) a1##_##a2##_##a3##_##a4##_##a5##_##a6##_##a7##_##a8##_INSTANTIATOR
+
 #define GLUE_ARGS0()
 #define GLUE_ARGS1(a1) a1
 #define GLUE_ARGS2(a1, a2) a1 a2
 #define GLUE_ARGS3(a1, a2, a3) a1 a2 COMMA a3
 #define GLUE_ARGS4(a1,a2,a3,a4) a1 a2 COMMA a3 a4
 #define GLUE_ARGS5(a1,a2,a3,a4,a5) a1 a2 COMMA a3 a4 COMMA a5
-#define GLUE_ARGS6(a1,a2,a3,a4,a5,a6) a1 a2 COMMA a3 a4  COMMA a5 a6
-#define GLUE_ARGS7(a1,a2,a3,a4,a5,a6,a7) a1 a2 COMMA a3 a4  COMMA a5 a6 COMMA a7
-#define GLUE_ARGS8(a1,a2,a3,a4,a5,a6,a7,a8) a1 a2 COMMA a3 a4  COMMA a5 a6 COMMA a8
+#define GLUE_ARGS6(a1,a2,a3,a4,a5,a6) a1 a2 COMMA a3 a4 COMMA a5 a6
+#define GLUE_ARGS7(a1,a2,a3,a4,a5,a6,a7) a1 a2 COMMA a3 a4 COMMA a5 a6 COMMA a7
+#define GLUE_ARGS8(a1,a2,a3,a4,a5,a6,a7,a8) a1 a2 COMMA a3 a4 COMMA a5 a6 COMMA a7 a8
 #define GLUE_ARGUMENT_PAIRS(...) EXPAND(CONCAT2(GLUE_ARGS, NARGS(__VA_ARGS__)))(EXPAND(__VA_ARGS__)) // TODO : on dirait que EXPAND(__VA_ARGS__) c'est pete avec plus d'1 argument. verifier si il y a des warning msvc
 
 #define COMMA_ARGS_MINUS_COUNTER1(a1) a1 = __COUNTER__ - OFFSET
@@ -1371,7 +1446,7 @@ struct Reflectable2
 	}
 
 	template <typename... Args>
-	std::any	InvokeFunction(std::string_view pMemberFuncName, Args... pFuncArgs)
+	std::any	InvokeFunction(std::string_view pMemberFuncName, Args&&... pFuncArgs)
 	{
 		FunctionInfo const* theFunction = GetFunction(pMemberFuncName);
 		if (theFunction == nullptr)
@@ -1379,20 +1454,20 @@ struct Reflectable2
 			return {};
 		}
 
-		return theFunction->InvokeWithArgs(this, pFuncArgs...);
+		return theFunction->InvokeWithArgs(this, std::forward<Args>(pFuncArgs)...);
 	}
 
 	template <typename Ret, typename... Args>
-	Ret	TypedInvokeFunction(std::string_view pMemberFuncName, Args... pFuncArgs)
+	Ret	TypedInvokeFunction(std::string_view pMemberFuncName, Args&&... pFuncArgs)
 	{
 		if constexpr (std::is_void_v<Ret>)
 		{
-			InvokeFunction(pMemberFuncName, pFuncArgs...);
+			InvokeFunction(pMemberFuncName, std::forward<Args>(pFuncArgs)...);
 			return;
 		}
 		else
 		{
-			std::any result = InvokeFunction(pMemberFuncName, pFuncArgs...);
+			std::any result = InvokeFunction(pMemberFuncName, std::forward<Args>(pFuncArgs)...);
 			return std::any_cast<Ret>(result);
 		}
 	}
@@ -1442,9 +1517,6 @@ struct ReflectableClassIDSetter
 		unsigned* theClassID = reinterpret_cast<unsigned*>(ptr);
 		unsigned myClassID = T::theTypeInfo.ReflectableID;
 		*theClassID = myClassID;
-		//Reflectable2* thisReflectable = 
-		//Reflectable2::SetReflectableClassID_Attorney setterAttorney;
-		//setterAttorney.SetReflectableClassID(*thisReflectable, T::theTypeInfo.ReflectableID);
 	}
 };
 
@@ -1458,6 +1530,39 @@ struct ReflectableClassIDSetter2 final
 		pOwner->SetReflectableClassID(T::theTypeInfo.ReflectableID);
 	}
 };
+
+
+template <typename T, typename... Args>
+struct ClassInstantiator final
+{
+	ClassInstantiator()
+	{
+		static_assert(std::is_base_of_v<Reflectable2, T>, "ClassInstantiator is only meant to be used as a member of Reflectable-derived classes.");
+		static_assert(std::is_constructible_v<T, Args...>,
+			"No constructor associated with the parameter types of declared instantiator. Please keep instantiator and constructor synchronized.");
+		Reflector3::EditSingleton().RegisterInstantiateFunction(T::GetClassReflectableTypeInfo().ReflectableID, &Instantiate);
+	}
+
+	static Reflectable2*	Instantiate(std::any const& pCtorParams)
+	{
+		using ArgumentPackTuple = std::tuple<Args...>;
+		ArgumentPackTuple const* argsTuple = std::any_cast<ArgumentPackTuple>(&pCtorParams);
+		if (argsTuple == nullptr) // i.e. we were sent garbage
+		{
+			return nullptr;
+		}
+		auto f = [](Args... pCtorArgs) -> Reflectable2*
+		{
+			return new T(pCtorArgs...);
+		};
+		Reflectable2* result = std::apply(f, *argsTuple);
+		return result;
+	}
+};
+
+
+#define DECLARE_INSTANTIATOR(...)  \
+	inline static ClassInstantiator<Self, __VA_ARGS__> VA_MACRO(GLUE_UNDERSCORE_ARGS, __VA_ARGS__);
 
 
 
@@ -1481,6 +1586,9 @@ struct ReflectableClassIDSetter2 final
 #define FORWARD_INERHITANCE_LIST4(a1, a2, a3, a4) a1 COMMA a2 COMMA a3 COMMA a4
 #define FORWARD_INERHITANCE_LIST5(a1, a2, a3, a4, a5) a1 COMMA a2 COMMA a3 COMMA a5
 
+#ifndef USE_DEFAULT_CONSTRUCTOR_INSTANTIATE
+# define USE_DEFAULT_CONSTRUCTOR_INSTANTIATE() true
+#endif
 
 #define reflectable_class(classname, ...) class classname INHERITANCE_LIST(__VA_ARGS__)
 #define reflectable_struct(structname, ...) \
@@ -1498,7 +1606,7 @@ struct ReflectableClassIDSetter2 final
     constexpr auto _self_type_helper() -> decltype(::SelfType::Writer<_self_type_tag, decltype(this)>{}); \
     using Self = ::SelfType::Read<_self_type_tag>;\
 	using Super = TypeInfoHelper<Self>::Super;\
-	inline static TypedReflectableTypeInfo<Self> theTypeInfo{TypeInfoHelper<Self>::TypeName};\
+	inline static TypedReflectableTypeInfo<Self, USE_DEFAULT_CONSTRUCTOR_INSTANTIATE()> theTypeInfo{TypeInfoHelper<Self>::TypeName};\
 	static ReflectableTypeInfo const&	GetClassReflectableTypeInfo()\
 	{\
 		return theTypeInfo;\
@@ -1565,7 +1673,7 @@ reflectable_struct(yolo,a)
 		printf("yolo\n");
 	}
 
-	 double zedouble;
+	double zedouble;
 	char pouiet[10];
 
 };
@@ -1575,6 +1683,15 @@ reflectable_struct(c,yolo)
 	DECLARE_REFLECTABLE_INFO()
 
 	DECLARE_PROPERTY(int, toto, 0)
+
+	c() = default;
+
+	c(int, bool)
+	{
+		printf("bonjour int bool\n");
+	}
+
+	DECLARE_INSTANTIATOR(int, bool)
 
 	void print() override
 	{
@@ -1586,11 +1703,13 @@ reflectable_struct(c,yolo)
 template <typename T>
 struct Subclass
 {
+	static_assert(std::is_base_of_v<Reflectable2, T>, "Subclass only works for Reflectable-derived classes.");
+
 	Subclass() = default;
 
 	[[nodiscard]] bool	IsValid() const
 	{
-		ReflectableTypeInfo const& parentTypeInfo = T::GetReflectableTypeInfo();
+		ReflectableTypeInfo const& parentTypeInfo = T::GetClassReflectableTypeInfo();
 		return (parentTypeInfo.IsParentOf(SubClassID));
 	}
 
@@ -1604,18 +1723,30 @@ struct Subclass
 		return SubClassID;
 	}
 
-	template <typename... Args>
-	[[nodiscard]] T*	Instantiate(Args&&... pCtorArgs)
+	template <typename Ret = T, typename... Args>
+	[[nodiscard]] Ret*	Instantiate(Args&&... pCtorArgs)
 	{
+		static_assert(std::is_base_of_v<T, Ret>, "Instantiate return type must be derived from the subclass type parameter!");
+
 		if (!IsValid())
 		{
 			return nullptr;
 		}
 
-		auto const* targetTypeInfo = Reflector3::EditSingleton().GetTypeInfo(SubClassID);
-		ReflectableTypeInfo const& parentTypeInfo = T::GetReflectableTypeInfo();
+		Reflectable2* newInstance;
 
+		if constexpr (sizeof...(Args) != 0)
+		{
+			using ArgumentPackTuple = std::tuple<Args...>;
+			std::any packedArgs(std::in_place_type<ArgumentPackTuple>, std::forward_as_tuple(std::forward<Args>(pCtorArgs)...));
+			newInstance = Reflector3::GetSingleton().TryInstantiate(SubClassID, packedArgs);
+		}
+		else
+		{
+			newInstance = Reflector3::GetSingleton().TryInstantiate(SubClassID, {});
+		}
 
+		return static_cast<Ret*>(newInstance);
 	}
 
 private:
@@ -1623,6 +1754,20 @@ private:
 	unsigned	SubClassID{};
 };
 
+
+class noncopyable
+{
+public:
+	noncopyable() = default;
+	noncopyable(noncopyable const&) = delete;
+	noncopyable& operator=(noncopyable const&) = delete;
+
+};
+
+
+DECLARE_TYPE_TRANSLATOR(Type::Class, int&)
+
+DECLARE_TYPE_TRANSLATOR(Type::Class2, noncopyable&)
 //TODO LIST:
 //- SubclassOf
 //- Create/Clone
@@ -1633,7 +1778,7 @@ private:
 //-hint file for reflectable_struct and friends
 reflectable_struct(Test)
 {
-	DECLARE_REFLECTABLE_INFO()
+	struct _self_type_tag {}; constexpr auto _self_type_helper() -> decltype(::SelfType::Writer<_self_type_tag, decltype(this)>{}); using Self = ::SelfType::Read<_self_type_tag>; using Super = TypeInfoHelper<Self>::Super; inline static TypedReflectableTypeInfo<Self, true> theTypeInfo{TypeInfoHelper<Self>::TypeName}; static ReflectableTypeInfo const& GetClassReflectableTypeInfo() { return theTypeInfo; } static ReflectableTypeInfo& EditClassReflectableTypeInfo() { return theTypeInfo; } ReflectableClassIDSetter2<Self> const structname_TYPEINFO_ID_SETTER{this};
 
 	DECLARE_VALUED_PROPERTY(int, titi, 4444);
 	DECLARE_VALUED_PROPERTY(int, bobo, 1234);
@@ -1643,8 +1788,20 @@ reflectable_struct(Test)
 	MOE_METHOD(int, grostoto, bool);
 	void zdzdzdz(float bibi);
 	MOE_METHOD_TYPEINFO(zdzdzdz);
+	MOE_METHOD(void, passbyref, int&);
 
+	MOE_METHOD(void, passbyref_tricky, noncopyable&);
 };
+
+void Test::passbyref(int& test)
+{
+	test = 42;
+}
+
+void Test::passbyref_tricky(noncopyable& test)
+{
+	test;
+}
 
 
 int test333(int a, float b, char c)
@@ -1660,6 +1817,12 @@ int j = __COUNTER__;
 
 int k = __COUNTER__;
 #endif
+
+
+void testfloat(float atest)
+{
+	atest;
+}
 
 int main()
 {
@@ -1709,6 +1872,11 @@ int main()
 	funcInfo->TypedInvokeWithArgs<void>(&tata, 3.f);
 
 	int tets = 1;
+	tata.TypedInvokeFunction<void>("passbyref", tets);
+	noncopyable nocopy;
+	tata.TypedInvokeFunction<void>("passbyref_tricky", nocopy);
+
+
 	int ffs = FindFirstSetBit(tets);
 
 	BitEnum be = BitEnum::seize;
@@ -1743,6 +1911,11 @@ int main()
 	{
 		printf("name: %s, type: %d, offset: %lu\n", (*it).name.c_str(), (*it).type, (*it).offset);
 	}
+
+	Subclass<a> aSubClass;
+	aSubClass.SetClass(c::GetClassReflectableTypeInfo().ReflectableID);
+	a* instance = aSubClass.Instantiate();
+	c* anotherInstance = aSubClass.Instantiate<c>(42, true); // TODO: try that with noncopyable...
 
 	return 0;
 
