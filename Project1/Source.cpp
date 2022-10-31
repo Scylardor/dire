@@ -1361,6 +1361,13 @@ struct Reflectable2
 		return myReflectableClassID;
 	}
 
+	template <typename TRefl>
+	[[nodiscard]] bool	IsA() const
+	{
+		static_assert(std::is_base_of_v<Reflectable2, TRefl>, "IsA only works with Reflectable-derived class types.");
+		return (myReflectableClassID == TRefl::GetClassReflectableTypeInfo().ReflectableID);
+	}
+
 	[[nodiscard]] IntrusiveLinkedList<TypeInfo2> const& GetProperties() const
 	{
 		return Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID)->Properties;
@@ -1382,7 +1389,6 @@ struct Reflectable2
 	{
 		return reinterpret_cast<T*>(reinterpret_cast<std::byte*>(this) + pOffset);
 	}
-
 
 	template <typename TProp>
 	[[nodiscard]] TProp const* GetProperty(std::string_view pName) const
@@ -1769,11 +1775,9 @@ DECLARE_TYPE_TRANSLATOR(Type::Class, int&)
 
 DECLARE_TYPE_TRANSLATOR(Type::Class2, noncopyable&)
 //TODO LIST:
-//- SubclassOf
-//- Create/Clone
+//- Clone
 //- class/structure members: du style SetProperty("maStruct.myInt", 1)
 //- fonctions virtuelles
-//- IsA
 //- inline methods
 //-hint file for reflectable_struct and friends
 reflectable_struct(Test)
@@ -1916,6 +1920,9 @@ int main()
 	aSubClass.SetClass(c::GetClassReflectableTypeInfo().ReflectableID);
 	a* instance = aSubClass.Instantiate();
 	c* anotherInstance = aSubClass.Instantiate<c>(42, true); // TODO: try that with noncopyable...
+	aSubClass.SetClass(yolo::GetClassReflectableTypeInfo().ReflectableID);
+	a* aYolo = aSubClass.Instantiate();
+	bool isAYolo = aYolo->IsA<float>();
 
 	return 0;
 
