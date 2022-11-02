@@ -19,14 +19,19 @@ enum class Type
 	Bool,
 	Double,
 	Class,
-	Class2
+	Class2,
+	Object
 };
 
 template <Type T>
 struct FromEnumTypeToActualType;
 
 template <typename T>
-struct FromActualTypeToEnumType;
+struct FromActualTypeToEnumType
+{
+	// If the type was not registered, by default it's just a generic "Object".
+	static const Type EnumType = Type::Object;
+};
 
 #define DECLARE_TYPE_TRANSLATOR(TheEnumType, TheActualType) \
 	template <> \
@@ -187,6 +192,9 @@ private:
 	IntrusiveListNode<T>* Head = nullptr;
 };
 
+// TODO: put in proper place
+static const unsigned INVALID_REFLECTABLE_ID = UINT32_MAX;
+
 struct TypeInfo2 : IntrusiveListNode<TypeInfo2>
 {
 	TypeInfo2(const char* pName, Type pType, std::ptrdiff_t pOffset) :
@@ -196,6 +204,11 @@ struct TypeInfo2 : IntrusiveListNode<TypeInfo2>
 	std::string		name;
 	Type			type;
 	std::ptrdiff_t	offset;
+
+	// TODO: storing it here is kind of a hack to go quick.
+	// I guess we should have a map of Type->ClassID to be able to easily find the class ID...
+	// without duplicating this information in all the type info structures of every property of the same type.
+	unsigned		reflectableID{ INVALID_REFLECTABLE_ID };
 };
 
 struct IFunctionTypeInfo
@@ -570,8 +583,8 @@ public:
 		return {};
 	}
 
-
-	unsigned							ReflectableID;
+	unsigned							ReflectableID{INVALID_REFLECTABLE_ID};
+	int									VirtualOffset{ 0 }; // for polymorphic classes
 	std::string_view					Typename;
 	IntrusiveLinkedList<TypeInfo2>		Properties;
 	IntrusiveLinkedList<FunctionInfo>	MemberFunctions;
@@ -616,6 +629,11 @@ public:
 				{
 					return new T();
 				});
+		}
+
+		if constexpr (std::is_polymorphic_v<T>)
+		{
+			VirtualOffset += sizeof(void*); // should be 4 on x86, 8 on x64
 		}
 	}
 
@@ -1129,18 +1147,18 @@ private:
 
 // This offset trick was inspired by https://stackoverflow.com/a/4938266/1987466
 #define DECLARE_VALUED_PROPERTY(type, name, value) \
-	typedef struct name##_tag\
+	struct name##_tag\
 	{ \
 		static ptrdiff_t Offset()\
 		{ \
 			return offsetof(Self, name); \
 		} \
     }; \
-	type name = value;\
-	inline static ReflectProperty3<Self> name##_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, name##_tag::Offset() };
+	type name{value};\
+	inline static ReflectProperty3<Self, type> name##_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, name##_tag::Offset() };
 
 #define DECLARE_PROPERTY(type, name) \
-	typedef struct name##_tag\
+	struct name##_tag\
 	{ \
 		static ptrdiff_t Offset()\
 		{ \
@@ -1148,7 +1166,7 @@ private:
 		} \
     }; \
 	type name{};\
-	inline static ReflectProperty3<Self> name##_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, name##_tag::Offset() };
+	inline static ReflectProperty3<Self, type> name##_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, name##_tag::Offset() };
 
 
 #ifdef _MSC_VER // MSVC compilers
@@ -1271,6 +1289,21 @@ struct Reflectable
 };
 
 template <typename T>
+constexpr std::enable_if_t<std::is_base_of_v<Reflectable2, T>, unsigned>
+FindClassReflectableID()
+{
+	return T::GetClassReflectableTypeInfo().ReflectableID;
+}
+
+
+template <typename T>
+constexpr std::enable_if_t<!std::is_base_of_v<Reflectable2, T>, unsigned>
+FindClassReflectableID()
+{
+	return INVALID_REFLECTABLE_ID;
+}
+
+template <typename T>
 struct ReflectProperty
 {
 	ReflectProperty(const char* pName, Type pType, std::ptrdiff_t pOffset)
@@ -1291,14 +1324,23 @@ struct ReflectProperty2 : TypeInfo2
 	}
 };
 
-template <typename T>
+template <typename T, typename TProp>
 struct ReflectProperty3 : TypeInfo2
 {
 	ReflectProperty3(const char* pName, Type pType, std::ptrdiff_t pOffset) :
 		TypeInfo2(pName, pType, pOffset)
 	{
-		ReflectableTypeInfo& typeInfo = T::EditClassReflectableTypeInfo();
+		ReflectableTypeInfo& typeInfo = T::EditClassReflectableTypeInfo(); // TODO: maybe just give it as a parameter to the function
 		typeInfo.PushTypeInfo(*this);
+
+		if constexpr (std::is_base_of_v<Reflectable2, TProp>)
+		{
+			reflectableID = TProp::GetClassReflectableTypeInfo().ReflectableID;
+		}
+		else
+		{
+			reflectableID = INVALID_REFLECTABLE_ID;
+		}
 	}
 };
 
@@ -1473,11 +1515,24 @@ struct Reflectable2
 	{
 		ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
 
+		// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
+		int propOffset = -thisTypeInfo->VirtualOffset;
+
+		// Test for compound property - the syntax uses the standard "." accessor
+		size_t const dotPos = pName.find('.');
+		bool const isCompoundProp = dotPos != pName.npos;
+		if (isCompoundProp)
+		{
+			std::string_view compoundPropName = std::string_view(pName.data(), dotPos);
+
+			return GetCompoundProperty<TProp>(thisTypeInfo, compoundPropName, pName, propOffset);
+		}
+
 		for (TypeInfo2 const& prop : thisTypeInfo->Properties)
 		{
 			if (prop.name == pName)
 			{
-				return GetMemberAtOffset<TProp>(prop.offset);
+				return GetMemberAtOffset<TProp>(propOffset + prop.offset);
 			}
 		}
 
@@ -1485,10 +1540,55 @@ struct Reflectable2
 		auto [parentClass, parentProperty] = thisTypeInfo->FindParentClassProperty(pName);
 		if (parentClass != nullptr && parentProperty != nullptr) // A parent property was found
 		{
-			return GetMemberAtOffset<TProp>(parentProperty->offset);
+			return GetMemberAtOffset<TProp>(propOffset + parentProperty->offset);
 		}
 
 		return nullptr;
+	}
+
+	// TODO: I think pTotalOffset can drop the reference
+	template <typename TProp>
+	[[nodiscard]] TProp const* GetCompoundProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pFullPath, int& pTotalOffset) const
+	{
+		// First, find our compound property
+		TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
+		if (thisProp == nullptr)
+		{
+			return nullptr; // There was no property with the given name.
+		}
+
+		// We found our compound property: consume its name from the "full path"
+		// +1 to also remove the '.', except if we are at the last nested property.
+		pFullPath.remove_prefix(std::min(pName.size() + 1, pFullPath.size()));
+
+		// Now, add the offset of the compound to the total offset
+		pTotalOffset += (int)thisProp->offset;
+
+		// Do we need to go deeper?
+		if (pFullPath.empty())
+		{
+			// No: just return the variable at the current offset
+			return GetMemberAtOffset<TProp>(pTotalOffset);
+		}
+
+		// Yes: recurse one more time, this time using this property's type info (needs to be Reflectable)
+		pTypeInfoOwner = Reflector3::GetSingleton().GetTypeInfo(thisProp->reflectableID);
+		if (pTypeInfoOwner == nullptr)
+		{
+			return nullptr; // This type isn't reflectable? Nothing I can do for you...
+		}
+
+		// Update the next property's name to search for it.
+		size_t const dotPos = pFullPath.find('.');
+		if (dotPos != pFullPath.npos)
+		{
+			pName = std::string_view(pFullPath.data(), dotPos);
+		}
+		else
+		{
+			pName = pFullPath;
+		}
+		return GetCompoundProperty<TProp>(pTypeInfoOwner, pName, pFullPath, pTotalOffset);
 	}
 
 	/* Version that returns a reference for when you are 100% confident this property exists */
@@ -1497,17 +1597,33 @@ struct Reflectable2
 	{
 		ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
 
-		TypeInfo2 const* propTypeInfo = thisTypeInfo->FindProperty(pName);
-		if (propTypeInfo != nullptr)
+		// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
+		int propOffset = -thisTypeInfo->VirtualOffset;
+
+		// Test for compound property - the syntax uses the standard "." accessor
+		size_t const dotPos = pName.find('.');
+		bool const isCompoundProp = dotPos != pName.npos;
+		if (isCompoundProp)
 		{
-			return *GetMemberAtOffset<TProp>(propTypeInfo->offset);
+			std::string_view compoundPropName = std::string_view(pName.data(), dotPos);
+
+
+			return GetSafeCompoundProperty<TProp>(thisTypeInfo, compoundPropName, pName, propOffset);
+		}
+
+		for (TypeInfo2 const& prop : thisTypeInfo->Properties)
+		{
+			if (prop.name == pName)
+			{
+				return *GetMemberAtOffset<TProp>(propOffset + prop.offset);
+			}
 		}
 
 		// Maybe in the parent classes?
 		auto [parentClass, parentProperty] = thisTypeInfo->FindParentClassProperty(pName);
-		if (parentClass != nullptr && parentProperty != nullptr)
+		if (parentClass != nullptr && parentProperty != nullptr) // A parent property was found
 		{
-			return *GetMemberAtOffset<TProp>(parentProperty->offset);
+			return *GetMemberAtOffset<TProp>(propOffset + parentProperty->offset);
 		}
 
 		// throw exception, or assert
@@ -1516,29 +1632,132 @@ struct Reflectable2
 		throw std::runtime_error("bad");
 	}
 
+	// TODO: I think pTotalOffset can drop the reference
+	template <typename TProp>
+	[[nodiscard]] TProp const& GetSafeCompoundProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pFullPath, int& pTotalOffset) const
+	{
+		// First, find our compound property
+		TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
+		if (thisProp == nullptr)
+		{
+			assert(false);
+			throw std::runtime_error("uh oh"); // should not happen
+		}
+
+		// We found our compound property: consume its name from the "full path"
+		// +1 to also remove the '.', except if we are at the last nested property.
+		pFullPath.remove_prefix(std::min(pName.size() + 1, pFullPath.size()));
+
+		// Now, add the offset of the compound to the total offset
+		pTotalOffset += (int)thisProp->offset;
+
+		// Do we need to go deeper?
+		if (pFullPath.empty())
+		{
+			// No: just return the variable at the current offset
+			return *GetMemberAtOffset<TProp>(pTotalOffset);
+		}
+
+		// Yes: recurse one more time, this time using this property's type info (needs to be Reflectable)
+		pTypeInfoOwner = Reflector3::GetSingleton().GetTypeInfo(thisProp->reflectableID);
+		if (pTypeInfoOwner == nullptr) // This type isn't reflectable? Nothing I can do for you...
+		{
+			assert(false);
+			throw std::runtime_error("uh oh"); // should not happen
+		}
+
+		// Update the next property's name to search for it.
+		size_t const dotPos = pFullPath.find('.');
+		if (dotPos != pFullPath.npos)
+		{
+			pName = std::string_view(pFullPath.data(), dotPos);
+		}
+		else
+		{
+			pName = pFullPath;
+		}
+		return GetSafeCompoundProperty<TProp>(pTypeInfoOwner, pName, pFullPath, pTotalOffset);
+	}
+
+
 	template <typename TProp>
 	bool SetProperty(std::string_view pName, TProp&& pSetValue)
 	{
 		ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
-
-		TypeInfo2 const* propTypeInfo = thisTypeInfo->FindProperty(pName);
-		if (propTypeInfo != nullptr)
+		if (thisTypeInfo == nullptr)
 		{
-			auto* theEditedProp = EditMemberAtOffset<TProp>(propTypeInfo->offset);
-			*theEditedProp = std::forward<TProp>(pSetValue);
-			return true;
+			return false;
 		}
 
-		// Maybe in the parent classes?
-		auto [parentClass, parentProperty] = thisTypeInfo->FindParentClassProperty(pName);
-		if (parentClass != nullptr && parentProperty != nullptr)
+		// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
+		int const propOffset = -thisTypeInfo->VirtualOffset;
+
+		// Test for compound property - the syntax uses the standard "." accessor
+		size_t const dotPos = pName.find('.');
+		if (dotPos != pName.npos)
 		{
-			auto* theEditedProp = EditMemberAtOffset<TProp>(parentProperty->offset);
+			std::string_view compoundPropName = std::string_view(pName.data(), dotPos);
+
+			return SetCompoundProperty(thisTypeInfo, compoundPropName, pName, propOffset, std::forward<TProp>(pSetValue));
+		}
+
+		TypeInfo2 const* propTypeInfo = thisTypeInfo->FindPropertyInHierarchy(pName);
+
+		if (propTypeInfo != nullptr)
+		{
+			auto* theEditedProp = EditMemberAtOffset<TProp>(propOffset + propTypeInfo->offset);
 			*theEditedProp = std::forward<TProp>(pSetValue);
 			return true;
 		}
 
 		return false;
+	}
+	
+	template <typename TProp>
+	bool SetCompoundProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pFullPath, int pTotalOffset, TProp&& pSetValue)
+	{
+		// First, find our compound property
+		TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
+		if (thisProp == nullptr)
+		{
+			return false; // There was no property with the given name.
+		}
+
+		// We found our compound property: consume its name from the "full path"
+		// +1 to also remove the '.', except if we are at the last nested property.
+		pFullPath.remove_prefix(std::min(pName.size() + 1, pFullPath.size()));
+
+		// Now, add the offset of the compound to the total offset
+		pTotalOffset += (int)thisProp->offset;
+
+		// Do we need to go deeper?
+		if (pFullPath.empty())
+		{
+			// No: just edit the variable at the current offset
+			auto* theEditedProp = EditMemberAtOffset<TProp>(pTotalOffset);
+			*theEditedProp = std::forward<TProp>(pSetValue);
+			return true;
+		}
+
+		// Yes: recurse one more time, this time using this property's type info (needs to be Reflectable)
+		pTypeInfoOwner = Reflector3::GetSingleton().GetTypeInfo(thisProp->reflectableID);
+		if (pTypeInfoOwner == nullptr)
+		{
+			return false; // This type isn't reflectable? Nothing I can do for you...
+		}
+
+		// Update the next property's name to search for it.
+		size_t const dotPos = pFullPath.find('.');
+		if (dotPos != pFullPath.npos)
+		{
+			pName = std::string_view(pFullPath.data(), dotPos);
+		}
+		else
+		{
+			pName = pFullPath;
+		}
+
+		return SetCompoundProperty<TProp>(pTypeInfoOwner, pName, pFullPath, pTotalOffset, std::forward<TProp>(pSetValue));
 	}
 
 	[[nodiscard]] FunctionInfo const* GetFunction(std::string_view pMemberFuncName) const
@@ -1631,6 +1850,29 @@ template<class T1, class... Ts>
 constexpr bool IsOneOf() noexcept {
 	return (std::is_same_v<T1, Ts> || ...);
 }
+
+// https://stackoverflow.com/a/1234781/1987466
+template <typename MostDerived, typename C, typename M>
+ptrdiff_t my_offsetof(M C::* member)
+{
+	MostDerived d;
+	return reinterpret_cast<char*> (&(d.*member)) - reinterpret_cast<char*> (&d);
+}
+
+
+//https://stackoverflow.com/a/12812237/1987466
+template <typename T, typename M> M get_member_type(M T::*);
+template <typename T, typename M> T get_class_type(M T::*);
+
+template <typename T,
+	typename R,
+	R T::* M
+>
+constexpr std::size_t my_offsetof2()
+{
+	return reinterpret_cast<std::size_t>(&(((T*)0)->*M));
+}
+
 
 template <typename T, typename... TOtherBases>
 struct ReflectableClassIDSetter
@@ -1800,6 +2042,25 @@ struct FatOfTheLand
 	float fat[4];
 };
 
+reflectable_struct(testcompound2)
+{
+	DECLARE_REFLECTABLE_INFO()
+
+	DECLARE_VALUED_PROPERTY(int, leet, 1337);
+
+	testcompound2() = default;
+};
+
+reflectable_struct(testcompound)
+{
+	DECLARE_REFLECTABLE_INFO()
+
+	DECLARE_VALUED_PROPERTY(int, compint, 0x2a2a)
+	DECLARE_PROPERTY(testcompound2, compleet)
+
+	testcompound() = default;
+};
+
 reflectable_struct(yolo, a, FatOfTheLand) // an example of multiple inheritance
 {
 	DECLARE_REFLECTABLE_INFO()
@@ -1818,15 +2079,17 @@ reflectable_struct(yolo, a, FatOfTheLand) // an example of multiple inheritance
 
 	DECLARE_PROPERTY(double, bdouble, 0)
 
+	DECLARE_PROPERTY(testcompound, compvar)
 	char bpouiet[10];
 
 };
+
 
 reflectable_struct(c,yolo)
 {
 	DECLARE_REFLECTABLE_INFO()
 
-	DECLARE_PROPERTY(int, ctoto, 0)
+	DECLARE_VALUED_PROPERTY(unsigned, ctoto, 0xDEADBEEF)
 
 	c() = default;
 
@@ -1841,6 +2104,8 @@ reflectable_struct(c,yolo)
 	{
 		printf("c\n");
 	}
+
+
 
 };
 
@@ -1920,7 +2185,7 @@ DECLARE_TYPE_TRANSLATOR(Type::Class2, noncopyable&)
 //-hint file for reflectable_struct and friends
 reflectable_struct(Test)
 {
-	struct _self_type_tag {}; constexpr auto _self_type_helper() -> decltype(::SelfType::Writer<_self_type_tag, decltype(this)>{}); using Self = ::SelfType::Read<_self_type_tag>; using Super = TypeInfoHelper<Self>::Super; inline static TypedReflectableTypeInfo<Self, true> theTypeInfo{TypeInfoHelper<Self>::TypeName}; static ReflectableTypeInfo const& GetClassReflectableTypeInfo() { return theTypeInfo; } static ReflectableTypeInfo& EditClassReflectableTypeInfo() { return theTypeInfo; } ReflectableClassIDSetter2<Self> const structname_TYPEINFO_ID_SETTER{this};
+	DECLARE_REFLECTABLE_INFO()
 
 	DECLARE_VALUED_PROPERTY(int, titi, 4444);
 	DECLARE_VALUED_PROPERTY(int, bobo, 1234);
@@ -2083,8 +2348,26 @@ int main()
 	std::cout << "Child's Interface address is at : " << reinterpret_cast<Interface*>(static_cast<Child*>(&GC)) << std::endl;
 
 	aYolo->InvokeFunction("test");
-	return 0;
+	constexpr size_t szcomp = sizeof(testcompound);
+	auto offcomp = offsetof(testcompound, compint);
+	auto compoff = offsetof(c, compvar);
+	testcompound const* monComp = (testcompound const*) (reinterpret_cast<std::byte const*>(anotherInstance) + 80);
 
+	int const* monCompint = (int const*)(reinterpret_cast<std::byte const*>(anotherInstance) + 88);
+	int const* compint = anotherInstance->GetProperty<int>("compvar.compint");
+
+	int const* compleet = anotherInstance->GetProperty<int>("compvar.compleet.leet");
+
+	int const& compleetRef = anotherInstance->GetSafeProperty<int>("compvar.compleet.leet");
+
+	bool edited = anotherInstance->SetProperty<int>("compvar.compleet.leet", 42);
+
+	unsigned const* totoRef = anotherInstance->GetProperty<unsigned>("ctoto");
+
+	edited = anotherInstance->SetProperty<unsigned>("ctoto", 1);
+	edited = anotherInstance->SetProperty<int>("compvar.compleet.leet", 0x2a2a);
+
+	return 0;
 }
 
 
@@ -2109,3 +2392,9 @@ void Test::zdzdzdz(float bibi)
 	bibi;
 	printf("bonjour\n");
 }
+
+// References:
+// https://stackoverflow.com/questions/41453/how-can-i-add-reflection-to-a-c-application
+// http://msinilo.pl/blog2/post/p517/
+// https://replicaisland.blogspot.com/2010/11/building-reflective-object-system-in-c.html
+// https://medium.com/geekculture/c-inheritance-memory-model-eac9eb9c56b5
