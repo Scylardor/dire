@@ -8,6 +8,7 @@
 #include <string_view>
 #include <unordered_map>
 
+struct ArrayPropertyCRUDHandler;
 struct Reflectable2;
 class ReflectableTypeInfo;
 
@@ -193,17 +194,19 @@ private:
 };
 
 // TODO: put in proper place
-static const unsigned INVALID_REFLECTABLE_ID = UINT32_MAX;
+static unsigned const INVALID_REFLECTABLE_ID = UINT32_MAX;
 
 struct TypeInfo2 : IntrusiveListNode<TypeInfo2>
 {
-	TypeInfo2(const char* pName, Type pType, std::ptrdiff_t pOffset) :
-		name(pName), type(pType), offset(pOffset)
+	TypeInfo2(char const* pName, Type const  pType, std::ptrdiff_t const pOffset, size_t const pSize) :
+		name(pName), type(pType), offset(pOffset), size(pSize)
 	{}
 
 	std::string		name;
 	Type			type;
 	std::ptrdiff_t	offset;
+	std::size_t		size;
+	ArrayPropertyCRUDHandler const* ArrayHandler = nullptr; // Useful for arrays or types that have operator[] overridden, will stay null for other types.
 
 	// TODO: storing it here is kind of a hack to go quick.
 	// I guess we should have a map of Type->ClassID to be able to easily find the class ID...
@@ -1146,7 +1149,7 @@ private:
 	struct Typeinfo_##name {};
 
 // This offset trick was inspired by https://stackoverflow.com/a/4938266/1987466
-#define DECLARE_VALUED_PROPERTY(type, name, value) \
+#define DECLARE_VALUED_PROPERTY(type, name, ...) \
 	struct name##_tag\
 	{ \
 		static ptrdiff_t Offset()\
@@ -1154,7 +1157,7 @@ private:
 			return offsetof(Self, name); \
 		} \
     }; \
-	type name{value};\
+	type name{__VA_ARGS__};\
 	inline static ReflectProperty3<Self, type> name##_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, name##_tag::Offset() };
 
 #define DECLARE_PROPERTY(type, name) \
@@ -1166,6 +1169,17 @@ private:
 		} \
     }; \
 	type name{};\
+	inline static ReflectProperty3<Self, type> name##_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, name##_tag::Offset() };
+
+#define DECLARE_ARRAY_PROPERTY(type, name, size) \
+	struct name##_tag\
+	{ \
+		static ptrdiff_t Offset()\
+		{ \
+			return offsetof(Self, name); \
+		} \
+    }; \
+	type name[size]{};\
 	inline static ReflectProperty3<Self, type> name##_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, name##_tag::Offset() };
 
 
@@ -1324,11 +1338,266 @@ struct ReflectProperty2 : TypeInfo2
 	}
 };
 
+// Inspired by https://stackoverflow.com/a/62061759/1987466
+//template <typename... Ts>
+//using void_t = void;
+//template <template <class...> class Trait, class AlwaysVoid, class... Args>
+//struct detector : std::false_type {};
+//template <template <class...> class Trait, class... Args>
+//struct detector<Trait, void_t<Trait<Args...>>, Args...> : std::true_type {};
+
+
+// Inspired by https://stackoverflow.com/a/71574097/1987466
+// Useful for member function names like "operator[]" that would break the build if used as is
+#define MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(Alias, FunctionName, Param1) \
+	template <typename ContainerType>\
+	using Alias##_method_t = decltype(std::declval< ContainerType >().FunctionName(Param1));\
+	template <typename ContainerType COMMA typename = std::void_t<>>\
+	struct has_##Alias : std::false_type {};\
+	template <typename ContainerType>\
+	struct has_##Alias<ContainerType COMMA std::void_t<Alias##_method_t< ContainerType >>> :\
+		std::true_type {};\
+	template <typename ContainerType>\
+	inline constexpr bool has_##Alias##_v = has_##Alias<ContainerType>::value;
+
+#define MEMBER_FUNCTION_DETECTOR_PARAM1(FunctionName, Param1) \
+	template <typename ContainerType>\
+	using FunctionName##_method_t = decltype(std::declval< ContainerType >().FunctionName(Param1));\
+	template <typename ContainerType COMMA typename = std::void_t<>>\
+	struct has_##FunctionName : std::false_type {};\
+	template <typename ContainerType>\
+	struct has_##FunctionName<ContainerType COMMA std::void_t<FunctionName##_method_t< ContainerType >>> :\
+		std::true_type {};\
+	template <typename ContainerType>\
+	inline constexpr bool has_##FunctionName##_v = has_##FunctionName<ContainerType>::value;
+
+#define MEMBER_FUNCTION_DETECTOR_PARAM2(FunctionName, Param1, Param2) \
+	template <typename ContainerType>\
+	using FunctionName##_method_t = decltype(std::declval< ContainerType >().FunctionName(Param1, Param2));\
+	template <typename ContainerType COMMA typename = std::void_t<>>\
+	struct has_##FunctionName : std::false_type {};\
+	template <typename ContainerType>\
+	struct has_##FunctionName<ContainerType COMMA std::void_t<FunctionName##_method_t< ContainerType >>> :\
+		std::true_type {};\
+	template <typename ContainerType>\
+	inline constexpr bool has_##FunctionName##_v = has_##FunctionName<ContainerType>::value;
+
+#define MEMBER_FUNCTION_DETECTOR(FunctionName) \
+	template <typename ContainerType>\
+	using FunctionName##_method_t = decltype(std::declval< ContainerType >().FunctionName());\
+	template <typename ContainerType COMMA typename = std::void_t<>>\
+	struct has_##FunctionName : std::false_type {};\
+	template <typename ContainerType>\
+	struct has_##FunctionName<ContainerType COMMA std::void_t<FunctionName##_method_t< ContainerType >>> :\
+		std::true_type {};\
+	template <typename ContainerType>\
+	inline constexpr bool has_##FunctionName##_v = has_##FunctionName<ContainerType>::value;
+
+MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(Brackets, operator[], 0)
+MEMBER_FUNCTION_DETECTOR_PARAM2(insert, std::declval<ContainerType>().begin(), std::declval<ContainerType>()[0])
+MEMBER_FUNCTION_DETECTOR_PARAM1(erase, std::declval<ContainerType>().begin())
+MEMBER_FUNCTION_DETECTOR(clear)
+MEMBER_FUNCTION_DETECTOR(size)
+
+struct ArrayPropertyCRUDHandler
+{
+	using ArrayReadFptr = void const* (*)(void const* , size_t );
+	using ArrayUpdateFptr = void (*)(void* , size_t , void const* );
+	using ArrayCreateFptr = void (*)(void* , size_t , void const* );
+	using ArrayEraseFptr = void	(*)(void* , size_t );
+	using ArrayClearFptr = void	(*)(void* );
+	using ArraySizeFptr = size_t(*)(void*);
+
+	ArrayReadFptr	Read = nullptr;
+	ArrayUpdateFptr Update = nullptr;
+	ArrayCreateFptr	Create = nullptr;
+	ArrayEraseFptr	Erase = nullptr;
+	ArrayClearFptr	Clear = nullptr;
+	ArraySizeFptr	Size = nullptr;
+};
+
+// CRUD = Create, Read, Update, Delete
+template <typename T, typename = void>
+struct TypedArrayPropertyCRUDHandler2
+{};
+
+// Base class for reflectable properties that have brackets operator to be able to make operations on the underlying array
+template <typename T>
+struct TypedArrayPropertyCRUDHandler2<T,
+	typename std::enable_if_t<!std::is_array_v<T> && has_Brackets_v<T>>> : ArrayPropertyCRUDHandler
+{
+	using ElementType = decltype(std::declval<T>()[0]);
+	// Decaying removes the references and fixes the compile error "pointer to reference is illegal"
+	using ElementValueType = std::decay_t<ElementType>;
+
+	TypedArrayPropertyCRUDHandler2()
+	{
+		Read = &ArrayRead;
+		Update = &ArrayUpdate;
+		Create = &ArrayCreate;
+		Erase = &ArrayErase;
+		Clear = &ArrayClear;
+		Size = &ArraySize;
+	}
+
+	static_assert(has_Brackets_v<T>
+		&& has_insert_v<T>
+		&& has_erase_v<T>
+		&& has_clear_v<T>
+		&& has_size_v<T>,
+		"In order to use Array-style reflection indexing, your type has to implement the following member functions with the same signature-style as std::vector:"
+			" operator[], begin, insert(iterator, value), erase, clear, size.");
+
+	static void const* ArrayRead(void const* pArray, size_t pIndex)
+	{
+		if (pArray == nullptr)
+		{
+			return nullptr;
+		}
+		T const* thisArray = static_cast<T const*>(pArray);
+		return &(*thisArray)[pIndex];
+	}
+
+	static void	ArrayUpdate(void* pArray, size_t pIndex, void const* pNewData)
+	{
+		if (pArray == nullptr || pNewData == nullptr)
+		{
+			return;
+		}
+
+		T* thisArray = static_cast<T*>(pArray);
+		ElementValueType const* actualData = static_cast<ElementValueType const*>(pNewData);
+		(*thisArray)[pIndex] = *actualData;
+	}
+
+	static void	ArrayCreate(void* pArray, size_t pAtIndex, void const* pInitData)
+	{
+		if (pArray != nullptr)
+		{
+			T* thisArray = static_cast<T*>(pArray);
+			ElementValueType const* actualInitData = (pInitData ? static_cast<ElementValueType const*>(pInitData) : nullptr);
+			thisArray->insert(thisArray->begin() + pAtIndex, actualInitData ? *actualInitData : ElementValueType());
+		}
+	}
+
+	static void	ArrayErase(void* pArray, size_t pAtIndex)
+	{
+		if (pArray != nullptr)
+		{
+			T* thisArray = static_cast<T*>(pArray);
+			thisArray->erase(thisArray->begin() + pAtIndex);
+		}
+	}
+
+	static void	ArrayClear(void* pArray)
+	{
+		if (pArray != nullptr)
+		{
+			T* thisArray = static_cast<T*>(pArray);
+			thisArray->clear();
+		}
+	}
+
+	static size_t	ArraySize(void* pArray)
+	{
+		if (pArray != nullptr)
+		{
+			T* thisArray = static_cast<T*>(pArray);
+			return thisArray->size();
+		}
+
+		return 0;
+	}
+};
+
+// Base class for reflectable properties that are C-arrays to be able to make operations on the underlying array
+template <typename T>
+struct TypedArrayPropertyCRUDHandler2<T,
+	typename std::enable_if_t<std::is_array_v<T>>>
+{
+	using ElementType = decltype(std::declval<T>()[0]);
+	// Decaying removes the references and fixes the compile error "pointer to reference is illegal"
+	using ElementValueType = std::decay_t<ElementType>;
+
+	inline static const size_t ARRAY_SIZE = std::extent_v<T>;
+
+	static void const* ArrayRead(void const* pArray, size_t pIndex)
+	{
+		if (pArray == nullptr)
+		{
+			return nullptr;
+		}
+		T const* thisArray = static_cast<T const*>(pArray);
+		return &(*thisArray)[pIndex];
+	}
+
+	static void	ArrayUpdate(void* pArray, size_t pIndex, void const* pNewData)
+	{
+		if (pArray == nullptr || pNewData == nullptr)
+		{
+			return;
+		}
+
+		T* thisArray = static_cast<T*>(pArray);
+		ElementValueType const* actualData = static_cast<ElementValueType const*>(pNewData);
+		(*thisArray)[pIndex] = *actualData;
+	}
+
+	static void	ArrayCreate(void* pArray, size_t pAtIndex, void const* pInitData)
+	{
+		if (pArray == nullptr)
+		{
+			return;
+		}
+
+		// TODO: throw exception if exceptions are enabled
+		assert(pAtIndex < ARRAY_SIZE);
+
+		T* thisArray = static_cast<T*>(pArray);
+		ElementValueType const* actualInitData = (pInitData ? static_cast<ElementValueType const*>(pInitData) : nullptr);
+		(*thisArray)[pAtIndex] = actualInitData ? *actualInitData : ElementValueType();
+	}
+
+	static void	ArrayErase(void* pArray, size_t pAtIndex)
+	{
+		if (pArray == nullptr || pAtIndex >= ARRAY_SIZE)
+		{
+			return;
+		}
+
+		T* thisArray = static_cast<T*>(pArray);
+		(*thisArray)[pAtIndex] = ElementValueType();
+	}
+
+	static void	ArrayClear(void* pArray)
+	{
+		if (pArray == nullptr)
+		{
+			return;
+		}
+
+		T* thisArray = static_cast<T*>(pArray);
+		// I don't know if we can do something smarter in this case...
+		for (auto i = 0u; i < ARRAY_SIZE; ++i)
+		{
+			(*thisArray)[i] = ElementValueType();
+		}
+	}
+
+	static size_t	ArraySize(void* /*pArray*/)
+	{
+		return ARRAY_SIZE;
+	}
+};
+
+
+
+
 template <typename T, typename TProp>
 struct ReflectProperty3 : TypeInfo2
 {
 	ReflectProperty3(const char* pName, Type pType, std::ptrdiff_t pOffset) :
-		TypeInfo2(pName, pType, pOffset)
+		TypeInfo2(pName, pType, pOffset, sizeof(T))
 	{
 		ReflectableTypeInfo& typeInfo = T::EditClassReflectableTypeInfo(); // TODO: maybe just give it as a parameter to the function
 		typeInfo.PushTypeInfo(*this);
@@ -1341,7 +1610,15 @@ struct ReflectProperty3 : TypeInfo2
 		{
 			reflectableID = INVALID_REFLECTABLE_ID;
 		}
+
+		if constexpr (std::is_array_v<T> || has_Brackets_v<T>)
+		{
+			ArrayHandler = &theTypeArrayCRUDHandler;
+		}
 	}
+
+private:
+	inline static const TypedArrayPropertyCRUDHandler2<T>	theTypeArrayCRUDHandler{};
 };
 
 
@@ -2091,6 +2368,10 @@ reflectable_struct(c,yolo)
 
 	DECLARE_VALUED_PROPERTY(unsigned, ctoto, 0xDEADBEEF)
 
+
+	DECLARE_VALUED_PROPERTY(std::vector<int>, aVector, 1, 2, 3)
+	DECLARE_ARRAY_PROPERTY(int, anArray, 10)
+
 	c() = default;
 
 	c(int, bool)
@@ -2179,7 +2460,8 @@ DECLARE_TYPE_TRANSLATOR(Type::Class, int&)
 DECLARE_TYPE_TRANSLATOR(Type::Class2, noncopyable&)
 //TODO LIST:
 //- Clone
-//- class/structure members: du style SetProperty("maStruct.myInt", 1)
+//- Array Properties (CRUD)
+//- Serialization / Reflector Resolver
 //- fonctions virtuelles
 //- inline methods 
 //-hint file for reflectable_struct and friends
@@ -2366,6 +2648,65 @@ int main()
 
 	edited = anotherInstance->SetProperty<unsigned>("ctoto", 1);
 	edited = anotherInstance->SetProperty<int>("compvar.compleet.leet", 0x2a2a);
+
+	constexpr bool hasBrackets1 = has_Brackets_v< std::string>;
+	constexpr bool hasBrackets2 = has_Brackets_v< std::vector<int>>;
+	constexpr bool hasBrackets3 = has_Brackets_v<int[]>;
+
+	constexpr bool hasINsert4 = has_insert_v< std::string>;
+	constexpr bool hasINsert5 = has_insert_v< std::vector<int>>;
+	constexpr bool hasINsert6 = has_insert_v<int[]>;
+
+	constexpr bool hasErase1 = has_erase_v< std::string>;
+	constexpr bool hasErase2 = has_erase_v< std::vector<int>>;
+	constexpr bool hasErase3 = has_erase_v<int[]>;
+
+	constexpr bool hasClear1 = has_clear_v< std::string>;
+	constexpr bool hasClear2 = has_clear_v< std::vector<int>>;
+	constexpr bool hasClear3 = has_clear_v<int[]>;
+
+	constexpr bool hasSize1 = has_size_v< std::string>;
+	constexpr bool hasSize2 = has_size_v< std::vector<int>>;
+	constexpr bool hasSize3 = has_size_v<int[]>;
+
+	std::vector<int> testvec{ 1,2,3 };
+	TypedArrayPropertyCRUDHandler2<std::vector<int>> vechandler;
+	int first = *(int*)vechandler.ArrayRead(&testvec, 0);
+
+	int rint = 42;
+	vechandler.ArrayUpdate(&testvec, 0, &rint);
+	rint = 1337;
+	vechandler.ArrayCreate(&testvec, 3, &rint);
+
+	vechandler.ArrayErase(&testvec, 1);
+
+	auto szvec = vechandler.ArraySize(&testvec);
+	vechandler.ArrayClear(&testvec);
+	szvec = vechandler.ArraySize(&testvec);
+
+	int testarray[]{ 1, 2, 3 };
+	TypedArrayPropertyCRUDHandler2<decltype(testarray)> arrayHandler;
+
+	first = *(int*)arrayHandler.ArrayRead(&testarray, 0);
+	arrayHandler.ArrayUpdate(&testarray, 0, &rint);
+	rint = 42;
+	arrayHandler.ArrayCreate(&testarray, 2, &rint);
+
+	// will assert/throw
+	//arrayHandler.ArrayCreate(&testarray, 3, &rint);
+
+	arrayHandler.ArrayErase(&testarray, 1);
+
+	arrayHandler.ArrayClear(&testarray);
+
+	auto szarr = arrayHandler.ArraySize(&testarray);
+
+	constexpr bool testpb = has_size_v<std::vector<int>>;
+	constexpr bool teste =  has_erase_v<std::vector<int>>;
+	constexpr bool testi =  has_insert_v<std::vector<int>>;
+
+
+	int const* vec0 = anotherInstance->GetProperty<int>("aVector[0]");
 
 	return 0;
 }
