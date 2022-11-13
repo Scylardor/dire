@@ -1662,9 +1662,9 @@ struct TypedArrayPropertyCRUDHandler2<T,
 
 	static unsigned ArrayElementReflectableID() // TODO: ReflectableID
 	{
-		if constexpr (std::is_base_of_v<Reflectable2, T>)
+		if constexpr (std::is_base_of_v<Reflectable2, ElementValueType>)
 		{
-			return T::GetClassReflectableTypeInfo().ReflectableID;
+			return ElementValueType::GetClassReflectableTypeInfo().ReflectableID;
 		}
 		else
 		{
@@ -1878,41 +1878,39 @@ struct Reflectable2
 		ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
 
 		// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
-		int propOffset = -thisTypeInfo->VirtualOffset;
+		std::byte const* propertyAddr = reinterpret_cast<std::byte const*>(this) - thisTypeInfo->VirtualOffset;
 
-		// Test for array property - the syntax uses the standard "[]" array subscript operator
+		// Test for either array or compound access and branch into the one seen first
+		// compound property syntax uses the standard "." accessor
+		// array property syntax uses the standard "[]" array subscript operator
+		size_t const dotPos = pName.find('.');
 		size_t const leftBrackPos = pName.find('[');
-		if (leftBrackPos != pName.npos)
+		if (dotPos != pName.npos && dotPos < leftBrackPos) // it's a compound
+		{
+			std::string_view compoundPropName = std::string_view(pName.data(), dotPos);
+			return GetCompoundProperty<TProp>(thisTypeInfo, compoundPropName, pName, propertyAddr);
+		}
+		else if (leftBrackPos != pName.npos && leftBrackPos < dotPos) // it's an array
 		{
 			size_t const rightBrackPos = pName.find(']');
 			// If there is a mismatched bracket, or the closing bracket is before the opening one,
 			// or there is no number between the two brackets, the expression has to be ill-formed!
-			if (rightBrackPos == pName.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos+1)
+			if (rightBrackPos == pName.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 1)
 			{
 				return nullptr;
 			}
 			int propIndex = atoi(pName.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
 			std::string_view propName = std::string_view(pName.data(), leftBrackPos);
-			pName.remove_prefix(rightBrackPos+1);
-			return GetArrayProperty<TProp>(thisTypeInfo, propName, pName, propIndex, propOffset);
+			pName.remove_prefix(rightBrackPos + 1);
+			return GetArrayProperty<TProp>(thisTypeInfo, propName, pName, propIndex, propertyAddr);
 		}
-
-		// Test for compound property - the syntax uses the standard "." accessor
-		size_t const dotPos = pName.find('.');
-		bool const isCompoundProp = dotPos != pName.npos;
-		if (isCompoundProp)
-		{
-			std::string_view compoundPropName = std::string_view(pName.data(), dotPos);
-
-			return GetCompoundProperty<TProp>(thisTypeInfo, compoundPropName, pName, propOffset);
-		}
-
+		
 		// Otherwise: search for a "normal" property
 		for (TypeInfo2 const& prop : thisTypeInfo->Properties)
 		{
 			if (prop.name == pName)
 			{
-				return GetMemberAtOffset<TProp>(propOffset + prop.offset);
+				return reinterpret_cast<TProp const*>(propertyAddr + prop.offset);
 			}
 		}
 
@@ -1920,14 +1918,14 @@ struct Reflectable2
 		auto [parentClass, parentProperty] = thisTypeInfo->FindParentClassProperty(pName);
 		if (parentClass != nullptr && parentProperty != nullptr) // A parent property was found
 		{
-			return GetMemberAtOffset<TProp>(propOffset + parentProperty->offset);
+			return reinterpret_cast<TProp const*>(propertyAddr + parentProperty->offset);
 		}
 
 		return nullptr;
 	}
 
 	template <typename TProp>
-	[[nodiscard]] TProp const* GetArrayProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pRemainingPath, int pArrayIdx, int pTotalOffset) const
+	[[nodiscard]] TProp const* GetArrayProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const
 	{
 		// First, find our array property
 		TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
@@ -1936,47 +1934,62 @@ struct Reflectable2
 			return nullptr; // There was no property with the given name.
 		}
 
-		ptrdiff_t propOffset = pTotalOffset + thisProp->offset;
-		void const* propPtr = reinterpret_cast<char const*>(this) + propOffset;
+		pPropPtr += thisProp->offset;
 		ArrayPropertyCRUDHandler const* arrayHandler = thisProp->ArrayHandler;
 
-		return RecurseFindArrayProperty<TProp>(arrayHandler, pName, pRemainingPath, pArrayIdx, pTotalOffset, propPtr);
+		return RecurseFindArrayProperty<TProp>(arrayHandler, pName, pRemainingPath, pArrayIdx, pPropPtr);
 	}
 
 
 	template <typename TProp>
-	[[nodiscard]] TProp const* RecurseFindArrayProperty(ArrayPropertyCRUDHandler const* pArrayHandler, std::string_view pName, std::string_view pRemainingPath, int pArrayIdx, int pTotalOffset, void const* propPtr) const
+	[[nodiscard]] TProp const* RecurseFindArrayProperty(ArrayPropertyCRUDHandler const* pArrayHandler, std::string_view pName, std::string_view pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const
 	{
-		// Tried to access a prop that isn't an array as an array or index is out-of-bounds...
-		if (pArrayHandler == nullptr || pArrayHandler->Size(propPtr) <= pArrayIdx)
+		if (pArrayHandler == nullptr || pArrayHandler->Size(pPropPtr) <= pArrayIdx)
 		{
-			return nullptr;
+			return nullptr; // not an array or index is out-of-bounds
 		}
 
-		void const* elementPtr = pArrayHandler->Read(propPtr, pArrayIdx);
-		if (pRemainingPath.empty())
+		pPropPtr = (std::byte const*) pArrayHandler->Read(pPropPtr, pArrayIdx);
+		if (pRemainingPath.empty()) // this was what we were looking for : return
 		{
-			// We arrived at the end of our path so this was what we were looking for : return
-			return static_cast<TProp const*>(elementPtr);
+			return reinterpret_cast<TProp const*>(pPropPtr);
 		}
 
 		// There is more to eat: find out if we're looking for an array in an array or a compound
-		// Test for array property - the syntax uses the standard "[]" array subscript operator
-		size_t const dotPos = pRemainingPath.find('.');
+		size_t dotPos = pRemainingPath.find('.');
 		size_t const leftBrackPos = pRemainingPath.find('[');
 		if (dotPos == pRemainingPath.npos && leftBrackPos == pRemainingPath.npos)
 		{
-			return nullptr; // there was more path but it's not an array neither a compound? I don't know how to read it!
+			return nullptr; // it's not an array neither a compound? I don't know how to read it!
 		}
 		if (dotPos != pRemainingPath.npos && dotPos < leftBrackPos) // it's a compound in an array
 		{
-			pName = std::string_view(pRemainingPath.data(), dotPos);
 			ReflectableTypeInfo const* arrayElemTypeInfo = Reflector3::GetSingleton().GetTypeInfo(pArrayHandler->ElementReflectableID());
-			if (arrayElemTypeInfo == nullptr) // Tried to access a compound type that is not Reflectable...
+			if (arrayElemTypeInfo == nullptr) // compound type that is not Reflectable...
 			{
 				return nullptr;
 			}
-			return GetCompoundProperty<TProp>(arrayElemTypeInfo, pName, pRemainingPath, pTotalOffset);
+			pRemainingPath.remove_prefix(1); // strip the leading dot
+			// Lookup the next dot (if any) to know if we should search for a compound or an array.
+			dotPos = pRemainingPath.find('.');
+			// Use leftBrackPos-1 because it was computed before stripping the leading dot, so it is off by 1
+			auto suffixPos = (dotPos != pRemainingPath.npos || leftBrackPos != pRemainingPath.npos ? std::min(dotPos, leftBrackPos-1) : 0);
+			pName = std::string_view(pRemainingPath.data() + dotPos + 1, pRemainingPath.length() - (dotPos + 1));
+			dotPos = pName.find('.');
+			if (dotPos < leftBrackPos) // next entry is a compound
+				return GetCompoundProperty<TProp>(arrayElemTypeInfo, pName, pRemainingPath, pPropPtr);
+			else // next entry is an array
+			{
+				size_t const rightBrackPos = pRemainingPath.find(']');
+				if (rightBrackPos == pRemainingPath.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 2) //+2 because leftBrackPos is off by 1
+				{
+					return nullptr;
+				}
+				int propIndex = atoi(pRemainingPath.data() + leftBrackPos); // TODO: use own atoi to avoid multi-k-LOC dependency!
+				pName = std::string_view(pRemainingPath.data(), pRemainingPath.length() - suffixPos + 1);
+				pRemainingPath.remove_prefix(rightBrackPos + 1);
+				return GetArrayProperty<TProp>(arrayElemTypeInfo, pName, pRemainingPath, propIndex, pPropPtr);
+			}
 		}
 		else if (leftBrackPos != pRemainingPath.npos && leftBrackPos < dotPos) // it's an array in an array
 		{
@@ -1997,15 +2010,16 @@ struct Reflectable2
 
 			int propIndex = atoi(pRemainingPath.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
 			pRemainingPath.remove_prefix(rightBrackPos + 1);
-			return RecurseFindArrayProperty<TProp>(elementHandler, pName, pRemainingPath, propIndex, pTotalOffset, elementPtr);
+			return RecurseFindArrayProperty<TProp>(elementHandler, pName, pRemainingPath, propIndex, pPropPtr);
 		}
 
+		assert(false);
 		return nullptr; // Never supposed to arrive here!
 	}
 
 	// TODO: I think pTotalOffset can drop the reference
 	template <typename TProp>
-	[[nodiscard]] TProp const* GetCompoundProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pFullPath, int& pTotalOffset) const
+	[[nodiscard]] TProp const*  GetCompoundProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pFullPath, std::byte const* propertyAddr) const
 	{
 		// First, find our compound property
 		TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
@@ -2019,13 +2033,13 @@ struct Reflectable2
 		pFullPath.remove_prefix(std::min(pName.size() + 1, pFullPath.size()));
 
 		// Now, add the offset of the compound to the total offset
-		pTotalOffset += (int)thisProp->offset;
+		propertyAddr += (int)thisProp->offset;
 
 		// Do we need to go deeper?
 		if (pFullPath.empty())
 		{
 			// No: just return the variable at the current offset
-			return GetMemberAtOffset<TProp>(pTotalOffset);
+			return reinterpret_cast<TProp const*>(propertyAddr);
 		}
 
 		// Yes: recurse one more time, this time using this property's type info (needs to be Reflectable)
@@ -2045,7 +2059,27 @@ struct Reflectable2
 		{
 			pName = pFullPath;
 		}
-		return GetCompoundProperty<TProp>(pTypeInfoOwner, pName, pFullPath, pTotalOffset);
+
+		// Check if we are looking for an array in the compound...
+		size_t const leftBrackPos = pName.find('[');
+		if (leftBrackPos != pName.npos) // it's an array
+		{
+			size_t const rightBrackPos = pName.find(']');
+			// If there is a mismatched bracket, or the closing bracket is before the opening one,
+			// or there is no number between the two brackets, the expression has to be ill-formed!
+			if (rightBrackPos == pName.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 1)
+			{
+				return nullptr;
+			}
+			int propIndex = atoi(pName.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
+			std::string_view propName = std::string_view(pName.data(), leftBrackPos);
+			pFullPath.remove_prefix(rightBrackPos + 1);
+			return GetArrayProperty<TProp>(pTypeInfoOwner, propName, pFullPath, propIndex, propertyAddr);
+		}
+		else
+		{
+			return GetCompoundProperty<TProp>(pTypeInfoOwner, pName, pFullPath, propertyAddr);
+		}
 	}
 
 	/* Version that returns a reference for when you are 100% confident this property exists */
@@ -2518,6 +2552,34 @@ reflectable_struct(testcompound)
 	testcompound() = default;
 };
 
+reflectable_struct(SuperCompound)
+{
+	DECLARE_REFLECTABLE_INFO()
+
+	DECLARE_ARRAY_PROPERTY(int, titi, [5])
+
+};
+
+reflectable_struct(MegaCompound)
+{
+	DECLARE_REFLECTABLE_INFO()
+
+	DECLARE_VALUED_PROPERTY(int, compint, 0x2a2a)
+	DECLARE_PROPERTY(testcompound2, compleet)
+	DECLARE_ARRAY_PROPERTY(SuperCompound, toto, [3])
+
+	MegaCompound() = default;
+};
+
+reflectable_struct(UltraCompound)
+{
+	DECLARE_REFLECTABLE_INFO()
+
+	DECLARE_PROPERTY(MegaCompound, mega)
+
+	UltraCompound() = default;
+};
+
 reflectable_struct(yolo, a, FatOfTheLand) // an example of multiple inheritance
 {
 	DECLARE_REFLECTABLE_INFO()
@@ -2552,6 +2614,9 @@ reflectable_struct(c,yolo)
 	DECLARE_VALUED_PROPERTY(std::vector<int>, aVector, 1, 2, 3)
 	DECLARE_ARRAY_PROPERTY(int, anArray, [10])
 	DECLARE_ARRAY_PROPERTY(int, aMultiArray, [10][10])
+
+	DECLARE_PROPERTY(MegaCompound, mega);
+	DECLARE_PROPERTY(UltraCompound, ultra);
 
 	c() = default;
 
@@ -2818,17 +2883,23 @@ int main()
 
 	int const* monCompint = (int const*)(reinterpret_cast<std::byte const*>(anotherInstance) + 88);
 	int const* compint = anotherInstance->GetProperty<int>("compvar.compint");
+	assert(*compint == 0x2a2a);
 
 	int const* compleet = anotherInstance->GetProperty<int>("compvar.compleet.leet");
+	assert(*compleet == 1337);
 
 	int const& compleetRef = anotherInstance->GetSafeProperty<int>("compvar.compleet.leet");
+	assert(compleetRef == 1337);
 
 	bool edited = anotherInstance->SetProperty<int>("compvar.compleet.leet", 42);
+	assert(edited);
 
 	unsigned const* totoRef = anotherInstance->GetProperty<unsigned>("ctoto");
 
 	edited = anotherInstance->SetProperty<unsigned>("ctoto", 1);
+	assert(edited);
 	edited = anotherInstance->SetProperty<int>("compvar.compleet.leet", 0x2a2a);
+	assert(edited);
 
 	constexpr bool hasBrackets1 = has_Brackets_v< std::string>;
 	constexpr bool hasBrackets2 = has_Brackets_v< std::vector<int>>;
@@ -2891,12 +2962,20 @@ int main()
 
 	anotherInstance->anArray[5] = 42;
 	int const* arr0 = anotherInstance->GetProperty<int>("anArray[5]");
+	assert(*arr0 == 42);
+
 	anotherInstance->aMultiArray[1][2] = 1337;
 	int const* arr1 = anotherInstance->GetProperty<int>("aMultiArray[1][2]");
+	assert(*arr1 == 1337);
 
-	int amultiarray[10][10];
-	std::decay<decltype(std::declval<int[10][10]>()[0])>::type testarray2;
-	bool b = std::is_array_v<decltype(testarray2)>;
+	anotherInstance->mega.toto[2].titi[3] = 9999;
+	int const* arr2 = anotherInstance->GetProperty<int>("mega.toto[2].titi[3]");
+	assert(*arr2 == 9999);
+
+	anotherInstance->ultra.mega.toto[0].titi[2] = 0x7f7f;
+	int const* arr3 = anotherInstance->GetProperty<int>("ultra.mega.toto[0].titi[2]");
+	assert(*arr3 == 0x7f7f);
+
 	return 0;
 }
 
