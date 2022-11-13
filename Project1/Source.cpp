@@ -1179,8 +1179,8 @@ private:
 			return offsetof(Self, name); \
 		} \
     }; \
-	type name[size]{};\
-	inline static ReflectProperty3<Self, type> name##_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, name##_tag::Offset() };
+	type name##size{};\
+	inline static ReflectProperty3<Self, type##size> name##_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, name##_tag::Offset() };
 
 
 #ifdef _MSC_VER // MSVC compilers
@@ -1406,7 +1406,9 @@ struct ArrayPropertyCRUDHandler
 	using ArrayCreateFptr = void (*)(void* , size_t , void const* );
 	using ArrayEraseFptr = void	(*)(void* , size_t );
 	using ArrayClearFptr = void	(*)(void* );
-	using ArraySizeFptr = size_t(*)(void*);
+	using ArraySizeFptr = size_t(*)(void const*);
+	using ArrayElementHandlerFptr = ArrayPropertyCRUDHandler const* (*)();
+	using ArrayElementReflectableIDFptr = unsigned (*)();
 
 	ArrayReadFptr	Read = nullptr;
 	ArrayUpdateFptr Update = nullptr;
@@ -1414,6 +1416,8 @@ struct ArrayPropertyCRUDHandler
 	ArrayEraseFptr	Erase = nullptr;
 	ArrayClearFptr	Clear = nullptr;
 	ArraySizeFptr	Size = nullptr;
+	ArrayElementHandlerFptr	ElementHandler = nullptr;
+	ArrayElementReflectableIDFptr ElementReflectableID = nullptr;
 };
 
 // CRUD = Create, Read, Update, Delete
@@ -1438,6 +1442,8 @@ struct TypedArrayPropertyCRUDHandler2<T,
 		Erase = &ArrayErase;
 		Clear = &ArrayClear;
 		Size = &ArraySize;
+		ElementHandler = &ArrayElementHandler;
+		ElementReflectableID = &ArrayElementReflectableID;
 	}
 
 	static_assert(has_Brackets_v<T>
@@ -1498,28 +1504,67 @@ struct TypedArrayPropertyCRUDHandler2<T,
 		}
 	}
 
-	static size_t	ArraySize(void* pArray)
+	static size_t	ArraySize(void const* pArray)
 	{
 		if (pArray != nullptr)
 		{
-			T* thisArray = static_cast<T*>(pArray);
+			T const* thisArray = static_cast<T const*>(pArray);
 			return thisArray->size();
 		}
 
 		return 0;
+	}
+
+	static ArrayPropertyCRUDHandler const*	ArrayElementHandler()
+	{
+		if constexpr (std::is_array_v<ElementValueType> || has_Brackets_v<ElementValueType>)
+		{
+			return &TypedArrayPropertyCRUDHandler2<ElementValueType>::GetInstance();
+		}
+		return nullptr;
+	}
+
+	static unsigned ArrayElementReflectableID() // TODO: ReflectableID
+	{
+		if constexpr (std::is_base_of_v<Reflectable2, T>)
+		{
+			return T::GetClassReflectableTypeInfo().ReflectableID;
+		}
+		else
+		{
+			return INVALID_REFLECTABLE_ID;
+		}
+	}
+
+	static TypedArrayPropertyCRUDHandler2 const&	GetInstance()
+	{
+		static TypedArrayPropertyCRUDHandler2 instance{};
+		return instance;
 	}
 };
 
 // Base class for reflectable properties that are C-arrays to be able to make operations on the underlying array
 template <typename T>
 struct TypedArrayPropertyCRUDHandler2<T,
-	typename std::enable_if_t<std::is_array_v<T>>>
+	typename std::enable_if_t<std::is_array_v<T>>> : ArrayPropertyCRUDHandler
 {
 	using ElementType = decltype(std::declval<T>()[0]);
-	// Decaying removes the references and fixes the compile error "pointer to reference is illegal"
-	using ElementValueType = std::decay_t<ElementType>;
+	// remove_reference_t removes the references and fixes the compile error "pointer to reference is illegal"
+	using ElementValueType = std::remove_reference_t<ElementType>;
 
 	inline static const size_t ARRAY_SIZE = std::extent_v<T>;
+
+	TypedArrayPropertyCRUDHandler2()
+	{
+		Read = &ArrayRead;
+		Update = &ArrayUpdate;
+		Create = &ArrayCreate;
+		Erase = &ArrayErase;
+		Clear = &ArrayClear;
+		Size = &ArraySize;
+		ElementHandler = &ArrayElementHandler;
+		ElementReflectableID = &ArrayElementReflectableID;
+	}
 
 	static void const* ArrayRead(void const* pArray, size_t pIndex)
 	{
@@ -1538,9 +1583,13 @@ struct TypedArrayPropertyCRUDHandler2<T,
 			return;
 		}
 
-		T* thisArray = static_cast<T*>(pArray);
-		ElementValueType const* actualData = static_cast<ElementValueType const*>(pNewData);
-		(*thisArray)[pIndex] = *actualData;
+		// Check if the element is assignable to make arrays of arrays work
+		if constexpr (std::is_assignable_v<ElementValueType, ElementValueType>)
+		{
+			T* thisArray = static_cast<T*>(pArray);
+			ElementValueType const* actualData = static_cast<ElementValueType const*>(pNewData);
+			(*thisArray)[pIndex] = *actualData;
+		}
 	}
 
 	static void	ArrayCreate(void* pArray, size_t pAtIndex, void const* pInitData)
@@ -1553,9 +1602,13 @@ struct TypedArrayPropertyCRUDHandler2<T,
 		// TODO: throw exception if exceptions are enabled
 		assert(pAtIndex < ARRAY_SIZE);
 
-		T* thisArray = static_cast<T*>(pArray);
-		ElementValueType const* actualInitData = (pInitData ? static_cast<ElementValueType const*>(pInitData) : nullptr);
-		(*thisArray)[pAtIndex] = actualInitData ? *actualInitData : ElementValueType();
+		// Check if the element is assignable to make arrays of arrays work
+		if constexpr (std::is_assignable_v<ElementValueType, ElementValueType>)
+		{
+			T* thisArray = static_cast<T*>(pArray);
+			ElementValueType const* actualInitData = (pInitData ? static_cast<ElementValueType const*>(pInitData) : nullptr);
+			(*thisArray)[pAtIndex] = actualInitData ? *actualInitData : ElementValueType();
+		}
 	}
 
 	static void	ArrayErase(void* pArray, size_t pAtIndex)
@@ -1565,8 +1618,12 @@ struct TypedArrayPropertyCRUDHandler2<T,
 			return;
 		}
 
-		T* thisArray = static_cast<T*>(pArray);
-		(*thisArray)[pAtIndex] = ElementValueType();
+		// Check if the element is assignable to make arrays of arrays work
+		if constexpr (std::is_assignable_v<ElementValueType, ElementValueType>)
+		{
+			T* thisArray = static_cast<T*>(pArray);
+			(*thisArray)[pAtIndex] = ElementValueType();
+		}
 	}
 
 	static void	ArrayClear(void* pArray)
@@ -1576,20 +1633,51 @@ struct TypedArrayPropertyCRUDHandler2<T,
 			return;
 		}
 
-		T* thisArray = static_cast<T*>(pArray);
 		// I don't know if we can do something smarter in this case...
-		for (auto i = 0u; i < ARRAY_SIZE; ++i)
+		// Check if the element is assignable to make arrays of arrays work
+		if constexpr (std::is_assignable_v<ElementValueType, ElementValueType>)
 		{
-			(*thisArray)[i] = ElementValueType();
+			T* thisArray = static_cast<T*>(pArray);
+			for (auto i = 0u; i < ARRAY_SIZE; ++i)
+			{
+				(*thisArray)[i] = ElementValueType();
+			}
 		}
 	}
 
-	static size_t	ArraySize(void* /*pArray*/)
+	static size_t	ArraySize(void const* /*pArray*/)
 	{
 		return ARRAY_SIZE;
 	}
-};
 
+	// TODO: Refactor because there is code duplication between the two handler types
+	static ArrayPropertyCRUDHandler const* ArrayElementHandler()
+	{
+		if constexpr (std::is_array_v<ElementValueType> || has_Brackets_v<ElementValueType>)
+		{
+			return &TypedArrayPropertyCRUDHandler2<ElementValueType>::GetInstance();
+		}
+		return nullptr;
+	}
+
+	static unsigned ArrayElementReflectableID() // TODO: ReflectableID
+	{
+		if constexpr (std::is_base_of_v<Reflectable2, T>)
+		{
+			return T::GetClassReflectableTypeInfo().ReflectableID;
+		}
+		else
+		{
+			return INVALID_REFLECTABLE_ID;
+		}
+	}
+
+	static TypedArrayPropertyCRUDHandler2 const& GetInstance()
+	{
+		static TypedArrayPropertyCRUDHandler2 instance{};
+		return instance;
+	}
+};
 
 
 
@@ -1611,14 +1699,11 @@ struct ReflectProperty3 : TypeInfo2
 			reflectableID = INVALID_REFLECTABLE_ID;
 		}
 
-		if constexpr (std::is_array_v<T> || has_Brackets_v<T>)
+		if constexpr (std::is_array_v<TProp> || has_Brackets_v<TProp>)
 		{
-			ArrayHandler = &theTypeArrayCRUDHandler;
+			ArrayHandler = &TypedArrayPropertyCRUDHandler2<TProp>::GetInstance();
 		}
 	}
-
-private:
-	inline static const TypedArrayPropertyCRUDHandler2<T>	theTypeArrayCRUDHandler{};
 };
 
 
@@ -1795,6 +1880,23 @@ struct Reflectable2
 		// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
 		int propOffset = -thisTypeInfo->VirtualOffset;
 
+		// Test for array property - the syntax uses the standard "[]" array subscript operator
+		size_t const leftBrackPos = pName.find('[');
+		if (leftBrackPos != pName.npos)
+		{
+			size_t const rightBrackPos = pName.find(']');
+			// If there is a mismatched bracket, or the closing bracket is before the opening one,
+			// or there is no number between the two brackets, the expression has to be ill-formed!
+			if (rightBrackPos == pName.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos+1)
+			{
+				return nullptr;
+			}
+			int propIndex = atoi(pName.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
+			std::string_view propName = std::string_view(pName.data(), leftBrackPos);
+			pName.remove_prefix(rightBrackPos+1);
+			return GetArrayProperty<TProp>(thisTypeInfo, propName, pName, propIndex, propOffset);
+		}
+
 		// Test for compound property - the syntax uses the standard "." accessor
 		size_t const dotPos = pName.find('.');
 		bool const isCompoundProp = dotPos != pName.npos;
@@ -1805,6 +1907,7 @@ struct Reflectable2
 			return GetCompoundProperty<TProp>(thisTypeInfo, compoundPropName, pName, propOffset);
 		}
 
+		// Otherwise: search for a "normal" property
 		for (TypeInfo2 const& prop : thisTypeInfo->Properties)
 		{
 			if (prop.name == pName)
@@ -1821,6 +1924,83 @@ struct Reflectable2
 		}
 
 		return nullptr;
+	}
+
+	template <typename TProp>
+	[[nodiscard]] TProp const* GetArrayProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pRemainingPath, int pArrayIdx, int pTotalOffset) const
+	{
+		// First, find our array property
+		TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
+		if (thisProp == nullptr)
+		{
+			return nullptr; // There was no property with the given name.
+		}
+
+		ptrdiff_t propOffset = pTotalOffset + thisProp->offset;
+		void const* propPtr = reinterpret_cast<char const*>(this) + propOffset;
+		ArrayPropertyCRUDHandler const* arrayHandler = thisProp->ArrayHandler;
+
+		return RecurseFindArrayProperty<TProp>(arrayHandler, pName, pRemainingPath, pArrayIdx, pTotalOffset, propPtr);
+	}
+
+
+	template <typename TProp>
+	[[nodiscard]] TProp const* RecurseFindArrayProperty(ArrayPropertyCRUDHandler const* pArrayHandler, std::string_view pName, std::string_view pRemainingPath, int pArrayIdx, int pTotalOffset, void const* propPtr) const
+	{
+		// Tried to access a prop that isn't an array as an array or index is out-of-bounds...
+		if (pArrayHandler == nullptr || pArrayHandler->Size(propPtr) <= pArrayIdx)
+		{
+			return nullptr;
+		}
+
+		void const* elementPtr = pArrayHandler->Read(propPtr, pArrayIdx);
+		if (pRemainingPath.empty())
+		{
+			// We arrived at the end of our path so this was what we were looking for : return
+			return static_cast<TProp const*>(elementPtr);
+		}
+
+		// There is more to eat: find out if we're looking for an array in an array or a compound
+		// Test for array property - the syntax uses the standard "[]" array subscript operator
+		size_t const dotPos = pRemainingPath.find('.');
+		size_t const leftBrackPos = pRemainingPath.find('[');
+		if (dotPos == pRemainingPath.npos && leftBrackPos == pRemainingPath.npos)
+		{
+			return nullptr; // there was more path but it's not an array neither a compound? I don't know how to read it!
+		}
+		if (dotPos != pRemainingPath.npos && dotPos < leftBrackPos) // it's a compound in an array
+		{
+			pName = std::string_view(pRemainingPath.data(), dotPos);
+			ReflectableTypeInfo const* arrayElemTypeInfo = Reflector3::GetSingleton().GetTypeInfo(pArrayHandler->ElementReflectableID());
+			if (arrayElemTypeInfo == nullptr) // Tried to access a compound type that is not Reflectable...
+			{
+				return nullptr;
+			}
+			return GetCompoundProperty<TProp>(arrayElemTypeInfo, pName, pRemainingPath, pTotalOffset);
+		}
+		else if (leftBrackPos != pRemainingPath.npos && leftBrackPos < dotPos) // it's an array in an array
+		{
+			size_t const rightBrackPos = pRemainingPath.find(']');
+			// If there is a mismatched bracket, or the closing bracket is before the opening one,
+			// or there is no number between the two brackets, the expression has to be ill-formed!
+			if (rightBrackPos == pRemainingPath.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 1)
+			{
+				return nullptr;
+			}
+
+			ArrayPropertyCRUDHandler const* elementHandler = pArrayHandler->ElementHandler();
+
+			if (elementHandler == nullptr)
+			{
+				return nullptr; // Tried to access a property type that is not an array or not a Reflectable
+			}
+
+			int propIndex = atoi(pRemainingPath.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
+			pRemainingPath.remove_prefix(rightBrackPos + 1);
+			return RecurseFindArrayProperty<TProp>(elementHandler, pName, pRemainingPath, propIndex, pTotalOffset, elementPtr);
+		}
+
+		return nullptr; // Never supposed to arrive here!
 	}
 
 	// TODO: I think pTotalOffset can drop the reference
@@ -2370,7 +2550,8 @@ reflectable_struct(c,yolo)
 
 
 	DECLARE_VALUED_PROPERTY(std::vector<int>, aVector, 1, 2, 3)
-	DECLARE_ARRAY_PROPERTY(int, anArray, 10)
+	DECLARE_ARRAY_PROPERTY(int, anArray, [10])
+	DECLARE_ARRAY_PROPERTY(int, aMultiArray, [10][10])
 
 	c() = default;
 
@@ -2708,6 +2889,14 @@ int main()
 
 	int const* vec0 = anotherInstance->GetProperty<int>("aVector[0]");
 
+	anotherInstance->anArray[5] = 42;
+	int const* arr0 = anotherInstance->GetProperty<int>("anArray[5]");
+	anotherInstance->aMultiArray[1][2] = 1337;
+	int const* arr1 = anotherInstance->GetProperty<int>("aMultiArray[1][2]");
+
+	int amultiarray[10][10];
+	std::decay<decltype(std::declval<int[10][10]>()[0])>::type testarray2;
+	bool b = std::is_array_v<decltype(testarray2)>;
 	return 0;
 }
 
