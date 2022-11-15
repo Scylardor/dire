@@ -2086,35 +2086,10 @@ struct Reflectable2
 	template <typename TProp>
 	[[nodiscard]] TProp const& GetSafeProperty(std::string_view pName) const
 	{
-		ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
-
-		// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
-		int propOffset = -thisTypeInfo->VirtualOffset;
-
-		// Test for compound property - the syntax uses the standard "." accessor
-		size_t const dotPos = pName.find('.');
-		bool const isCompoundProp = dotPos != pName.npos;
-		if (isCompoundProp)
+		TProp const* propPtr = GetProperty<TProp>(pName);
+		if (propPtr != nullptr)
 		{
-			std::string_view compoundPropName = std::string_view(pName.data(), dotPos);
-
-
-			return GetSafeCompoundProperty<TProp>(thisTypeInfo, compoundPropName, pName, propOffset);
-		}
-
-		for (TypeInfo2 const& prop : thisTypeInfo->Properties)
-		{
-			if (prop.name == pName)
-			{
-				return *GetMemberAtOffset<TProp>(propOffset + prop.offset);
-			}
-		}
-
-		// Maybe in the parent classes?
-		auto [parentClass, parentProperty] = thisTypeInfo->FindParentClassProperty(pName);
-		if (parentClass != nullptr && parentProperty != nullptr) // A parent property was found
-		{
-			return *GetMemberAtOffset<TProp>(propOffset + parentProperty->offset);
+			return *propPtr;
 		}
 
 		// throw exception, or assert
@@ -2123,134 +2098,21 @@ struct Reflectable2
 		throw std::runtime_error("bad");
 	}
 
-	// TODO: I think pTotalOffset can drop the reference
-	template <typename TProp>
-	[[nodiscard]] TProp const& GetSafeCompoundProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pFullPath, int& pTotalOffset) const
-	{
-		// First, find our compound property
-		TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
-		if (thisProp == nullptr)
-		{
-			assert(false);
-			throw std::runtime_error("uh oh"); // should not happen
-		}
-
-		// We found our compound property: consume its name from the "full path"
-		// +1 to also remove the '.', except if we are at the last nested property.
-		pFullPath.remove_prefix(std::min(pName.size() + 1, pFullPath.size()));
-
-		// Now, add the offset of the compound to the total offset
-		pTotalOffset += (int)thisProp->offset;
-
-		// Do we need to go deeper?
-		if (pFullPath.empty())
-		{
-			// No: just return the variable at the current offset
-			return *GetMemberAtOffset<TProp>(pTotalOffset);
-		}
-
-		// Yes: recurse one more time, this time using this property's type info (needs to be Reflectable)
-		pTypeInfoOwner = Reflector3::GetSingleton().GetTypeInfo(thisProp->reflectableID);
-		if (pTypeInfoOwner == nullptr) // This type isn't reflectable? Nothing I can do for you...
-		{
-			assert(false);
-			throw std::runtime_error("uh oh"); // should not happen
-		}
-
-		// Update the next property's name to search for it.
-		size_t const dotPos = pFullPath.find('.');
-		if (dotPos != pFullPath.npos)
-		{
-			pName = std::string_view(pFullPath.data(), dotPos);
-		}
-		else
-		{
-			pName = pFullPath;
-		}
-		return GetSafeCompoundProperty<TProp>(pTypeInfoOwner, pName, pFullPath, pTotalOffset);
-	}
-
 
 	template <typename TProp>
 	bool SetProperty(std::string_view pName, TProp&& pSetValue)
 	{
-		ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
-		if (thisTypeInfo == nullptr)
+		TProp const* propPtr = GetProperty<TProp>(pName);
+		if (propPtr == nullptr)
 		{
 			return false;
 		}
 
-		// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
-		int const propOffset = -thisTypeInfo->VirtualOffset;
-
-		// Test for compound property - the syntax uses the standard "." accessor
-		size_t const dotPos = pName.find('.');
-		if (dotPos != pName.npos)
-		{
-			std::string_view compoundPropName = std::string_view(pName.data(), dotPos);
-
-			return SetCompoundProperty(thisTypeInfo, compoundPropName, pName, propOffset, std::forward<TProp>(pSetValue));
-		}
-
-		TypeInfo2 const* propTypeInfo = thisTypeInfo->FindPropertyInHierarchy(pName);
-
-		if (propTypeInfo != nullptr)
-		{
-			auto* theEditedProp = EditMemberAtOffset<TProp>(propOffset + propTypeInfo->offset);
-			*theEditedProp = std::forward<TProp>(pSetValue);
-			return true;
-		}
-
-		return false;
+		TProp* editablePropPtr = const_cast<TProp*>(propPtr);
+		(*editablePropPtr) = std::forward<TProp>(pSetValue);
+		return true;
 	}
 	
-	template <typename TProp>
-	bool SetCompoundProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pFullPath, int pTotalOffset, TProp&& pSetValue)
-	{
-		// First, find our compound property
-		TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
-		if (thisProp == nullptr)
-		{
-			return false; // There was no property with the given name.
-		}
-
-		// We found our compound property: consume its name from the "full path"
-		// +1 to also remove the '.', except if we are at the last nested property.
-		pFullPath.remove_prefix(std::min(pName.size() + 1, pFullPath.size()));
-
-		// Now, add the offset of the compound to the total offset
-		pTotalOffset += (int)thisProp->offset;
-
-		// Do we need to go deeper?
-		if (pFullPath.empty())
-		{
-			// No: just edit the variable at the current offset
-			auto* theEditedProp = EditMemberAtOffset<TProp>(pTotalOffset);
-			*theEditedProp = std::forward<TProp>(pSetValue);
-			return true;
-		}
-
-		// Yes: recurse one more time, this time using this property's type info (needs to be Reflectable)
-		pTypeInfoOwner = Reflector3::GetSingleton().GetTypeInfo(thisProp->reflectableID);
-		if (pTypeInfoOwner == nullptr)
-		{
-			return false; // This type isn't reflectable? Nothing I can do for you...
-		}
-
-		// Update the next property's name to search for it.
-		size_t const dotPos = pFullPath.find('.');
-		if (dotPos != pFullPath.npos)
-		{
-			pName = std::string_view(pFullPath.data(), dotPos);
-		}
-		else
-		{
-			pName = pFullPath;
-		}
-
-		return SetCompoundProperty<TProp>(pTypeInfoOwner, pName, pFullPath, pTotalOffset, std::forward<TProp>(pSetValue));
-	}
-
 	[[nodiscard]] FunctionInfo const* GetFunction(std::string_view pMemberFuncName) const
 	{
 		ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
@@ -2892,14 +2754,15 @@ int main()
 	assert(compleetRef == 1337);
 
 	bool edited = anotherInstance->SetProperty<int>("compvar.compleet.leet", 42);
-	assert(edited);
+	assert(edited && anotherInstance->compvar.compleet.leet == 42);
 
 	unsigned const* totoRef = anotherInstance->GetProperty<unsigned>("ctoto");
+	assert(*totoRef == 0xdeadbeef);
 
 	edited = anotherInstance->SetProperty<unsigned>("ctoto", 1);
-	assert(edited);
+	assert(edited && anotherInstance->ctoto == 1);
 	edited = anotherInstance->SetProperty<int>("compvar.compleet.leet", 0x2a2a);
-	assert(edited);
+	assert(edited && anotherInstance->compvar.compleet.leet == 0x2a2a);
 
 	constexpr bool hasBrackets1 = has_Brackets_v< std::string>;
 	constexpr bool hasBrackets2 = has_Brackets_v< std::vector<int>>;
@@ -2967,14 +2830,20 @@ int main()
 	anotherInstance->aMultiArray[1][2] = 1337;
 	int const* arr1 = anotherInstance->GetProperty<int>("aMultiArray[1][2]");
 	assert(*arr1 == 1337);
+	bool modified = anotherInstance->SetProperty<int>("aMultiArray[1][2]", 5656);
+	assert(modified && *arr1 == 5656);
 
 	anotherInstance->mega.toto[2].titi[3] = 9999;
 	int const* arr2 = anotherInstance->GetProperty<int>("mega.toto[2].titi[3]");
 	assert(*arr2 == 9999);
+	modified = anotherInstance->SetProperty<int>("mega.toto[2].titi[3]", 5678);
+	assert(modified && *arr2 == 5678);
 
 	anotherInstance->ultra.mega.toto[0].titi[2] = 0x7f7f;
 	int const* arr3 = anotherInstance->GetProperty<int>("ultra.mega.toto[0].titi[2]");
 	assert(*arr3 == 0x7f7f);
+	modified = anotherInstance->SetProperty<int>("ultra.mega.toto[0].titi[2]", 0xabcd);
+	assert(modified && *arr3 == 0xabcd);
 
 	return 0;
 }
