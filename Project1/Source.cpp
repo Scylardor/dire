@@ -1452,7 +1452,7 @@ struct TypedArrayPropertyCRUDHandler2<T,
 		&& has_clear_v<T>
 		&& has_size_v<T>,
 		"In order to use Array-style reflection indexing, your type has to implement the following member functions with the same signature-style as std::vector:"
-			" operator[], begin, insert(iterator, value), erase, clear, size.");
+			" operator[], begin, insert(iterator, value), erase, clear, size, resize.");
 
 	static void const* ArrayRead(void const* pArray, size_t pIndex)
 	{
@@ -1460,30 +1460,36 @@ struct TypedArrayPropertyCRUDHandler2<T,
 		{
 			return nullptr;
 		}
+
+		if (pIndex >= ArraySize(pArray))
+		{
+			ArrayCreate(const_cast<void*>(pArray), pIndex, nullptr);
+		}
+
 		T const* thisArray = static_cast<T const*>(pArray);
 		return &(*thisArray)[pIndex];
 	}
 
 	static void	ArrayUpdate(void* pArray, size_t pIndex, void const* pNewData)
 	{
-		if (pArray == nullptr || pNewData == nullptr)
+		if (pArray == nullptr)
 		{
 			return;
 		}
 
 		T* thisArray = static_cast<T*>(pArray);
+		if (pIndex >= ArraySize(pArray))
+		{
+			thisArray->resize(pIndex + 1);
+		}
+
 		ElementValueType const* actualData = static_cast<ElementValueType const*>(pNewData);
-		(*thisArray)[pIndex] = *actualData;
+		(*thisArray)[pIndex] = actualData ? *actualData : ElementValueType();
 	}
 
 	static void	ArrayCreate(void* pArray, size_t pAtIndex, void const* pInitData)
 	{
-		if (pArray != nullptr)
-		{
-			T* thisArray = static_cast<T*>(pArray);
-			ElementValueType const* actualInitData = (pInitData ? static_cast<ElementValueType const*>(pInitData) : nullptr);
-			thisArray->insert(thisArray->begin() + pAtIndex, actualInitData ? *actualInitData : ElementValueType());
-		}
+		return ArrayUpdate(pArray, pAtIndex, pInitData);
 	}
 
 	static void	ArrayErase(void* pArray, size_t pAtIndex)
@@ -1924,6 +1930,148 @@ struct Reflectable2
 		return nullptr;
 	}
 
+	[[nodiscard]] bool EraseProperty(std::string_view pName)
+	{
+		ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
+
+		return ErasePropertyImpl(thisTypeInfo, pName);
+	}
+
+
+	[[nodiscard]] bool ErasePropertyImpl(ReflectableTypeInfo const* pTypeInfo, std::string_view pName)
+	{
+		// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
+		std::byte * propertyAddr = reinterpret_cast<std::byte *>(this) - pTypeInfo->VirtualOffset;
+
+		// Test for either array or compound access and branch into the one seen first
+		// compound property syntax uses the standard "." accessor
+		// array property syntax uses the standard "[]" array subscript operator
+		size_t const dotPos = pName.find('.');
+		size_t const leftBrackPos = pName.find('[');
+		if (dotPos != pName.npos && dotPos < leftBrackPos) // it's a compound
+		{
+			std::string_view compoundPropName = std::string_view(pName.data(), dotPos);
+			return EraseInCompoundProperty(pTypeInfo, compoundPropName, pName, propertyAddr);
+		}
+		else if (leftBrackPos != pName.npos && leftBrackPos < dotPos) // it's an array
+		{
+			size_t const rightBrackPos = pName.find(']');
+			// If there is a mismatched bracket, or the closing bracket is before the opening one,
+			// or there is no number between the two brackets, the expression has to be ill-formed!
+			if (rightBrackPos == pName.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 1)
+			{
+				return false;
+			}
+			int propIndex = atoi(pName.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
+			std::string_view propName = std::string_view(pName.data(), leftBrackPos);
+			pName.remove_prefix(rightBrackPos + 1);
+			return EraseArrayProperty(pTypeInfo, propName, pName, propIndex, propertyAddr);
+		}
+
+		// Otherwise: maybe in the parent classes?
+		for (ReflectableTypeInfo const* parentClass : pTypeInfo->ParentClasses)
+		{
+			if (ErasePropertyImpl(parentClass, pName))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	[[nodiscard]] bool EraseArrayProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pRemainingPath, int pArrayIdx, std::byte* pPropPtr)
+	{
+		// First, find our array property
+		TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
+		if (thisProp == nullptr)
+		{
+			return false; // There was no property with the given name.
+		}
+
+		pPropPtr += thisProp->offset;
+		ArrayPropertyCRUDHandler const* arrayHandler = thisProp->ArrayHandler;
+
+		return RecurseEraseArrayProperty(arrayHandler, pName, pRemainingPath, pArrayIdx, pPropPtr);
+	}
+
+	[[nodiscard]] bool RecurseEraseArrayProperty(ArrayPropertyCRUDHandler const* pArrayHandler, std::string_view pName, std::string_view pRemainingPath, int pArrayIdx, std::byte * pPropPtr)
+	{
+		if (pArrayHandler == nullptr || pArrayIdx >= pArrayHandler->Size(pPropPtr))
+		{
+			return false; // not an array or index is out-of-bounds
+		}
+
+		if (pRemainingPath.empty()) // this was what we were looking for : return
+		{
+			pArrayHandler->Erase(pPropPtr, pArrayIdx);
+			return true;
+		}
+
+		// There is more to eat: find out if we're looking for an array in an array or a compound
+		size_t dotPos = pRemainingPath.find('.');
+		size_t const leftBrackPos = pRemainingPath.find('[');
+		if (dotPos == pRemainingPath.npos && leftBrackPos == pRemainingPath.npos)
+		{
+			return false; // it's not an array neither a compound? I don't know how to read it!
+		}
+		if (dotPos != pRemainingPath.npos && dotPos < leftBrackPos) // it's a compound in an array
+		{
+			ReflectableTypeInfo const* arrayElemTypeInfo = Reflector3::GetSingleton().GetTypeInfo(pArrayHandler->ElementReflectableID());
+			if (arrayElemTypeInfo == nullptr) // compound type that is not Reflectable...
+			{
+				return false;
+			}
+			pRemainingPath.remove_prefix(1); // strip the leading dot
+			// Lookup the next dot (if any) to know if we should search for a compound or an array.
+			dotPos = pRemainingPath.find('.');
+			// Use leftBrackPos-1 because it was computed before stripping the leading dot, so it is off by 1
+			auto suffixPos = (dotPos != pRemainingPath.npos || leftBrackPos != pRemainingPath.npos ? std::min(dotPos, leftBrackPos - 1) : 0);
+			pName = std::string_view(pRemainingPath.data() + dotPos + 1, pRemainingPath.length() - (dotPos + 1));
+			dotPos = pName.find('.');
+			if (dotPos < leftBrackPos) // next entry is a compound
+				return EraseInCompoundProperty(arrayElemTypeInfo, pName, pRemainingPath, pPropPtr);
+			else // next entry is an array
+			{
+				size_t const rightBrackPos = pRemainingPath.find(']');
+				if (rightBrackPos == pRemainingPath.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 2) //+2 because leftBrackPos is off by 1
+				{
+					return false;
+				}
+				int propIndex = atoi(pRemainingPath.data() + leftBrackPos); // TODO: use own atoi to avoid multi-k-LOC dependency!
+				pName = std::string_view(pRemainingPath.data(), pRemainingPath.length() - suffixPos + 1);
+				pRemainingPath.remove_prefix(rightBrackPos + 1);
+				return EraseArrayProperty(arrayElemTypeInfo, pName, pRemainingPath, propIndex, pPropPtr);
+			}
+		}
+		else if (leftBrackPos != pRemainingPath.npos && leftBrackPos < dotPos) // it's an array in an array
+		{
+			size_t const rightBrackPos = pRemainingPath.find(']');
+			// If there is a mismatched bracket, or the closing bracket is before the opening one,
+			// or there is no number between the two brackets, the expression has to be ill-formed!
+			if (rightBrackPos == pRemainingPath.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 1)
+			{
+				return false;
+			}
+
+			ArrayPropertyCRUDHandler const* elementHandler = pArrayHandler->ElementHandler();
+
+			if (elementHandler == nullptr)
+			{
+				return false; // Tried to access a property type that is not an array or not a Reflectable
+			}
+
+			int propIndex = atoi(pRemainingPath.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
+			pRemainingPath.remove_prefix(rightBrackPos + 1);
+			return RecurseEraseArrayProperty(elementHandler, pName, pRemainingPath, propIndex, pPropPtr);
+		}
+
+		assert(false);
+		return false; // Never supposed to arrive here!
+	}
+
+
+
 	template <typename TProp>
 	[[nodiscard]] TProp const* GetArrayProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const
 	{
@@ -1944,7 +2092,7 @@ struct Reflectable2
 	template <typename TProp>
 	[[nodiscard]] TProp const* RecurseFindArrayProperty(ArrayPropertyCRUDHandler const* pArrayHandler, std::string_view pName, std::string_view pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const
 	{
-		if (pArrayHandler == nullptr || pArrayHandler->Size(pPropPtr) <= pArrayIdx)
+		if (pArrayHandler == nullptr)
 		{
 			return nullptr; // not an array or index is out-of-bounds
 		}
@@ -2079,6 +2227,70 @@ struct Reflectable2
 		else
 		{
 			return GetCompoundProperty<TProp>(pTypeInfoOwner, pName, pFullPath, propertyAddr);
+		}
+	}
+
+	// TODO: I think pTotalOffset can drop the reference
+	[[nodiscard]] bool EraseInCompoundProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pFullPath, std::byte * propertyAddr)
+	{
+		// First, find our compound property
+		TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
+		if (thisProp == nullptr)
+		{
+			return false; // There was no property with the given name.
+		}
+
+		// We found our compound property: consume its name from the "full path"
+		// +1 to also remove the '.', except if we are at the last nested property.
+		pFullPath.remove_prefix(std::min(pName.size() + 1, pFullPath.size()));
+
+		// Now, add the offset of the compound to the total offset
+		propertyAddr += (int)thisProp->offset;
+
+		// Can we go deeper?
+		if (pFullPath.empty())
+		{
+			// No: we were unable to find the target array property
+			return false;
+		}
+
+		// Yes: recurse one more time, this time using this property's type info (needs to be Reflectable)
+		pTypeInfoOwner = Reflector3::GetSingleton().GetTypeInfo(thisProp->reflectableID);
+		if (pTypeInfoOwner == nullptr)
+		{
+			return false; // This type isn't reflectable? Nothing I can do for you...
+		}
+
+		// Update the next property's name to search for it.
+		size_t const dotPos = pFullPath.find('.');
+		if (dotPos != pFullPath.npos)
+		{
+			pName = std::string_view(pFullPath.data(), dotPos);
+		}
+		else
+		{
+			pName = pFullPath;
+		}
+
+		// Check if we are looking for an array in the compound...
+		size_t const leftBrackPos = pName.find('[');
+		if (leftBrackPos != pName.npos) // it's an array
+		{
+			size_t const rightBrackPos = pName.find(']');
+			// If there is a mismatched bracket, or the closing bracket is before the opening one,
+			// or there is no number between the two brackets, the expression has to be ill-formed!
+			if (rightBrackPos == pName.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 1)
+			{
+				return false;
+			}
+			int propIndex = atoi(pName.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
+			std::string_view propName = std::string_view(pName.data(), leftBrackPos);
+			pFullPath.remove_prefix(rightBrackPos + 1);
+			return EraseArrayProperty(pTypeInfoOwner, propName, pFullPath, propIndex, propertyAddr);
+		}
+		else
+		{
+			return EraseInCompoundProperty(pTypeInfoOwner, pName, pFullPath, propertyAddr);
 		}
 	}
 
@@ -2844,6 +3056,10 @@ int main()
 	assert(*arr3 == 0x7f7f);
 	modified = anotherInstance->SetProperty<int>("ultra.mega.toto[0].titi[2]", 0xabcd);
 	assert(modified && *arr3 == 0xabcd);
+
+	vec0 = anotherInstance->GetProperty<int>("aVector[4]");
+	bool erased = anotherInstance->EraseProperty("aVector[4]");
+	assert(erased);
 
 	return 0;
 }
