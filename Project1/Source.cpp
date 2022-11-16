@@ -2706,6 +2706,11 @@ reflectable_struct(c,yolo)
 		printf("c\n");
 	}
 
+};
+
+reflectable_struct(d,c)
+{
+	DECLARE_REFLECTABLE_INFO()
 
 
 };
@@ -3059,6 +3064,17 @@ int main()
 
 	vec0 = anotherInstance->GetProperty<int>("aVector[4]");
 	bool erased = anotherInstance->EraseProperty("aVector[4]");
+	assert(erased);
+
+	// test compound + array property in parent class
+	d aD;
+	modified = aD.SetProperty<int>("ultra.mega.toto[0].titi[2]", 0x1234);
+	assert(modified && aD.ultra.mega.toto[0].titi[2] == 0x1234);
+	erased = aD.EraseProperty("aVector[4]");
+	assert(!erased);
+	modified = aD.SetProperty<int>("aVector[4]", 0x42);
+	assert(modified && aD.aVector[4] == 0x42);
+	erased = aD.EraseProperty("aVector[4]");
 	assert(erased);
 
 	return 0;
