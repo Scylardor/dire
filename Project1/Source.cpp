@@ -1,21 +1,25 @@
 
 #include <any>
 #include <cassert>
+#include <charconv>
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
 #include <string>
-#include <string_view>
 #include <unordered_map>
 #include <fstream>
+#include <map>
+#include <sstream>
 
+struct MapPropertyCRUDHandler;
 struct ArrayPropertyCRUDHandler;
 struct Reflectable2;
 class ReflectableTypeInfo;
 
 enum class Type
 {
+	Unknown,
 	Void,
 	Int,
 	Float,
@@ -23,7 +27,9 @@ enum class Type
 	Double,
 	Class,
 	Class2,
-	Object
+	Object,
+	Array,
+	Map
 };
 
 template <Type T>
@@ -195,25 +201,56 @@ private:
 	IntrusiveListNode<T>* Head = nullptr;
 };
 
+struct AbstractPropertyHandler
+{
+	// TODO: try to find a way to merge these two,
+	// because a property can either be an array or map, but not both...
+	ArrayPropertyCRUDHandler const* ArrayHandler = nullptr;
+	MapPropertyCRUDHandler const* MapHandler = nullptr;
+} ;
+
+
 // TODO: put in proper place
 static unsigned const INVALID_REFLECTABLE_ID = UINT32_MAX;
 
 struct TypeInfo2 : IntrusiveListNode<TypeInfo2>
 {
-	TypeInfo2(char const* pName, Type const  pType, std::ptrdiff_t const pOffset, size_t const pSize) :
-		name(pName), type(pType), offset(pOffset), size(pSize)
+	TypeInfo2(char const* pName, std::ptrdiff_t const pOffset, size_t const pSize) :
+		name(pName), type(Type::Unknown), offset(pOffset), size(pSize)
 	{}
+
+	ArrayPropertyCRUDHandler const*	GetArrayHandler() const
+	{
+		return DataStructurePropertyHandler.ArrayHandler;
+	}
+
+	MapPropertyCRUDHandler const* GetMapHandler() const
+	{
+		return DataStructurePropertyHandler.MapHandler;
+	}
+
+	AbstractPropertyHandler const&	GetDataStructureHandler() const
+	{
+		return DataStructurePropertyHandler;
+	}
 
 	std::string		name;
 	Type			type;
 	std::ptrdiff_t	offset;
 	std::size_t		size;
-	ArrayPropertyCRUDHandler const* ArrayHandler = nullptr; // Useful for arrays or types that have operator[] overridden, will stay null for other types.
+	AbstractPropertyHandler	DataStructurePropertyHandler; // Useful for array-like or associative data structures, will stay null for other types.
 
 	// TODO: storing it here is kind of a hack to go quick.
 	// I guess we should have a map of Type->ClassID to be able to easily find the class ID...
 	// without duplicating this information in all the type info structures of every property of the same type.
 	unsigned		reflectableID{ INVALID_REFLECTABLE_ID };
+
+protected:
+
+	void	SetType(Type const pType)
+	{
+		type = pType;
+	}
 };
 
 struct IFunctionTypeInfo
@@ -964,7 +1001,7 @@ struct FunctionTypeInfo<Ret(Class::*)(Args...)> : FunctionInfo
 #define COMMA_ARGS2(a1, a2) a1 COMMA a2
 #define COMMA_ARGS3(a1, a2, a3) a1 COMMA a2 COMMA a3
 #define COMMA_ARGS4(a1, a2, a3, a4) a1 COMMA a2 COMMA a3 COMMA a4
-#define COMMA_ARGS5(a1, a2, a3, a4, a5) a1 COMMA a2 COMMA a3 COMMA a5
+#define COMMA_ARGS5(a1, a2, a3, a4, a5) a1 COMMA a2 COMMA a3 COMMA a4 COMMA a5
 
 #define BRACES_STRINGIZE_COMMA_VALUE(a) { STRINGIZE(a) COMMA a  } COMMA
 
@@ -975,21 +1012,9 @@ struct FunctionTypeInfo<Ret(Class::*)(Args...)> : FunctionInfo
 #define BRACES_STRINGIZE_COMMA_VALUE5(a1, a2, a3, a4, a5) BRACES_STRINGIZE_COMMA_VALUE(a1) BRACES_STRINGIZE_COMMA_VALUE(a2) BRACES_STRINGIZE_COMMA_VALUE(a3)  BRACES_STRINGIZE_COMMA_VALUE(a4)  BRACES_STRINGIZE_COMMA_VALUE(a5)
 
 
-#define EXTRACT_ODD_ARGS0()
-#define EXTRACT_ODD_ARGS1(a1) a1
-#define EXTRACT_ODD_ARGS2(a1, a2) a1
-#define EXTRACT_ODD_ARGS3(a1, a2, a3) a1 COMMA a3
-#define EXTRACT_ODD_ARGS4(a1,a2,a3,a4) a1 COMMA a3
-#define EXTRACT_ODD_ARGS5(a1,a2,a3,a4,a5) a1 COMMA a3 COMMA a5
-#define EXTRACT_ODD_ARGS6(a1,a2,a3,a4,a5,a6) a1 COMMA a3 COMMA a5
-#define EXTRACT_ODD_ARGS7(a1,a2,a3,a4,a5,a6,a7) a1 COMMA a3 COMMA a5 COMMA a7
-#define EXTRACT_ODD_ARGS8(a1,a2,a3,a4,a5,a6,a7,a8) a1 COMMA a3 COMMA a5 COMMA a7
-
 #define EVAL_1(...) __VA_ARGS__
 #define CONCAT(a, b) a ## b
 #define CONCAT2(a, b) CONCAT(a, b)
-#define EXTRACT_ODD_ARGUMENTS(...) EXPAND(CONCAT2(EXTRACT_ODD_ARGS, NARGS(__VA_ARGS__))(__VA_ARGS__)) // attention : ajouter le ##__VA_ARGS__ pour GCC sort un warning sur msvc, il faudra p-e le ifdef...
-
 
 #define STRINGIZE(a) #a
 
@@ -1334,11 +1359,22 @@ private:
 	T	myValue;
 };
 
+// inspired by https://stackoverflow.com/a/4298441/1987466
+
+template<typename T>
+struct GetParenthesizedType;
+
+template<typename R, typename P1>
+struct GetParenthesizedType<R(P1)>
+{
+	typedef P1 Type;
+};
+
 #define PROPERTY(type, name, value) \
 	struct Typeinfo_##name {};
 
 // This offset trick was inspired by https://stackoverflow.com/a/4938266/1987466
-#define DECLARE_VALUED_PROPERTY(type, name, ...) \
+#define DECLARE_PROPERTY(type, name, ...) \
 	struct name##_tag\
 	{ \
 		static ptrdiff_t Offset()\
@@ -1346,21 +1382,23 @@ private:
 			return offsetof(Self, name); \
 		} \
     }; \
-	type name{__VA_ARGS__};\
-	inline static ReflectProperty3<Self, type> name##_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, name##_tag::Offset() };
+	GetParenthesizedType<void LPAREN UNPAREN(type) RPAREN>::Type name{__VA_ARGS__};\
+	inline static ReflectProperty3<Self, UNPAREN(type)> name##_TYPEINFO_PROPERTY{STRINGIZE(name), name##_tag::Offset() };
 
-#define DECLARE_PROPERTY(type, name) \
-	struct name##_tag\
-	{ \
-		static ptrdiff_t Offset()\
-		{ \
-			return offsetof(Self, name); \
-		} \
-    }; \
-	type name{};\
-	inline static ReflectProperty3<Self, type> name##_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, name##_tag::Offset() };
+// inspired by https://www.mikeash.com/pyblog/friday-qa-2015-03-20-preprocessor-abuse-and-optional-parentheses.html
+#define EXTRACT(...) EXTRACT __VA_ARGS__
+#define NOTHING_EXTRACT
+#define PASTE(x, ...) x ## __VA_ARGS__
+#define EVALUATING_PASTE(x, ...) PASTE(x, __VA_ARGS__)
+#define UNPAREN(x) EVALUATING_PASTE(NOTHING_, EXTRACT x)
 
-#define DECLARE_ARRAY_PROPERTY(type, name, size) \
+// inspired from https://stackoverflow.com/a/18523890/1987466
+#define Paste(a, b)     a ## _ ## b
+#define Helper(a, b)    Paste(a, b)
+#define Merge(a, b)   Helper(a, b)
+
+
+#define DECLARE_PROPERTY3(type, name, ...) \
 	struct name##_tag\
 	{ \
 		static ptrdiff_t Offset()\
@@ -1368,8 +1406,20 @@ private:
 			return offsetof(Self, name); \
 		} \
     }; \
-	type name##size{};\
-	inline static ReflectProperty3<Self, type##size> name##_TYPEINFO_PROPERTY{STRINGIZE(name), FromActualTypeToEnumType<type>::EnumType, name##_tag::Offset() };
+	GetParenthesizedType<void LPAREN UNPAREN(type) RPAREN>::Type name{__VA_ARGS__};\
+	inline static ReflectProperty3<Self, UNPAREN(type)> name##_TYPEINFO_PROPERTY{STRINGIZE(name), name##_tag::Offset() };
+
+
+#define DECLARE_ARRAY_PROPERTY(type, name, size, ...) \
+	struct name##_tag\
+	{ \
+		static ptrdiff_t Offset()\
+		{ \
+			return offsetof(Self, name); \
+		} \
+	}; \
+	GetParenthesizedType<void LPAREN UNPAREN(type) RPAREN>::Type name##size{ __VA_ARGS__ }; \
+	inline static ReflectProperty3<Self, UNPAREN(type) ## size> name##_TYPEINFO_PROPERTY{ STRINGIZE(name), name##_tag::Offset() };
 
 
 #ifdef _MSC_VER // MSVC compilers
@@ -1585,8 +1635,234 @@ struct ReflectProperty2 : TypeInfo2
 MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(Brackets, operator[], 0)
 MEMBER_FUNCTION_DETECTOR_PARAM2(insert, std::declval<ContainerType>().begin(), std::declval<ContainerType>()[0])
 MEMBER_FUNCTION_DETECTOR_PARAM1(erase, std::declval<ContainerType>().begin())
+MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(MapErase, erase, typename ContainerType::key_type())
 MEMBER_FUNCTION_DETECTOR(clear)
 MEMBER_FUNCTION_DETECTOR(size)
+
+// Inspired by https://stackoverflow.com/a/62203640/1987466
+
+#define DECLARE_HAS_TYPE_DETECTOR(DetectorName, DetectedType) \
+template <class T, class = void>\
+struct DetectorName\
+{\
+	using type = std::false_type;\
+};\
+template <class T>\
+struct DetectorName <T, std::void_t<typename T::DetectedType >>\
+{\
+	using type = std::true_type;\
+};\
+template <class T>\
+inline constexpr bool DetectorName##_v = DetectorName<T>::type::value;
+
+DECLARE_HAS_TYPE_DETECTOR(HasValueType, value_type)
+DECLARE_HAS_TYPE_DETECTOR(HasKeyType, key_type)
+DECLARE_HAS_TYPE_DETECTOR(HasMappedType, mapped_type)
+
+template<typename T>
+inline constexpr bool HasMapSemantics_v = has_Brackets_v<T> && HasKeyType_v<T> && HasValueType_v<T> && HasMappedType_v<T>;
+
+template<typename T>
+using HasMapSemantics_t = std::enable_if_t<HasMapSemantics_v<T> >;
+
+template<typename T>
+inline constexpr bool HasArraySemantics_v = std::is_array_v<T> || has_Brackets_v<T> && HasValueType_v<T> && !HasMapSemantics_v<T>;
+
+template<typename T>
+using HasArraySemantics_t = std::enable_if_t<HasArraySemantics_v<T>>;
+
+
+struct MapPropertyCRUDHandler
+{
+	using MapReadFptr = void const* (*)(void const*, std::string_view);
+	using MapUpdateFptr = void (*)(void*, std::string_view, void const* );
+	using MapCreateFptr = void (*)(void*, std::string_view, void const*);
+	using MapEraseFptr = void	(*)(void*, std::string_view);
+	using MapClearFptr = void	(*)(void*);
+	using MapSizeFptr = size_t(*)(void const*);
+	using MapValueHandlerFptr = AbstractPropertyHandler (*)();
+	using MapElementReflectableIDFptr = unsigned (*)();
+
+	MapReadFptr		Read = nullptr;
+	MapUpdateFptr	Update = nullptr;
+	MapCreateFptr	Create = nullptr;
+	MapEraseFptr	Erase = nullptr;
+	MapClearFptr	Clear = nullptr;
+	MapSizeFptr		Size = nullptr;
+	MapValueHandlerFptr		ValueHandler = nullptr;
+	MapElementReflectableIDFptr	ValueReflectableID = nullptr;
+};
+
+// CRUD = Create, Read, Update, Delete
+template <typename T, typename = void>
+struct TypedMapPropertyCRUDHandler2
+{};
+
+// CRUD = Create, Read, Update, Delete
+template <typename T, typename = void>
+struct TypedArrayPropertyCRUDHandler2
+{};
+
+
+// Default conversion version to be overloaded by custom types if need be.
+template <typename T>
+T	FromChars(std::string_view const& pChars);
+
+// Base class for reflectable properties that have brackets operator to be able to make operations on the underlying array
+template <typename T>
+struct TypedMapPropertyCRUDHandler2<T,
+	typename std::enable_if_t<HasMapSemantics_v<T>>> : MapPropertyCRUDHandler
+{
+	using KeyType = typename T::key_type;
+	using ValueType = typename T::mapped_type;
+
+	TypedMapPropertyCRUDHandler2()
+	{
+		Read = &MapRead;
+		Update = &MapUpdate;
+		Create = &MapCreate;
+		Erase = &MapErase;
+		Clear = &MapClear;
+		Size = &MapSize;
+		ValueHandler = &MapValueHandler;
+		ValueReflectableID = &MapElementReflectableID;
+	}
+
+	static_assert(has_MapErase_v<T>
+		&& has_clear_v<T>
+		&& has_size_v<T>,
+		"In order to use Map-style reflection access, your type has to implement the following members with the same signature-style as std::map:"
+		"a key_type typedef, a mapped_type typedef, operator[], begin, end, find, an std::pair-like iterator type, erase, clear, size.");
+
+	static KeyType	GetKeyFromString(std::string_view const& pKey)
+	{
+		if constexpr (std::is_arithmetic_v<KeyType>)
+		{
+			KeyType result;
+			if constexpr (std::is_same_v<KeyType, bool>)
+			{
+				// bool is an arithmetic type but from_chars doesn't support it so we need a special case to handle it
+				result = (pKey == "true" || pKey == "1");
+			}
+			else
+			{
+				auto [_, error] { std::from_chars(pKey.data(), pKey.data() + pKey.size(), result) };
+			}
+			// TODO: check for errors
+			return result;
+		}
+		else
+		{
+			KeyType key = FromChars<KeyType>(pKey);
+			return key;
+		}
+	}
+
+	static void const* MapRead(void const* pMap, std::string_view pKey)
+	{
+		T const* thisMap = static_cast<T const*>(pMap);
+		if (thisMap == nullptr)
+		{
+			return nullptr;
+		}
+
+		KeyType const key = GetKeyFromString(pKey);
+		auto it = thisMap->find(key);
+		if (it == thisMap->end())
+		{
+			return nullptr;
+		}
+		return &it->second;
+	}
+
+	static void	MapUpdate(void* pMap, std::string_view pKey, void const* pNewData)
+	{
+		if (pMap == nullptr)
+		{
+			return;
+		}
+
+		ValueType* valuePtr = const_cast<ValueType*>((ValueType const*)MapRead(pMap, pKey));
+		if (valuePtr == nullptr) // key not found
+		{
+			return;
+		}
+
+		auto* newValue = static_cast<ValueType const*>(pNewData);
+		(*valuePtr) = *newValue;
+	}
+
+	static void	MapCreate(void* pMap, std::string_view pKey, void const* pInitData)
+	{
+		return MapUpdate(pMap, pKey, pInitData);
+	}
+
+	static void	MapErase(void* pMap, std::string_view pKey)
+	{
+		if (pMap != nullptr)
+		{
+			T* thisMap = static_cast<T*>(pMap);
+			KeyType const key = GetKeyFromString(pKey);
+
+			thisMap->erase(key);
+		}
+	}
+
+	static void	MapClear(void* pMap)
+	{
+		if (pMap != nullptr)
+		{
+			T* thisMap = static_cast<T*>(pMap);
+			thisMap->clear();
+		}
+	}
+
+	static size_t	MapSize(void const* pMap)
+	{
+		if (pMap != nullptr)
+		{
+			T const* thisMap = static_cast<T const*>(pMap);
+			return thisMap->size();
+		}
+
+		return 0;
+	}
+
+	static AbstractPropertyHandler MapValueHandler()
+	{
+		AbstractPropertyHandler handler;
+		handler.ArrayHandler = nullptr;
+		if constexpr (HasMapSemantics_v<ValueType>)
+		{
+			handler.MapHandler = &TypedMapPropertyCRUDHandler2<ValueType>::GetInstance();
+		}
+		else if constexpr(HasArraySemantics_v<ValueType>)
+		{
+			handler.ArrayHandler = &TypedArrayPropertyCRUDHandler2<ValueType>::GetInstance();
+		}
+		return handler;
+	}
+
+	static unsigned MapElementReflectableID() // TODO: ReflectableID
+	{
+		if constexpr (std::is_base_of_v<Reflectable2, ValueType>)
+		{
+			return ValueType::GetClassReflectableTypeInfo().ReflectableID;
+		}
+		else
+		{
+			return INVALID_REFLECTABLE_ID;
+		}
+	}
+
+	static TypedMapPropertyCRUDHandler2 const& GetInstance()
+	{
+		static TypedMapPropertyCRUDHandler2 instance{};
+		return instance;
+	}
+};
+
+
 
 struct ArrayPropertyCRUDHandler
 {
@@ -1596,7 +1872,7 @@ struct ArrayPropertyCRUDHandler
 	using ArrayEraseFptr = void	(*)(void* , size_t );
 	using ArrayClearFptr = void	(*)(void* );
 	using ArraySizeFptr = size_t(*)(void const*);
-	using ArrayElementHandlerFptr = ArrayPropertyCRUDHandler const* (*)();
+	using ArrayElementHandlerFptr = AbstractPropertyHandler (*)();
 	using ArrayElementReflectableIDFptr = unsigned (*)();
 
 	ArrayReadFptr	Read = nullptr;
@@ -1608,11 +1884,6 @@ struct ArrayPropertyCRUDHandler
 	ArrayElementHandlerFptr	ElementHandler = nullptr;
 	ArrayElementReflectableIDFptr ElementReflectableID = nullptr;
 };
-
-// CRUD = Create, Read, Update, Delete
-template <typename T, typename = void>
-struct TypedArrayPropertyCRUDHandler2
-{};
 
 // Base class for reflectable properties that have brackets operator to be able to make operations on the underlying array
 template <typename T>
@@ -1710,13 +1981,19 @@ struct TypedArrayPropertyCRUDHandler2<T,
 		return 0;
 	}
 
-	static ArrayPropertyCRUDHandler const*	ArrayElementHandler()
+	static AbstractPropertyHandler	ArrayElementHandler()
 	{
-		if constexpr (std::is_array_v<ElementValueType> || has_Brackets_v<ElementValueType>)
+		AbstractPropertyHandler handler;
+		handler.ArrayHandler = nullptr;
+		if constexpr (HasMapSemantics_v<ElementValueType>)
 		{
-			return &TypedArrayPropertyCRUDHandler2<ElementValueType>::GetInstance();
+			handler.MapHandler = &TypedMapPropertyCRUDHandler2<ElementValueType>::GetInstance();
 		}
-		return nullptr;
+		else if constexpr (HasArraySemantics_v<ElementValueType>)
+		{
+			handler.ArrayHandler = &TypedArrayPropertyCRUDHandler2<ElementValueType>::GetInstance();
+		}
+		return handler;
 	}
 
 	static unsigned ArrayElementReflectableID() // TODO: ReflectableID
@@ -1846,13 +2123,19 @@ struct TypedArrayPropertyCRUDHandler2<T,
 	}
 
 	// TODO: Refactor because there is code duplication between the two handler types
-	static ArrayPropertyCRUDHandler const* ArrayElementHandler()
+	static AbstractPropertyHandler	ArrayElementHandler()
 	{
-		if constexpr (std::is_array_v<ElementValueType> || has_Brackets_v<ElementValueType>)
+		AbstractPropertyHandler handler;
+		handler.ArrayHandler = nullptr;
+		if constexpr (HasMapSemantics_v<ElementValueType>)
 		{
-			return &TypedArrayPropertyCRUDHandler2<ElementValueType>::GetInstance();
+			handler.MapHandler = &TypedMapPropertyCRUDHandler2<ElementValueType>::GetInstance();
 		}
-		return nullptr;
+		else if constexpr (HasArraySemantics_v<ElementValueType>)
+		{
+			handler.ArrayHandler = &TypedArrayPropertyCRUDHandler2<ElementValueType>::GetInstance();
+		}
+		return handler;
 	}
 
 	static unsigned ArrayElementReflectableID() // TODO: ReflectableID
@@ -1879,9 +2162,18 @@ struct TypedArrayPropertyCRUDHandler2<T,
 template <typename T, typename TProp>
 struct ReflectProperty3 : TypeInfo2
 {
-	ReflectProperty3(const char* pName, Type pType, std::ptrdiff_t pOffset) :
-		TypeInfo2(pName, pType, pOffset, sizeof(T))
+	ReflectProperty3(const char* pName, std::ptrdiff_t pOffset) :
+		TypeInfo2(pName, pOffset, sizeof(T))
 	{
+		if constexpr (HasArraySemantics_v<TProp>)
+		{
+			SetType(Type::Array);
+		}
+		else if constexpr (HasMapSemantics_v<TProp>)
+		{
+			SetType(Type::Map);
+		}
+
 		ReflectableTypeInfo& typeInfo = T::EditClassReflectableTypeInfo(); // TODO: maybe just give it as a parameter to the function
 		typeInfo.PushTypeInfo(*this);
 
@@ -1894,9 +2186,13 @@ struct ReflectProperty3 : TypeInfo2
 			reflectableID = INVALID_REFLECTABLE_ID;
 		}
 
-		if constexpr (std::is_array_v<TProp> || has_Brackets_v<TProp>)
+		if constexpr (HasMapSemantics_v<TProp>)
 		{
-			ArrayHandler = &TypedArrayPropertyCRUDHandler2<TProp>::GetInstance();
+			DataStructurePropertyHandler.MapHandler = &TypedMapPropertyCRUDHandler2<TProp>::GetInstance();
+		}
+		else if constexpr (HasArraySemantics_v<TProp>)
+		{
+			DataStructurePropertyHandler.ArrayHandler = &TypedArrayPropertyCRUDHandler2<TProp>::GetInstance();
 		}
 	}
 };
@@ -2075,9 +2371,9 @@ struct Reflectable2
 		// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
 		std::byte const* propertyAddr = reinterpret_cast<std::byte const*>(this) - thisTypeInfo->VirtualOffset;
 
-		// Test for either array or compound access and branch into the one seen first
+		// Test for either array, map or compound access and branch into the one seen first
 		// compound property syntax uses the standard "." accessor
-		// array property syntax uses the standard "[]" array subscript operator
+		// array and map property syntax uses the standard "[]" array subscript operator
 		size_t const dotPos = pName.find('.');
 		size_t const leftBrackPos = pName.find('[');
 		if (dotPos != pName.npos && dotPos < leftBrackPos) // it's a compound
@@ -2085,21 +2381,37 @@ struct Reflectable2
 			std::string_view compoundPropName = std::string_view(pName.data(), dotPos);
 			return GetCompoundProperty<TProp>(thisTypeInfo, compoundPropName, pName, propertyAddr);
 		}
-		else if (leftBrackPos != pName.npos && leftBrackPos < dotPos) // it's an array
+		else if (leftBrackPos != pName.npos && leftBrackPos < dotPos) // it's an array or map
 		{
 			size_t const rightBrackPos = pName.find(']');
 			// If there is a mismatched bracket, or the closing bracket is before the opening one,
-			// or there is no number between the two brackets, the expression has to be ill-formed!
+			// or there is nothing between the two brackets, the expression has to be ill-formed!
 			if (rightBrackPos == pName.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 1)
 			{
 				return nullptr;
 			}
-			int propIndex = atoi(pName.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
+
 			std::string_view propName = std::string_view(pName.data(), leftBrackPos);
-			pName.remove_prefix(rightBrackPos + 1);
-			return GetArrayProperty<TProp>(thisTypeInfo, propName, pName, propIndex, propertyAddr);
+
+			if (TypeInfo2 const* thisProp = thisTypeInfo->FindPropertyInHierarchy(propName))
+			{
+				if (thisProp->type == Type::Array)
+				{
+					int const propIndex = atoi(pName.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
+					pName.remove_prefix(rightBrackPos + 1);
+					return GetArrayProperty<TProp>(thisTypeInfo, propName, pName, propIndex, propertyAddr);
+				}
+				else if (thisProp->type == Type::Map)
+				{
+					auto const keyStartPos = leftBrackPos + 1;
+					std::string_view key(pName.data() + keyStartPos, rightBrackPos - keyStartPos);
+					pName.remove_prefix(rightBrackPos + 1);
+					return GetArrayMapProperty<TProp>(thisTypeInfo, propName, pName, key, propertyAddr);
+				}
+			}
+			return nullptr; // Didn't find the property or it's of a type that we don't know how to handle in this context.
 		}
-		
+
 		// Otherwise: search for a "normal" property
 		for (TypeInfo2 const& prop : thisTypeInfo->Properties)
 		{
@@ -2179,7 +2491,7 @@ struct Reflectable2
 		}
 
 		pPropPtr += thisProp->offset;
-		ArrayPropertyCRUDHandler const* arrayHandler = thisProp->ArrayHandler;
+		ArrayPropertyCRUDHandler const* arrayHandler = thisProp->GetArrayHandler();
 
 		return RecurseEraseArrayProperty(arrayHandler, pName, pRemainingPath, pArrayIdx, pPropPtr);
 	}
@@ -2243,7 +2555,7 @@ struct Reflectable2
 				return false;
 			}
 
-			ArrayPropertyCRUDHandler const* elementHandler = pArrayHandler->ElementHandler();
+			ArrayPropertyCRUDHandler const* elementHandler = pArrayHandler->ElementHandler().ArrayHandler;
 
 			if (elementHandler == nullptr)
 			{
@@ -2259,8 +2571,6 @@ struct Reflectable2
 		return false; // Never supposed to arrive here!
 	}
 
-
-
 	template <typename TProp>
 	[[nodiscard]] TProp const* GetArrayProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const
 	{
@@ -2272,7 +2582,7 @@ struct Reflectable2
 		}
 
 		pPropPtr += thisProp->offset;
-		ArrayPropertyCRUDHandler const* arrayHandler = thisProp->ArrayHandler;
+		ArrayPropertyCRUDHandler const* arrayHandler = thisProp->GetArrayHandler();
 
 		return RecurseFindArrayProperty<TProp>(arrayHandler, pName, pRemainingPath, pArrayIdx, pPropPtr);
 	}
@@ -2338,7 +2648,7 @@ struct Reflectable2
 				return nullptr;
 			}
 
-			ArrayPropertyCRUDHandler const* elementHandler = pArrayHandler->ElementHandler();
+			ArrayPropertyCRUDHandler const* elementHandler = pArrayHandler->ElementHandler().ArrayHandler;
 
 			if (elementHandler == nullptr)
 			{
@@ -2352,6 +2662,108 @@ struct Reflectable2
 
 		assert(false);
 		return nullptr; // Never supposed to arrive here!
+	}
+
+	template <typename TProp>
+	[[nodiscard]] TProp const* RecurseArrayMapProperty(AbstractPropertyHandler const& pDataStructureHandler, std::byte const* pPropPtr, std::string_view pRemainingPath, std::string_view pKey) const
+	{
+		// Find out the type of handler we are interested in
+		void const* value = nullptr;
+		if (pDataStructureHandler.ArrayHandler)
+		{
+			size_t index;
+			std::from_chars(pKey.data(), pKey.data() + pKey.size(), index); // TODO: check for errors
+			value = pDataStructureHandler.ArrayHandler->Read(pPropPtr, index);
+		}
+		else if (pDataStructureHandler.MapHandler)
+		{
+			value = pDataStructureHandler.MapHandler->Read(pPropPtr, pKey);
+		}
+
+		if (value == nullptr)
+		{
+			return nullptr; // there was no explorable data structure found: probably a syntax error
+		}
+
+		if (pRemainingPath.empty()) // this was what we were looking for : return
+		{
+			return static_cast<TProp const*>(value);
+		}
+
+		// there is more: we have to find if it's a compound, an array or a map...
+		AbstractPropertyHandler const& valueHandler = pDataStructureHandler.ArrayHandler ? pDataStructureHandler.ArrayHandler->ElementHandler() : pDataStructureHandler.MapHandler->ValueHandler();
+
+		auto* valueAsBytes = static_cast<std::byte const*>(value);
+
+		if (pRemainingPath[0] == '.') // it's a nested structure
+		{
+			unsigned valueID = pDataStructureHandler.ArrayHandler ? pDataStructureHandler.ArrayHandler->ElementReflectableID() : pDataStructureHandler.MapHandler->ValueReflectableID();
+			ReflectableTypeInfo const* valueTypeInfo = Reflector3::GetSingleton().GetTypeInfo(valueID);
+			auto nextDelimiterPos = pRemainingPath.find_first_of(".[", 1);
+			std::string_view propName = pRemainingPath.substr(1, nextDelimiterPos == pRemainingPath.npos ? nextDelimiterPos : nextDelimiterPos - 1);
+			if (nextDelimiterPos == pRemainingPath.npos)
+			{
+				pRemainingPath.remove_prefix(1);
+				Reflectable2 const* reflectable = reinterpret_cast<Reflectable2 const*>(valueAsBytes);
+				return reflectable->GetProperty<TProp>(pRemainingPath);
+			}
+			if (pRemainingPath[nextDelimiterPos] == '.')
+			{
+				pRemainingPath.remove_prefix(1);
+				return GetCompoundProperty<TProp>(valueTypeInfo, propName, pRemainingPath, valueAsBytes);
+			}
+			else
+			{
+				size_t rightBracketPos = pRemainingPath.find(']', 1);
+				if (rightBracketPos == pRemainingPath.npos || rightBracketPos == 1)
+				{
+					return nullptr; // syntax error: no right bracket or nothing between the brackets
+				}
+				pKey = pRemainingPath.substr(nextDelimiterPos+1, rightBracketPos - nextDelimiterPos - 1);
+				pRemainingPath.remove_prefix(rightBracketPos + 1);
+
+				return GetArrayMapProperty<TProp>(valueTypeInfo, propName, pRemainingPath, pKey, valueAsBytes);
+			}
+
+		}
+
+		if (pRemainingPath[0] == '[')
+		{
+			size_t rightBracketPos = pRemainingPath.find(']', 1);
+			if (rightBracketPos == pRemainingPath.npos || rightBracketPos == 1)
+			{
+				return nullptr; // syntax error: no right bracket or nothing between the brackets
+			}
+			pKey = pRemainingPath.substr(1, rightBracketPos-1);
+			pRemainingPath.remove_prefix(rightBracketPos+1);
+
+			if (pDataStructureHandler.ArrayHandler)
+			{
+				return RecurseArrayMapProperty<TProp>(pDataStructureHandler.ArrayHandler->ElementHandler(), valueAsBytes, pRemainingPath, pKey);
+			}
+			else if (pDataStructureHandler.MapHandler)
+			{
+				return RecurseArrayMapProperty<TProp>(pDataStructureHandler.MapHandler->ValueHandler(), valueAsBytes, pRemainingPath, pKey);
+			}
+		}
+
+		return nullptr;
+	}
+
+	template <typename TProp>
+	[[nodiscard]] TProp const* GetArrayMapProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pRemainingPath, std::string_view pKey, std::byte const* pPropPtr) const
+	{
+		// First, find our array property
+		TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
+		if (thisProp == nullptr)
+		{
+			return nullptr; // There was no property with the given name.
+		}
+
+		pPropPtr += thisProp->offset;
+		// Find out the type of handler we are interested in
+		AbstractPropertyHandler const& dataStructureHandler = thisProp->GetDataStructureHandler();
+		return RecurseArrayMapProperty<TProp>(dataStructureHandler, pPropPtr, pRemainingPath, pKey);
 	}
 
 	// TODO: I think pTotalOffset can drop the reference
@@ -2380,43 +2792,35 @@ struct Reflectable2
 		}
 
 		// Yes: recurse one more time, this time using this property's type info (needs to be Reflectable)
-		pTypeInfoOwner = Reflector3::GetSingleton().GetTypeInfo(thisProp->reflectableID);
-		if (pTypeInfoOwner == nullptr)
+		ReflectableTypeInfo const* nestedTypeInfo = Reflector3::GetSingleton().GetTypeInfo(thisProp->reflectableID);
+		if (nestedTypeInfo != nullptr)
 		{
-			return nullptr; // This type isn't reflectable? Nothing I can do for you...
+			pTypeInfoOwner = nestedTypeInfo;
 		}
 
 		// Update the next property's name to search for it.
-		size_t const dotPos = pFullPath.find('.');
-		if (dotPos != pFullPath.npos)
-		{
-			pName = std::string_view(pFullPath.data(), dotPos);
-		}
-		else
-		{
-			pName = pFullPath;
-		}
-
 		// Check if we are looking for an array in the compound...
-		size_t const leftBrackPos = pName.find('[');
-		if (leftBrackPos != pName.npos) // it's an array
+		size_t const nextDelimiterPos = pFullPath.find_first_of(".[");
+
+		pName = pFullPath.substr(0, nextDelimiterPos);
+
+		if (nextDelimiterPos != pFullPath.npos && pFullPath[nextDelimiterPos] == '[') // it's an array
 		{
-			size_t const rightBrackPos = pName.find(']');
+			size_t const rightBrackPos = pFullPath.find(']');
 			// If there is a mismatched bracket, or the closing bracket is before the opening one,
 			// or there is no number between the two brackets, the expression has to be ill-formed!
-			if (rightBrackPos == pName.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 1)
+			if (rightBrackPos == pFullPath.npos || rightBrackPos < nextDelimiterPos || rightBrackPos == nextDelimiterPos + 1)
 			{
 				return nullptr;
 			}
-			int propIndex = atoi(pName.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
-			std::string_view propName = std::string_view(pName.data(), leftBrackPos);
+			pName = std::string_view(pFullPath.data(), nextDelimiterPos);
+			std::string_view key = pFullPath.substr(nextDelimiterPos+1, rightBrackPos - nextDelimiterPos - 1);
 			pFullPath.remove_prefix(rightBrackPos + 1);
-			return GetArrayProperty<TProp>(pTypeInfoOwner, propName, pFullPath, propIndex, propertyAddr);
+			return GetArrayMapProperty<TProp>(pTypeInfoOwner, pName, pFullPath, key, propertyAddr);
 		}
-		else
-		{
-			return GetCompoundProperty<TProp>(pTypeInfoOwner, pName, pFullPath, propertyAddr);
-		}
+
+		return GetCompoundProperty<TProp>(pTypeInfoOwner, pName, pFullPath, propertyAddr);
+
 	}
 
 	// TODO: I think pTotalOffset can drop the reference
@@ -2744,8 +3148,8 @@ struct ClassInstantiator final
 	{\
 		return theTypeInfo;\
 	}\
-	ReflectableClassIDSetter2<Self> const structname##_TYPEINFO_ID_SETTER{this}; // TODO: fix this "structname"
-
+	mutable ReflectableClassIDSetter2<Self> structname##_TYPEINFO_ID_SETTER{this}; // TODO: fix this "structname"
+	// I had to use mutable, otherwise the MapUpdate function breaks compilation because we try to copy assign. Maybe try to find a better way
 
 
 // This was inspired by https://stackoverflow.com/a/70701479/1987466 and https://gcc.godbolt.org/z/rrb1jdTrK
@@ -2778,11 +3182,23 @@ reflectable_struct(SuperCompound)
 
 };
 
+
+reflectable_struct(testcompound3)
+{
+	DECLARE_REFLECTABLE_INFO()
+
+	DECLARE_PROPERTY((std::map<int, bool>), aBoolMap);
+
+	DECLARE_PROPERTY((std::map<int, SuperCompound>), aSuperMap);
+
+	testcompound3() = default;
+};
+
 reflectable_struct(testcompound2)
 {
 	DECLARE_REFLECTABLE_INFO()
 
-	DECLARE_VALUED_PROPERTY(int, leet, 1337);
+	DECLARE_PROPERTY(int, leet, 1337);
 
 	testcompound2() = default;
 };
@@ -2791,7 +3207,7 @@ reflectable_struct(testcompound)
 {
 	DECLARE_REFLECTABLE_INFO()
 
-	DECLARE_VALUED_PROPERTY(int, compint, 0x2a2a)
+	DECLARE_PROPERTY(int, compint, 0x2a2a)
 	DECLARE_PROPERTY(testcompound2, compleet)
 
 	testcompound() = default;
@@ -2802,7 +3218,7 @@ reflectable_struct(MegaCompound)
 {
 	DECLARE_REFLECTABLE_INFO()
 
-	DECLARE_VALUED_PROPERTY(int, compint, 0x2a2a)
+	DECLARE_PROPERTY(int, compint, 0x2a2a)
 	DECLARE_PROPERTY(testcompound2, compleet)
 	DECLARE_ARRAY_PROPERTY(SuperCompound, toto, [3])
 
@@ -2842,6 +3258,7 @@ reflectable_struct(a)
 
 struct FatOfTheLand
 {
+	bool bibi;
 	float fat[4];
 };
 
@@ -2874,10 +3291,10 @@ reflectable_struct(c,yolo)
 {
 	DECLARE_REFLECTABLE_INFO()
 
-	DECLARE_VALUED_PROPERTY(unsigned, ctoto, 0xDEADBEEF)
+	DECLARE_PROPERTY(unsigned, ctoto, 0xDEADBEEF)
 
 
-	DECLARE_VALUED_PROPERTY(std::vector<int>, aVector, 1, 2, 3)
+	DECLARE_PROPERTY(std::vector<int>, aVector, 1, 2, 3)
 	DECLARE_ARRAY_PROPERTY(int, anArray, [10])
 	DECLARE_ARRAY_PROPERTY(int, aMultiArray, [10][10])
 
@@ -2900,11 +3317,19 @@ reflectable_struct(c,yolo)
 
 };
 
+
 reflectable_struct(d,c)
 {
 	DECLARE_REFLECTABLE_INFO()
 
+	DECLARE_PROPERTY((std::map<int, bool>), aMap);
 
+	DECLARE_PROPERTY(int, xp, 42)
+	DECLARE_PROPERTY((std::map<int, bool>), aBoolMap);
+	DECLARE_PROPERTY((std::map<int, testcompound2>), aFatMap);
+	DECLARE_PROPERTY((std::map<int, std::map<bool, int>>), aMapInMap);
+
+	DECLARE_PROPERTY(testcompound3, aStruct);
 };
 
 //reflectable_struct(x,c)
@@ -3006,9 +3431,9 @@ reflectable_struct(Test)
 {
 	DECLARE_REFLECTABLE_INFO()
 
-	DECLARE_VALUED_PROPERTY(int, titi, 4444);
-	DECLARE_VALUED_PROPERTY(int, bobo, 1234);
-	DECLARE_VALUED_PROPERTY(float, arrrr, 42.f);
+	DECLARE_PROPERTY(int, titi, 4444);
+	DECLARE_PROPERTY(int, bobo, 1234);
+	DECLARE_PROPERTY(float, arrrr, 42.f);
 
 	MOE_METHOD_NAMED_PARAMS(int, tititest, int, tata);
 	MOE_METHOD(int, grostoto, bool);
@@ -3050,6 +3475,8 @@ void testfloat(float atest)
 	atest;
 }
 
+
+
 int main()
 {
 	auto& info = a::GetClassReflectableTypeInfo();
@@ -3077,7 +3504,6 @@ int main()
 	int nbArgs = NARGS(1, 2, 3, 4, 5, 6, 7, 8, 9);
 	int nbArgs2 = NARGS(1, 2);
 	int nbArgs3 = NARGS();
-	EXTRACT_ODD_ARGUMENTS(int rrrr = 42, prout, pppp = 1111);
 	// NARGS
 	printf("%d\n", NARGS());          // Prints 0
 	printf("%d\n", NARGS(1));         // Prints 1
@@ -3292,7 +3718,74 @@ int main()
 
 	//Reflector3::EditSingleton().ExportTypeInfoSettings("reflector2.bin");
 
-	Reflector3::EditSingleton().ImportTypeInfoSettings("reflector2.bin");
+	//Reflector3::EditSingleton().ImportTypeInfoSettings("reflector2.bin");
+
+	int testarray2[10];
+	std::map<int, bool> testmap;
+	std::unordered_map<int, bool> testhashmap;
+	constexpr bool arrayhassemantics = HasArraySemantics_v<decltype(testarray2)>;
+	static_assert(arrayhassemantics);
+
+	constexpr bool vechassemantics = HasArraySemantics_v<decltype(testvec)>;
+	static_assert(vechassemantics);
+
+	constexpr bool maphassemantics = HasMapSemantics_v<decltype(testmap)>;
+	static_assert(maphassemantics);
+
+	constexpr bool hashmaphassemantics = HasMapSemantics_v<decltype(testhashmap)>;
+	static_assert(hashmaphassemantics);
+
+	constexpr bool arraynomapsemantics = HasMapSemantics_v<decltype(testarray2)>;
+	static_assert(!arraynomapsemantics);
+
+	constexpr bool vecnomapsemantics = HasMapSemantics_v<decltype(testvec)>;
+	static_assert(!vecnomapsemantics);
+
+	constexpr bool mapnoarraysemantics = HasArraySemantics_v<decltype(testmap)>;
+	static_assert(!mapnoarraysemantics);
+
+	constexpr bool hashmapnoarraysemantics = HasArraySemantics_v<decltype(testhashmap)>;
+	static_assert(!hashmapnoarraysemantics);
+
+	constexpr bool customnomapsemantics = HasMapSemantics_v<MegaCompound>;
+	static_assert(!customnomapsemantics);
+
+	constexpr bool customnnoarraysemantics = HasArraySemantics_v<MegaCompound>;
+	static_assert(!customnnoarraysemantics);
+
+	GetParenthesizedType<void(std::map<int, bool>)>::Type mymap;
+
+
+	assert(aD.xp == 42);
+	aD.aBoolMap[0] = false;
+
+	bool const* mapbool = aD.GetProperty<bool>("aBoolMap[0]");
+	assert(mapbool == &aD.aBoolMap[0]);
+	bool bval = aD.GetSafeProperty<bool>("aBoolMap[0]");
+	assert(bval == aD.aBoolMap[0]);
+	aD.aBoolMap[1] = true;
+	bval = aD.GetSafeProperty<bool>("aBoolMap[0]");
+	assert(bval == aD.aBoolMap[0]);
+
+	aD.aFatMap[0].leet = 4242;
+	int const* mapint = aD.GetProperty<int>("aFatMap[0].leet");
+	assert(mapint == &aD.aFatMap[0].leet);
+
+	aD.aMapInMap[0][true] = 9999;
+	mapint = aD.GetProperty<int>("aMapInMap[0][true]");
+	assert(mapint == &aD.aMapInMap[0][true]);
+
+	aD.aStruct.aBoolMap[1] = true;
+	mapbool = aD.GetProperty<bool>("aStruct.aBoolMap[1]");
+	assert(mapbool == &aD.aStruct.aBoolMap[1]);
+
+	aD.aStruct.aSuperMap[42].titi[0] = 1;
+	aD.aStruct.aSuperMap[42].titi[1] = 2;
+	aD.aStruct.aSuperMap[42].titi[2] = 3;
+
+	mapint = aD.GetProperty<int>("aStruct.aSuperMap[42].titi[1]");
+	assert(mapint == &aD.aStruct.aSuperMap[42].titi[1] && *mapint == 2);
+
 	return 0;
 }
 
