@@ -215,8 +215,10 @@ static unsigned const INVALID_REFLECTABLE_ID = UINT32_MAX;
 
 struct TypeInfo2 : IntrusiveListNode<TypeInfo2>
 {
-	TypeInfo2(char const* pName, std::ptrdiff_t const pOffset, size_t const pSize) :
-		name(pName), type(Type::Unknown), offset(pOffset), size(pSize)
+	using CopyConstructorPtr = void (*)(void* pDestAddr, void const* pOther, size_t pOffset);
+
+	TypeInfo2(char const* pName, std::ptrdiff_t const pOffset, size_t const pSize, CopyConstructorPtr const pCopyCtor = nullptr) :
+		name(pName), type(Type::Unknown), offset(pOffset), size(pSize), CopyCtor(pCopyCtor)
 	{}
 
 	ArrayPropertyCRUDHandler const*	GetArrayHandler() const
@@ -239,6 +241,7 @@ struct TypeInfo2 : IntrusiveListNode<TypeInfo2>
 	std::ptrdiff_t	offset;
 	std::size_t		size;
 	AbstractPropertyHandler	DataStructurePropertyHandler; // Useful for array-like or associative data structures, will stay null for other types.
+	CopyConstructorPtr CopyCtor = nullptr; // if copy constructor ptr is null : this type is not copy-constructible
 
 	// TODO: storing it here is kind of a hack to go quick.
 	// I guess we should have a map of Type->ClassID to be able to easily find the class ID...
@@ -2163,7 +2166,7 @@ template <typename T, typename TProp>
 struct ReflectProperty3 : TypeInfo2
 {
 	ReflectProperty3(const char* pName, std::ptrdiff_t pOffset) :
-		TypeInfo2(pName, pOffset, sizeof(T))
+		TypeInfo2(pName, pOffset, sizeof(TProp))
 	{
 		if constexpr (HasArraySemantics_v<TProp>)
 		{
@@ -2193,6 +2196,23 @@ struct ReflectProperty3 : TypeInfo2
 		else if constexpr (HasArraySemantics_v<TProp>)
 		{
 			DataStructurePropertyHandler.ArrayHandler = &TypedArrayPropertyCRUDHandler2<TProp>::GetInstance();
+		}
+
+		if constexpr (std::is_trivially_copyable_v<TProp>)
+		{
+			CopyCtor = [](void* pDestAddr, void const* pOther, size_t pOffset)
+			{
+				memcpy((std::byte*)pDestAddr + pOffset, (std::byte const*)pOther + pOffset, sizeof(TProp));
+			};
+		}
+		else if constexpr (!std::is_trivially_copy_assignable_v<TProp>)
+		{
+			CopyCtor = [](void* pDestAddr, void const* pOther, size_t pOffset)
+			{
+				TProp* actualDestination = (TProp*)((std::byte*)pDestAddr + pOffset);
+				TProp const* actualOther = (TProp const*)((std::byte const*)pOther + pOffset);
+				(*actualDestination) = *actualOther;
+			};
 		}
 	}
 };
@@ -2340,6 +2360,54 @@ struct Reflectable2
 		ReflectableTypeInfo const& parentTypeInfo = TRefl::GetClassReflectableTypeInfo();
 		return (parentTypeInfo.ReflectableID == myReflectableClassID || parentTypeInfo.IsParentOf(myReflectableClassID));
 	}
+
+	template <typename T = Reflectable2>
+	T*	Clone()
+	{
+		static_assert(std::is_base_of_v<Reflectable2, T>, "Clone only works with Reflectable-derived class types.");
+
+		ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
+		if (thisTypeInfo == nullptr)
+		{
+			return nullptr;
+		}
+
+		Reflectable2* clone = Reflector3::GetSingleton().TryInstantiate(myReflectableClassID, {});
+		if (clone == nullptr)
+		{
+			return nullptr;
+		}
+
+		auto const& parents = thisTypeInfo->ParentClasses;
+		for (ReflectableTypeInfo const* parent : parents)
+		{
+			if (parent == nullptr)
+				continue;
+
+			CloneProperties(this, parent, clone);
+		}
+
+		CloneProperties(this, thisTypeInfo, clone);
+
+		return (T*)clone;
+	}
+
+	void	CloneProperties(Reflectable2 const* pCloned, ReflectableTypeInfo const* pClonedTypeInfo, Reflectable2* pClone)
+	{
+		for (TypeInfo2 const& prop : pClonedTypeInfo->Properties)
+		{
+			auto* propPtr = pCloned->GetProperty<void const*>(prop.name);
+			if (propPtr != nullptr)
+			{
+				auto actualOffset = ((std::byte const*)propPtr - (std::byte const*)pCloned); // accounting for vptr etc.
+				if (prop.CopyCtor != nullptr)
+				{
+					prop.CopyCtor(pClone, pCloned, actualOffset);
+				}
+			}
+		}
+	}
+
 
 	[[nodiscard]] IntrusiveLinkedList<TypeInfo2> const& GetProperties() const
 	{
@@ -3084,7 +3152,7 @@ struct ClassInstantiator final
 		}
 		auto f = [](Args... pCtorArgs) -> Reflectable2*
 		{
-			return new T(pCtorArgs...);
+			return new T(pCtorArgs...); // TODO: allow for custom allocator usage
 		};
 		Reflectable2* result = std::apply(f, *argsTuple);
 		return result;
@@ -3174,6 +3242,28 @@ namespace SelfType
 }
 
 
+reflectable_struct(LogCopyable)
+{
+	DECLARE_REFLECTABLE_INFO()
+
+	DECLARE_PROPERTY(float, aUselessProp, 4.f);
+
+	LogCopyable() = default;
+	LogCopyable(LogCopyable const& pOther)
+	{
+		printf("Hello copy\n");
+		aUselessProp = pOther.aUselessProp;
+	}
+
+	LogCopyable& operator=(LogCopyable const& pOther)
+	{
+		printf("Hello equal\n");
+		aUselessProp = pOther.aUselessProp;
+		return *this;
+	}
+
+};
+
 reflectable_struct(SuperCompound)
 {
 	DECLARE_REFLECTABLE_INFO()
@@ -3199,6 +3289,7 @@ reflectable_struct(testcompound2)
 	DECLARE_REFLECTABLE_INFO()
 
 	DECLARE_PROPERTY(int, leet, 1337);
+	DECLARE_PROPERTY(LogCopyable, copyable);
 
 	testcompound2() = default;
 };
@@ -3349,8 +3440,6 @@ reflectable_struct(y,c)
 reflectable_struct(z,c)
 {
 	DECLARE_REFLECTABLE_INFO()
-
-
 };
 
 template <typename T>
@@ -3422,8 +3511,6 @@ DECLARE_TYPE_TRANSLATOR(Type::Class, int&)
 
 DECLARE_TYPE_TRANSLATOR(Type::Class2, noncopyable&)
 //TODO LIST:
-// - Map CRUD Handler
-// - Clone
 // - fonctions virtuelles
 // - inline methods 
 // - hint file for reflectable_struct and friends
@@ -3785,6 +3872,11 @@ int main()
 
 	mapint = aD.GetProperty<int>("aStruct.aSuperMap[42].titi[1]");
 	assert(mapint == &aD.aStruct.aSuperMap[42].titi[1] && *mapint == 2);
+
+	testcompound2 clonedComp;
+	clonedComp.leet = 123456789;
+	testcompound2* clone = clonedComp.Clone<testcompound2>();
+	assert(clone->leet == clonedComp.leet && &clone->leet != &clonedComp.leet);
 
 	return 0;
 }
