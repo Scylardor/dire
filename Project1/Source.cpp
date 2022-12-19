@@ -12,6 +12,16 @@
 #include <map>
 #include <sstream>
 
+#define USE_SERIALIZE_API 1
+#define RAPIDJSON_REFLECTION_SERIALIZER 1
+
+#if USE_SERIALIZE_API
+# if RAPIDJSON_REFLECTION_SERIALIZER
+struct RapidJsonReflectorSerializer;
+typedef RapidJsonReflectorSerializer REFLECTOR_SERIALIZER_TYPE;
+# endif
+#endif
+
 struct MapPropertyCRUDHandler;
 struct ArrayPropertyCRUDHandler;
 struct Reflectable2;
@@ -21,16 +31,20 @@ enum class Type
 {
 	Unknown,
 	Void,
-	Int,
-	Float,
 	Bool,
+	Int,
+	Uint,
+	Int64,
+	Uint64,
+	Float,
 	Double,
-	Class,
-	Class2,
-	Object,
+	String,
 	Array,
-	Map
+	Map,
+	Enum,
+	Object
 };
+// TODO: what about char, short? String is not covered either?
 
 template <Type T>
 struct FromEnumTypeToActualType;
@@ -38,8 +52,8 @@ struct FromEnumTypeToActualType;
 template <typename T>
 struct FromActualTypeToEnumType
 {
-	// If the type was not registered, by default it's just a generic "Object".
-	static const Type EnumType = Type::Object;
+	// If the type was not registered, by default it's unknown
+	static const Type EnumType = Type::Unknown;
 };
 
 #define DECLARE_TYPE_TRANSLATOR(TheEnumType, TheActualType) \
@@ -55,9 +69,12 @@ struct FromActualTypeToEnumType
 	};
 
 DECLARE_TYPE_TRANSLATOR(Type::Void, void)
-DECLARE_TYPE_TRANSLATOR(Type::Int, int)
-DECLARE_TYPE_TRANSLATOR(Type::Float, float)
 DECLARE_TYPE_TRANSLATOR(Type::Bool, bool)
+DECLARE_TYPE_TRANSLATOR(Type::Int, int)
+DECLARE_TYPE_TRANSLATOR(Type::Uint, unsigned)
+DECLARE_TYPE_TRANSLATOR(Type::Int64, int64_t)
+DECLARE_TYPE_TRANSLATOR(Type::Uint64, uint64_t)
+DECLARE_TYPE_TRANSLATOR(Type::Float, float)
 DECLARE_TYPE_TRANSLATOR(Type::Double, double)
 
 
@@ -217,6 +234,10 @@ struct TypeInfo2 : IntrusiveListNode<TypeInfo2>
 {
 	using CopyConstructorPtr = void (*)(void* pDestAddr, void const* pOther, size_t pOffset);
 
+#if USE_SERIALIZE_API
+	using SerializeFptr = void(REFLECTOR_SERIALIZER_TYPE::*)(TypeInfo2 const& pSerializedTypeInfo, void const* pPropPtr);
+#endif
+
 	TypeInfo2(char const* pName, std::ptrdiff_t const pOffset, size_t const pSize, CopyConstructorPtr const pCopyCtor = nullptr) :
 		name(pName), type(Type::Unknown), offset(pOffset), size(pSize), CopyCtor(pCopyCtor)
 	{}
@@ -236,12 +257,16 @@ struct TypeInfo2 : IntrusiveListNode<TypeInfo2>
 		return DataStructurePropertyHandler;
 	}
 
-	std::string		name;
+	std::string		name; // TODO: try storing a string view?
 	Type			type;
 	std::ptrdiff_t	offset;
 	std::size_t		size;
 	AbstractPropertyHandler	DataStructurePropertyHandler; // Useful for array-like or associative data structures, will stay null for other types.
 	CopyConstructorPtr CopyCtor = nullptr; // if copy constructor ptr is null : this type is not copy-constructible
+
+#if USE_SERIALIZE_API
+	SerializeFptr	SerializerFunction = nullptr;
+#endif
 
 	// TODO: storing it here is kind of a hack to go quick.
 	// I guess we should have a map of Type->ClassID to be able to easily find the class ID...
@@ -641,6 +666,24 @@ public:
 
 		return {};
 	}
+
+	template <typename F>
+	void	ForEachPropertyInHierarchy(F&& pVisitorFunction) const
+	{
+		for (auto const& prop : Properties)
+		{
+			pVisitorFunction(prop);
+		}
+
+		for (ReflectableTypeInfo const* parentClass : ParentClasses)
+		{
+			for (auto const& prop : parentClass->Properties)
+			{
+				pVisitorFunction(prop);
+			}
+		}
+	}
+
 
 	unsigned							ReflectableID{INVALID_REFLECTABLE_ID};
 	int									VirtualOffset{ 0 }; // for polymorphic classes
@@ -1580,6 +1623,7 @@ struct ReflectProperty2 : TypeInfo2
 	}
 };
 
+
 // Inspired by https://stackoverflow.com/a/62061759/1987466
 //template <typename... Ts>
 //using void_t = void;
@@ -1675,6 +1719,164 @@ template<typename T>
 using HasArraySemantics_t = std::enable_if_t<HasArraySemantics_v<T>>;
 
 
+
+#if USE_SERIALIZE_API && RAPIDJSON_REFLECTION_SERIALIZER
+# include <rapidjson/rapidjson.h>
+# include <rapidjson/stringbuffer.h>	// wrapper of C stream for prettywriter as output
+# include <rapidjson/prettywriter.h>	// for stringify JSON
+
+#define SERIALIZE_VALUE_SPECIALIZATION(Type, JsonFunc) \
+template <>\
+void	SerializeValue<Type>(void const* pPropPtr, AbstractPropertyHandler const* /*unused: pHandler*/)\
+{\
+	myJsonWriter.JsonFunc(*static_cast<Type const*>(pPropPtr));\
+}
+
+#define SERIALIZE_PROPERTY_SPECIALIZATION(Type) \
+template <>\
+void	SerializeProperty<Type>(TypeInfo2 const& pSerializedTypeInfo, void const* pPropPtr)\
+{\
+	myJsonWriter.String(pSerializedTypeInfo.name.data(), pSerializedTypeInfo.name.size());\
+	SerializeValue<Type>(pPropPtr, &pSerializedTypeInfo.GetDataStructureHandler());\
+}
+
+
+namespace ReflectorConversions
+{
+	// inspired by https://stackoverflow.com/a/33399801/1987466
+	namespace ADL
+	{
+		template<class T>
+		std::string AsString(T&& t)
+		{
+			using std::to_string;
+			return to_string(std::forward<T>(t));
+		}
+	}
+	template<class T>
+	std::string to_string(T&& t)
+	{
+		return ADL::AsString(std::forward<T>(t));
+	}
+}
+
+struct RapidJsonReflectorSerializer
+{
+	RapidJsonReflectorSerializer() :
+		myJsonWriter(myBuffer)
+	{}
+
+	using SerializeWriter = rapidjson::Writer<rapidjson::StringBuffer>;
+
+	const char*	Serialize(Reflectable2 const& serializedObject);
+
+	void	Deserialize(Reflectable2 const& serializedObject)
+	{
+
+	}
+
+	using SerializeValueFptr = void	(RapidJsonReflectorSerializer::*)(void const*);
+
+	template <typename T>
+	void	SerializeValue(void const* pPropPtr, AbstractPropertyHandler const* pHandler = nullptr)
+	{
+		if constexpr (HasArraySemantics_v<T>)
+		{
+			if (pHandler != nullptr)
+			{
+				SerializeArrayValue(pPropPtr, pHandler->ArrayHandler);
+			}
+		}
+		else if constexpr (HasMapSemantics_v<T>)
+		{
+			if (pHandler != nullptr)
+			{
+				SerializeMapValue(pPropPtr, pHandler->MapHandler);
+			}
+		}
+		else if constexpr (std::is_class_v<T>)
+		{
+			SerializeCompoundValue(pPropPtr);
+		}
+	}
+
+	SERIALIZE_VALUE_SPECIALIZATION(bool, Bool)
+	SERIALIZE_VALUE_SPECIALIZATION(int, Int)
+	SERIALIZE_VALUE_SPECIALIZATION(unsigned, Uint)
+	SERIALIZE_VALUE_SPECIALIZATION(int64_t, Int64)
+	SERIALIZE_VALUE_SPECIALIZATION(uint64_t, Uint64)
+	SERIALIZE_VALUE_SPECIALIZATION(float, Double)
+	SERIALIZE_VALUE_SPECIALIZATION(double, Double)
+
+	void	SerializeArrayValue(void const* pPropPtr, ArrayPropertyCRUDHandler const* pArrayHandler);
+
+	void	SerializeMapValue(void const* pPropPtr, MapPropertyCRUDHandler const* pMapHandler);
+
+	template <typename K, typename V>
+	void	SerializeMapKeyValuePair(K const& pKey, V const& pVal, AbstractPropertyHandler const& pValueHandler)
+	{
+		auto const keyStr = ReflectorConversions::to_string(pKey);
+		myJsonWriter.String(keyStr.data(), keyStr.length());
+		SerializeValue<V>(&pVal, &pValueHandler);
+	}
+
+	void	SerializeCompoundValue(void const* pPropPtr);
+
+	template <typename T>
+	void	SerializeProperty(TypeInfo2 const& pSerializedTypeInfo, void const* pPropPtr)
+	{
+		// The generic version has to analyze the type of prop to know what to do.
+		switch (pSerializedTypeInfo.type)
+		{
+		case Type::Array:
+			SerializeArrayProperty(pSerializedTypeInfo, pPropPtr);
+			break;
+		case Type::Map:
+			SerializeMapProperty(pSerializedTypeInfo, pPropPtr);
+			break;
+		case Type::Object:
+			SerializeCompoundProperty(pSerializedTypeInfo, pPropPtr);
+			break;
+		default:
+			assert(false); // not supposed to happen
+		}
+	}
+
+	SERIALIZE_PROPERTY_SPECIALIZATION(bool)
+	SERIALIZE_PROPERTY_SPECIALIZATION(int)
+	SERIALIZE_PROPERTY_SPECIALIZATION(unsigned)
+	SERIALIZE_PROPERTY_SPECIALIZATION(int64_t)
+	SERIALIZE_PROPERTY_SPECIALIZATION(uint64_t)
+	SERIALIZE_PROPERTY_SPECIALIZATION(float)
+	SERIALIZE_PROPERTY_SPECIALIZATION(double)
+
+	void	SerializeCompoundProperty(TypeInfo2 const& pSerializedTypeInfo, void const* pPropPtr);
+
+	void	SerializeArrayProperty(TypeInfo2 const& pSerializedTypeInfo, void const* pPropPtr)
+	{
+		myJsonWriter.String(pSerializedTypeInfo.name.data(), pSerializedTypeInfo.name.size());
+
+		SerializeArrayValue(pPropPtr, pSerializedTypeInfo.DataStructurePropertyHandler.ArrayHandler);
+	}
+
+	void	SerializeMapProperty(TypeInfo2 const& pSerializedTypeInfo, void const* pPropPtr)
+	{
+		myJsonWriter.String(pSerializedTypeInfo.name.data(), pSerializedTypeInfo.name.size());
+
+		SerializeMapValue(pPropPtr, pSerializedTypeInfo.DataStructurePropertyHandler.MapHandler);
+	}
+
+
+private:
+	rapidjson::StringBuffer	myBuffer;
+	rapidjson::Writer<rapidjson::StringBuffer>	myJsonWriter;
+};
+
+typedef RapidJsonReflectorSerializer REFLECTOR_SERIALIZER_TYPE;
+
+#endif
+
+
 struct MapPropertyCRUDHandler
 {
 	using MapReadFptr = void const* (*)(void const*, std::string_view);
@@ -1694,6 +1896,11 @@ struct MapPropertyCRUDHandler
 	MapSizeFptr		Size = nullptr;
 	MapValueHandlerFptr		ValueHandler = nullptr;
 	MapElementReflectableIDFptr	ValueReflectableID = nullptr;
+
+#if USE_SERIALIZE_API
+	using MapSerializeFptr = void (*)(void const*, REFLECTOR_SERIALIZER_TYPE&);
+	MapSerializeFptr KeyValueSerializer = nullptr;
+#endif
 };
 
 // CRUD = Create, Read, Update, Delete
@@ -1705,7 +1912,6 @@ struct TypedMapPropertyCRUDHandler2
 template <typename T, typename = void>
 struct TypedArrayPropertyCRUDHandler2
 {};
-
 
 // Default conversion version to be overloaded by custom types if need be.
 template <typename T>
@@ -1729,6 +1935,10 @@ struct TypedMapPropertyCRUDHandler2<T,
 		Size = &MapSize;
 		ValueHandler = &MapValueHandler;
 		ValueReflectableID = &MapElementReflectableID;
+
+#if USE_SERIALIZE_API
+		KeyValueSerializer = &MapSerialize;
+#endif
 	}
 
 	static_assert(has_MapErase_v<T>
@@ -1858,6 +2068,21 @@ struct TypedMapPropertyCRUDHandler2<T,
 		}
 	}
 
+#if USE_SERIALIZE_API
+	static void	MapSerialize(void const* pMap, REFLECTOR_SERIALIZER_TYPE& pSerializer)
+	{
+		if (pMap != nullptr)
+		{
+			T const* thisMap = static_cast<T const*>(pMap);
+			AbstractPropertyHandler mapValueHandler = MapValueHandler();
+			for (auto it = thisMap->begin(); it != thisMap->end(); ++it)
+			{
+				pSerializer.SerializeMapKeyValuePair(it->first, it->second, mapValueHandler);
+			}
+		}
+	}
+#endif
+
 	static TypedMapPropertyCRUDHandler2 const& GetInstance()
 	{
 		static TypedMapPropertyCRUDHandler2 instance{};
@@ -1877,6 +2102,9 @@ struct ArrayPropertyCRUDHandler
 	using ArraySizeFptr = size_t(*)(void const*);
 	using ArrayElementHandlerFptr = AbstractPropertyHandler (*)();
 	using ArrayElementReflectableIDFptr = unsigned (*)();
+#if USE_SERIALIZE_API
+	using SerializeValueFptr = void(REFLECTOR_SERIALIZER_TYPE::*)(void const* pPropPtr, AbstractPropertyHandler const* pHandler);
+#endif
 
 	ArrayReadFptr	Read = nullptr;
 	ArrayUpdateFptr Update = nullptr;
@@ -1886,6 +2114,10 @@ struct ArrayPropertyCRUDHandler
 	ArraySizeFptr	Size = nullptr;
 	ArrayElementHandlerFptr	ElementHandler = nullptr;
 	ArrayElementReflectableIDFptr ElementReflectableID = nullptr;
+#if USE_SERIALIZE_API
+	SerializeValueFptr ElementSerializer = nullptr;
+#endif
+
 };
 
 // Base class for reflectable properties that have brackets operator to be able to make operations on the underlying array
@@ -1907,6 +2139,9 @@ struct TypedArrayPropertyCRUDHandler2<T,
 		Size = &ArraySize;
 		ElementHandler = &ArrayElementHandler;
 		ElementReflectableID = &ArrayElementReflectableID;
+#if USE_SERIALIZE_API
+		ElementSerializer = &REFLECTOR_SERIALIZER_TYPE::template SerializeValue<ElementValueType>;
+#endif
 	}
 
 	static_assert(has_Brackets_v<T>
@@ -2039,6 +2274,9 @@ struct TypedArrayPropertyCRUDHandler2<T,
 		Size = &ArraySize;
 		ElementHandler = &ArrayElementHandler;
 		ElementReflectableID = &ArrayElementReflectableID;
+#if USE_SERIALIZE_API
+		ElementSerializer = &REFLECTOR_SERIALIZER_TYPE::template SerializeValue<ElementValueType>;
+#endif
 	}
 
 	static void const* ArrayRead(void const* pArray, size_t pIndex)
@@ -2160,8 +2398,6 @@ struct TypedArrayPropertyCRUDHandler2<T,
 	}
 };
 
-
-
 template <typename T, typename TProp>
 struct ReflectProperty3 : TypeInfo2
 {
@@ -2175,6 +2411,16 @@ struct ReflectProperty3 : TypeInfo2
 		else if constexpr (HasMapSemantics_v<TProp>)
 		{
 			SetType(Type::Map);
+		}
+		else if constexpr (std::is_class_v<TProp>)
+		{
+			SetType(Type::Object);
+		}
+		// TODO: that doesnt manage custom enums
+		else
+		{
+			// primary type
+			SetType(FromActualTypeToEnumType<TProp>::EnumType);
 		}
 
 		ReflectableTypeInfo& typeInfo = T::EditClassReflectableTypeInfo(); // TODO: maybe just give it as a parameter to the function
@@ -2214,7 +2460,15 @@ struct ReflectProperty3 : TypeInfo2
 				(*actualDestination) = *actualOther;
 			};
 		}
+
+#if USE_SERIALIZE_API
+		SetupSerializerFunction();
+#endif
 	}
+
+#if USE_SERIALIZE_API
+	void	SetupSerializerFunction();
+#endif
 };
 
 
@@ -2337,6 +2591,7 @@ private:
 	inline static IDType	s_CurrentID = 0;
 };
 
+
 struct Reflectable2
 {
 	using ClassID = unsigned;
@@ -2431,7 +2686,7 @@ struct Reflectable2
 		return reinterpret_cast<T*>(reinterpret_cast<std::byte*>(this) + pOffset);
 	}
 
-	template <typename TProp>
+	template <typename TProp = void>
 	[[nodiscard]] TProp const* GetProperty(std::string_view pName) const
 	{
 		ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
@@ -2510,7 +2765,7 @@ struct Reflectable2
 	[[nodiscard]] bool ErasePropertyImpl(ReflectableTypeInfo const* pTypeInfo, std::string_view pName)
 	{
 		// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
-		std::byte * propertyAddr = reinterpret_cast<std::byte *>(this) - pTypeInfo->VirtualOffset;
+		std::byte* propertyAddr = reinterpret_cast<std::byte*>(this) - pTypeInfo->VirtualOffset;
 
 		// Test for either array or compound access and branch into the one seen first
 		// compound property syntax uses the standard "." accessor
@@ -2564,7 +2819,7 @@ struct Reflectable2
 		return RecurseEraseArrayProperty(arrayHandler, pName, pRemainingPath, pArrayIdx, pPropPtr);
 	}
 
-	[[nodiscard]] bool RecurseEraseArrayProperty(ArrayPropertyCRUDHandler const* pArrayHandler, std::string_view pName, std::string_view pRemainingPath, int pArrayIdx, std::byte * pPropPtr)
+	[[nodiscard]] bool RecurseEraseArrayProperty(ArrayPropertyCRUDHandler const* pArrayHandler, std::string_view pName, std::string_view pRemainingPath, int pArrayIdx, std::byte* pPropPtr)
 	{
 		if (pArrayHandler == nullptr || pArrayIdx >= pArrayHandler->Size(pPropPtr))
 		{
@@ -2664,7 +2919,7 @@ struct Reflectable2
 			return nullptr; // not an array or index is out-of-bounds
 		}
 
-		pPropPtr = (std::byte const*) pArrayHandler->Read(pPropPtr, pArrayIdx);
+		pPropPtr = (std::byte const*)pArrayHandler->Read(pPropPtr, pArrayIdx);
 		if (pRemainingPath.empty()) // this was what we were looking for : return
 		{
 			return reinterpret_cast<TProp const*>(pPropPtr);
@@ -2688,7 +2943,7 @@ struct Reflectable2
 			// Lookup the next dot (if any) to know if we should search for a compound or an array.
 			dotPos = pRemainingPath.find('.');
 			// Use leftBrackPos-1 because it was computed before stripping the leading dot, so it is off by 1
-			auto suffixPos = (dotPos != pRemainingPath.npos || leftBrackPos != pRemainingPath.npos ? std::min(dotPos, leftBrackPos-1) : 0);
+			auto suffixPos = (dotPos != pRemainingPath.npos || leftBrackPos != pRemainingPath.npos ? std::min(dotPos, leftBrackPos - 1) : 0);
 			pName = std::string_view(pRemainingPath.data() + dotPos + 1, pRemainingPath.length() - (dotPos + 1));
 			dotPos = pName.find('.');
 			if (dotPos < leftBrackPos) // next entry is a compound
@@ -2759,8 +3014,6 @@ struct Reflectable2
 		}
 
 		// there is more: we have to find if it's a compound, an array or a map...
-		AbstractPropertyHandler const& valueHandler = pDataStructureHandler.ArrayHandler ? pDataStructureHandler.ArrayHandler->ElementHandler() : pDataStructureHandler.MapHandler->ValueHandler();
-
 		auto* valueAsBytes = static_cast<std::byte const*>(value);
 
 		if (pRemainingPath[0] == '.') // it's a nested structure
@@ -2787,7 +3040,7 @@ struct Reflectable2
 				{
 					return nullptr; // syntax error: no right bracket or nothing between the brackets
 				}
-				pKey = pRemainingPath.substr(nextDelimiterPos+1, rightBracketPos - nextDelimiterPos - 1);
+				pKey = pRemainingPath.substr(nextDelimiterPos + 1, rightBracketPos - nextDelimiterPos - 1);
 				pRemainingPath.remove_prefix(rightBracketPos + 1);
 
 				return GetArrayMapProperty<TProp>(valueTypeInfo, propName, pRemainingPath, pKey, valueAsBytes);
@@ -2802,8 +3055,8 @@ struct Reflectable2
 			{
 				return nullptr; // syntax error: no right bracket or nothing between the brackets
 			}
-			pKey = pRemainingPath.substr(1, rightBracketPos-1);
-			pRemainingPath.remove_prefix(rightBracketPos+1);
+			pKey = pRemainingPath.substr(1, rightBracketPos - 1);
+			pRemainingPath.remove_prefix(rightBracketPos + 1);
 
 			if (pDataStructureHandler.ArrayHandler)
 			{
@@ -2836,7 +3089,7 @@ struct Reflectable2
 
 	// TODO: I think pTotalOffset can drop the reference
 	template <typename TProp>
-	[[nodiscard]] TProp const*  GetCompoundProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pFullPath, std::byte const* propertyAddr) const
+	[[nodiscard]] TProp const*	GetCompoundProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pFullPath, std::byte const* propertyAddr) const
 	{
 		// First, find our compound property
 		TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
@@ -2882,7 +3135,7 @@ struct Reflectable2
 				return nullptr;
 			}
 			pName = std::string_view(pFullPath.data(), nextDelimiterPos);
-			std::string_view key = pFullPath.substr(nextDelimiterPos+1, rightBrackPos - nextDelimiterPos - 1);
+			std::string_view key = pFullPath.substr(nextDelimiterPos + 1, rightBrackPos - nextDelimiterPos - 1);
 			pFullPath.remove_prefix(rightBrackPos + 1);
 			return GetArrayMapProperty<TProp>(pTypeInfoOwner, pName, pFullPath, key, propertyAddr);
 		}
@@ -2892,7 +3145,7 @@ struct Reflectable2
 	}
 
 	// TODO: I think pTotalOffset can drop the reference
-	[[nodiscard]] bool EraseInCompoundProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pFullPath, std::byte * propertyAddr)
+	[[nodiscard]] bool EraseInCompoundProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pFullPath, std::byte* propertyAddr)
 	{
 		// First, find our compound property
 		TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
@@ -2985,7 +3238,7 @@ struct Reflectable2
 		(*editablePropPtr) = std::forward<TProp>(pSetValue);
 		return true;
 	}
-	
+
 	[[nodiscard]] FunctionInfo const* GetFunction(std::string_view pMemberFuncName) const
 	{
 		ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
@@ -3062,8 +3315,34 @@ public:
 	DECLARE_ATTORNEY(SetReflectableClassID);
 
 private:
-	ClassID	myReflectableClassID{0x2a2a};
+	ClassID	myReflectableClassID{ 0x2a2a };
 };
+
+
+#if USE_SERIALIZE_API
+template <typename T, typename TProp>
+void ReflectProperty3<T, TProp>::SetupSerializerFunction()
+{
+	if constexpr (HasArraySemantics_v<TProp>)
+	{
+		SerializerFunction = &REFLECTOR_SERIALIZER_TYPE::SerializeArrayProperty;
+	}
+	else if constexpr (HasMapSemantics_v<TProp>)
+	{
+		SerializerFunction = &REFLECTOR_SERIALIZER_TYPE::SerializeMapProperty;
+	}
+	else if constexpr (std::is_class_v<TProp>)
+	{
+		SerializerFunction = &REFLECTOR_SERIALIZER_TYPE::SerializeCompoundProperty;
+	}
+	// TODO: that doesnt manage custom enums
+	else
+	{
+		SerializerFunction = &REFLECTOR_SERIALIZER_TYPE::template SerializeProperty<TProp>;
+	}
+}
+#endif
+
 
 template<typename... TypeList>
 constexpr size_t SizeofSumOfAllTypes()
@@ -3442,6 +3721,13 @@ reflectable_struct(z,c)
 	DECLARE_REFLECTABLE_INFO()
 };
 
+
+reflectable_struct(mapType)
+{
+	DECLARE_REFLECTABLE_INFO()
+	DECLARE_PROPERTY((std::map<int, bool>), aEvenOddMap);
+};
+
 template <typename T>
 struct Subclass
 {
@@ -3506,10 +3792,7 @@ public:
 
 };
 
-// TODO: fix this
-DECLARE_TYPE_TRANSLATOR(Type::Class, int&)
 
-DECLARE_TYPE_TRANSLATOR(Type::Class2, noncopyable&)
 //TODO LIST:
 // - fonctions virtuelles
 // - inline methods 
@@ -3878,9 +4161,157 @@ int main()
 	testcompound2* clone = clonedComp.Clone<testcompound2>();
 	assert(clone->leet == clonedComp.leet && &clone->leet != &clonedComp.leet);
 
+	// test serializing an object
+#if USE_SERIALIZE_API && RAPIDJSON_REFLECTION_SERIALIZER
+	RapidJsonReflectorSerializer jsonSerializer;
+	std::string serialized = jsonSerializer.Serialize(clonedComp);
+	assert(serialized == "{\"copyable\":{\"aUselessProp\":4.0},\"leet\":123456789}");
+
+	// test serializing an array
+	SuperCompound seriaArray;
+	for (int i = 0; i < 5; ++i)
+		seriaArray.titi[i] = i;
+	serialized = jsonSerializer.Serialize(seriaArray);
+	assert(serialized == "{\"titi\":[0,1,2,3,4]}");
+
+	// test serializing objects, arrays, and array of objects
+	MegaCompound megaSerialized;
+	for (int i = 0; i < 3; i++)
+	{
+		for (int j = 0; j < 5; ++j)
+		{
+			megaSerialized.toto[i].titi[j] = i + j;
+		}
+	}
+
+	serialized = jsonSerializer.Serialize(megaSerialized);
+	assert(serialized == "{\"toto\":[{\"titi\":[0,1,2,3,4]},{\"titi\":[1,2,3,4,5]},{\"titi\":[2,3,4,5,6]}],\"compleet\":{\"copyable\":{\"aUselessProp\":4.0},\"leet\":1337},\"compint\":10794}");
+
+	// test serializing std::vector (among other things)
+	c serializedC;
+	serializedC.aVector = { 42,43,44,45,46 };
+	for (int i = 0; i < 10; i++)
+	{
+		serializedC.anArray[i] = i + 1;
+		for (int j = 0; j < 10; ++j)
+		{
+			serializedC.aMultiArray[i][j] = i + j;
+		}
+	}
+	serialized = jsonSerializer.Serialize(serializedC);
+	assert(serialized == 
+	"{\"ultra\":{\"mega\":{\"toto\":\
+[{\"titi\":[0,0,0,0,0]},{\"titi\":[0,0,0,0,0]},{\"titi\":[0,0,0,0,0]}],\
+\"compleet\":{\"copyable\":{\"aUselessProp\":4.0},\"leet\":1337},\"compint\":10794}},\
+\"mega\":{\"toto\":[{\"titi\":[0,0,0,0,0]},{\"titi\":[0,0,0,0,0]},{\"titi\":[0,0,0,0,0]}],\
+\"compleet\":{\"copyable\":{\"aUselessProp\":4.0},\"leet\":1337},\"compint\":10794},\
+\"aMultiArray\":[[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,5,6,7,8,9,10],[2,3,4,5,6,7,8,9,10,11],[3,4,5,6,7,8,9,10,11,12],[4,5,6,7,8,9,10,11,12,13],[5,6,7,8,9,10,11,12,13,14],[6,7,8,9,10,11,12,13,14,15],[7,8,9,10,11,12,13,14,15,16],[8,9,10,11,12,13,14,15,16,17],[9,10,11,12,13,14,15,16,17,18]],\
+\"anArray\":[1,2,3,4,5,6,7,8,9,10],\"aVector\":[42,43,44,45,46],\"ctoto\":3735928559,\
+\"compvar\":{\"compleet\":{\"copyable\":{\"aUselessProp\":4.0},\"leet\":1337},\"compint\":10794},\"bdouble\":0.0,\"atoto\":0.0,\"atiti\":false}");
+
+	// test serializing std::map (among other things)
+	mapType serializedMap;
+	for (int i = 0; i < 10; i++)
+	{
+		serializedMap.aEvenOddMap[i] = (i % 2 == 0);
+	}
+	serialized = jsonSerializer.Serialize(serializedMap);
+	assert(serialized == "{\"aEvenOddMap\":{\"0\":true,\"1\":false,\"2\":true,\"3\":false,\"4\":true,\"5\":false,\"6\":true,\"7\":false,\"8\":true,\"9\":false}}");
+#endif
+
 	return 0;
 }
 
+
+#if USE_SERIALIZE_API && RAPIDJSON_REFLECTION_SERIALIZER
+const char* RapidJsonReflectorSerializer::Serialize(Reflectable2 const& serializedObject)
+{
+	myBuffer.Clear(); // to clean any previously written information
+	myJsonWriter.Reset(myBuffer); // to wipe the root of a previously serialized object
+
+	myJsonWriter.StartObject();
+
+	Reflector3::GetSingleton().GetTypeInfo(serializedObject.GetReflectableClassID())->ForEachPropertyInHierarchy([&serializedObject, this](TypeInfo2 const& pProperty)
+	{
+		void const* propPtr = serializedObject.GetProperty(pProperty.name);
+		auto serializeFunc = pProperty.SerializerFunction;
+		if (serializeFunc != nullptr)
+		{
+			(this->*serializeFunc)(pProperty, propPtr);
+		}
+	});
+
+	myJsonWriter.EndObject();
+
+	return myBuffer.GetString();
+}
+
+void RapidJsonReflectorSerializer::SerializeArrayValue(void const* pPropPtr,
+	ArrayPropertyCRUDHandler const* pArrayHandler)
+{
+	myJsonWriter.StartArray();
+
+	if (pArrayHandler != nullptr)
+	{
+		size_t arraySize = pArrayHandler->Size(pPropPtr);
+		AbstractPropertyHandler elemHandler = pArrayHandler->ElementHandler();
+
+		auto elementSerializer = pArrayHandler->ElementSerializer;
+		if (elementSerializer != nullptr)
+		{
+			for (int iElem = 0; iElem < arraySize; ++iElem)
+			{
+				void const* elemVal = pArrayHandler->Read(pPropPtr, iElem);
+				(this->*elementSerializer)(elemVal, &elemHandler);
+			}
+		}
+	}
+
+	myJsonWriter.EndArray();
+}
+
+void RapidJsonReflectorSerializer::SerializeMapValue(void const* pPropPtr, MapPropertyCRUDHandler const* pMapHandler)
+{
+	myJsonWriter.StartObject();
+
+	if (pMapHandler != nullptr && pMapHandler->KeyValueSerializer != nullptr)
+	{
+		pMapHandler->KeyValueSerializer(pPropPtr, *this);
+	}
+
+	myJsonWriter.EndObject();
+}
+
+void RapidJsonReflectorSerializer::SerializeCompoundValue(void const* pPropPtr)
+{
+	// TODO: Casting to Reflectable feels easy here... Shouldn't there be a way to properly reflect structs without making them reflectable ?
+	auto* reflectableProp = static_cast<Reflectable2 const*>(pPropPtr);
+	ReflectableTypeInfo const* compTypeInfo = Reflector3::GetSingleton().GetTypeInfo(reflectableProp->GetReflectableClassID());
+	assert(compTypeInfo != nullptr); // TODO: customize assert
+
+	myJsonWriter.StartObject();
+
+	compTypeInfo->ForEachPropertyInHierarchy([this, reflectableProp](TypeInfo2 const& pProperty)
+		{
+			void const* compProp = reflectableProp->GetProperty(pProperty.name);
+			auto serializeFunc = pProperty.SerializerFunction;
+			if (serializeFunc != nullptr)
+			{
+				(this->*serializeFunc)(pProperty, compProp);
+			}
+		});
+
+	myJsonWriter.EndObject();
+}
+
+
+void RapidJsonReflectorSerializer::SerializeCompoundProperty(TypeInfo2 const& pSerializedTypeInfo, void const* pPropPtr)
+{
+	myJsonWriter.String(pSerializedTypeInfo.name.data(), pSerializedTypeInfo.name.size());
+
+	SerializeCompoundValue(pPropPtr);
+}
+#endif
 
 /**
  * \brief test
