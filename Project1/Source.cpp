@@ -18,7 +18,6 @@
 #if USE_SERIALIZE_API
 # if RAPIDJSON_REFLECTION_SERIALIZER
 struct RapidJsonReflectorSerializer;
-typedef RapidJsonReflectorSerializer REFLECTOR_SERIALIZER_TYPE;
 # endif
 #endif
 
@@ -26,6 +25,103 @@ struct MapPropertyCRUDHandler;
 struct ArrayPropertyCRUDHandler;
 struct Reflectable2;
 class ReflectableTypeInfo;
+
+
+#define COMMA ,
+
+// Inspired by https://stackoverflow.com/a/62061759/1987466
+//template <typename... Ts>
+//using void_t = void;
+//template <template <class...> class Trait, class AlwaysVoid, class... Args>
+//struct detector : std::false_type {};
+//template <template <class...> class Trait, class... Args>
+//struct detector<Trait, void_t<Trait<Args...>>, Args...> : std::true_type {};
+
+
+// Inspired by https://stackoverflow.com/a/71574097/1987466
+// Useful for member function names like "operator[]" that would break the build if used as is
+#define MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(Alias, FunctionName, Param1) \
+	template <typename ContainerType>\
+	using Alias##_method_t = decltype(std::declval< ContainerType >().FunctionName(Param1));\
+	template <typename ContainerType COMMA typename = std::void_t<>>\
+	struct has_##Alias : std::false_type {};\
+	template <typename ContainerType>\
+	struct has_##Alias<ContainerType COMMA std::void_t<Alias##_method_t< ContainerType >>> :\
+		std::true_type {};\
+	template <typename ContainerType>\
+	inline constexpr bool has_##Alias##_v = has_##Alias<ContainerType>::value;
+
+#define MEMBER_FUNCTION_DETECTOR_PARAM1(FunctionName, Param1) \
+	template <typename ContainerType>\
+	using FunctionName##_method_t = decltype(std::declval< ContainerType >().FunctionName(Param1));\
+	template <typename ContainerType COMMA typename = std::void_t<>>\
+	struct has_##FunctionName : std::false_type {};\
+	template <typename ContainerType>\
+	struct has_##FunctionName<ContainerType COMMA std::void_t<FunctionName##_method_t< ContainerType >>> :\
+		std::true_type {};\
+	template <typename ContainerType>\
+	inline constexpr bool has_##FunctionName##_v = has_##FunctionName<ContainerType>::value;
+
+#define MEMBER_FUNCTION_DETECTOR_PARAM2(FunctionName, Param1, Param2) \
+	template <typename ContainerType>\
+	using FunctionName##_method_t = decltype(std::declval< ContainerType >().FunctionName(Param1, Param2));\
+	template <typename ContainerType COMMA typename = std::void_t<>>\
+	struct has_##FunctionName : std::false_type {};\
+	template <typename ContainerType>\
+	struct has_##FunctionName<ContainerType COMMA std::void_t<FunctionName##_method_t< ContainerType >>> :\
+		std::true_type {};\
+	template <typename ContainerType>\
+	inline constexpr bool has_##FunctionName##_v = has_##FunctionName<ContainerType>::value;
+
+#define MEMBER_FUNCTION_DETECTOR(FunctionName) \
+	template <typename ContainerType>\
+	using FunctionName##_method_t = decltype(std::declval< ContainerType >().FunctionName());\
+	template <typename ContainerType COMMA typename = std::void_t<>>\
+	struct has_##FunctionName : std::false_type {};\
+	template <typename ContainerType>\
+	struct has_##FunctionName<ContainerType COMMA std::void_t<FunctionName##_method_t< ContainerType >>> :\
+		std::true_type {};\
+	template <typename ContainerType>\
+	inline constexpr bool has_##FunctionName##_v = has_##FunctionName<ContainerType>::value;
+
+MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(Brackets, operator[], 0)
+MEMBER_FUNCTION_DETECTOR_PARAM2(insert, std::declval<ContainerType>().begin(), std::declval<ContainerType>()[0])
+MEMBER_FUNCTION_DETECTOR_PARAM1(erase, std::declval<ContainerType>().begin())
+MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(MapErase, erase, typename ContainerType::key_type())
+MEMBER_FUNCTION_DETECTOR(clear)
+MEMBER_FUNCTION_DETECTOR(size)
+
+// Inspired by https://stackoverflow.com/a/62203640/1987466
+
+#define DECLARE_HAS_TYPE_DETECTOR(DetectorName, DetectedType) \
+template <class T, class = void>\
+struct DetectorName\
+{\
+	using type = std::false_type;\
+};\
+template <class T>\
+struct DetectorName <T, std::void_t<typename T::DetectedType >>\
+{\
+	using type = std::true_type;\
+};\
+template <class T>\
+inline constexpr bool DetectorName##_v = DetectorName<T>::type::value;
+
+DECLARE_HAS_TYPE_DETECTOR(HasValueType, value_type)
+DECLARE_HAS_TYPE_DETECTOR(HasKeyType, key_type)
+DECLARE_HAS_TYPE_DETECTOR(HasMappedType, mapped_type)
+
+template<typename T>
+inline constexpr bool HasMapSemantics_v = has_Brackets_v<T> && HasKeyType_v<T> && HasValueType_v<T> && HasMappedType_v<T>;
+
+template<typename T>
+using HasMapSemantics_t = std::enable_if_t<HasMapSemantics_v<T> >;
+
+template<typename T>
+inline constexpr bool HasArraySemantics_v = std::is_array_v<T> || has_Brackets_v<T> && HasValueType_v<T> && !HasMapSemantics_v<T>;
+
+template<typename T>
+using HasArraySemantics_t = std::enable_if_t<HasArraySemantics_v<T>>;
 
 enum class Type
 {
@@ -49,7 +145,7 @@ enum class Type
 template <Type T>
 struct FromEnumTypeToActualType;
 
-template <typename T>
+template <typename T, typename Enable = void>
 struct FromActualTypeToEnumType
 {
 	// If the type was not registered, by default it's unknown
@@ -62,10 +158,10 @@ struct FromActualTypeToEnumType
 	{ \
 		using ActualType = TheActualType; \
 	}; \
-	template <> \
-	struct FromActualTypeToEnumType<TheActualType> \
-	{ \
-		static const Type EnumType = TheEnumType; \
+	template <typename T>\
+	struct FromActualTypeToEnumType<T, typename std::enable_if_t<std::is_same_v<T, TheActualType>>>\
+	{\
+		static const Type EnumType = TheEnumType;\
 	};
 
 DECLARE_TYPE_TRANSLATOR(Type::Void, void)
@@ -76,6 +172,28 @@ DECLARE_TYPE_TRANSLATOR(Type::Int64, int64_t)
 DECLARE_TYPE_TRANSLATOR(Type::Uint64, uint64_t)
 DECLARE_TYPE_TRANSLATOR(Type::Float, float)
 DECLARE_TYPE_TRANSLATOR(Type::Double, double)
+
+// Note: adding the void at the end here is important as
+// "the types of default template parameter have to match, or else the specialization is not taken into account,
+// as a specialization is only taken when every template argument matches the specialization."
+// see https://stackoverflow.com/a/44858464/1987466
+template <typename T>
+struct FromActualTypeToEnumType<T, typename std::enable_if_t<std::is_class_v<T> && !HasMapSemantics_v<T> && !HasArraySemantics_v<T>, void>>
+{
+	static const Type EnumType = Type::Object;
+};
+
+template <typename T>
+struct FromActualTypeToEnumType<T, typename std::enable_if_t<std::is_class_v<T> && HasMapSemantics_v<T>, void>>
+{
+	static const Type EnumType = Type::Map;
+};
+
+template <typename T>
+struct FromActualTypeToEnumType<T, typename std::enable_if_t<HasArraySemantics_v<T>, void>>
+{
+	static const Type EnumType = Type::Array;
+};
 
 
 template <typename T>
@@ -234,13 +352,6 @@ struct TypeInfo2 : IntrusiveListNode<TypeInfo2>
 {
 	using CopyConstructorPtr = void (*)(void* pDestAddr, void const* pOther, size_t pOffset);
 
-#if USE_SERIALIZE_API
-	using SerializeFptr = void(REFLECTOR_SERIALIZER_TYPE::*)(TypeInfo2 const& pSerializedTypeInfo, void const* pPropPtr);
-
-	using DeserializedOpaqueValue = void const*;
-	using DeserializeFptr = void(REFLECTOR_SERIALIZER_TYPE::*)(DeserializedOpaqueValue, TypeInfo2 const& pSerializedTypeInfo, void* pPropPtr) const;
-#endif
-
 	TypeInfo2(char const* pName, std::ptrdiff_t const pOffset, size_t const pSize, CopyConstructorPtr const pCopyCtor = nullptr) :
 		name(pName), type(Type::Unknown), offset(pOffset), size(pSize), CopyCtor(pCopyCtor)
 	{}
@@ -266,11 +377,6 @@ struct TypeInfo2 : IntrusiveListNode<TypeInfo2>
 	std::size_t		size;
 	AbstractPropertyHandler	DataStructurePropertyHandler; // Useful for array-like or associative data structures, will stay null for other types.
 	CopyConstructorPtr CopyCtor = nullptr; // if copy constructor ptr is null : this type is not copy-constructible
-
-#if USE_SERIALIZE_API
-	SerializeFptr	SerializerFunction = nullptr;
-	DeserializeFptr	DeserializerFunction = nullptr;
-#endif
 
 	// TODO: storing it here is kind of a hack to go quick.
 	// I guess we should have a map of Type->ClassID to be able to easily find the class ID...
@@ -1012,7 +1118,6 @@ struct FunctionTypeInfo<Ret(Class::*)(Args...)> : FunctionInfo
 
 #define GLUE(a, b) a b
 #define GLUE3(a,b,c)
-#define COMMA ,
 
 
 #define GLUE_UNDERSCORE_ARGS1(a1) a1##_INSTANTIATOR
@@ -1627,152 +1732,6 @@ struct ReflectProperty2 : TypeInfo2
 	}
 };
 
-
-// Inspired by https://stackoverflow.com/a/62061759/1987466
-//template <typename... Ts>
-//using void_t = void;
-//template <template <class...> class Trait, class AlwaysVoid, class... Args>
-//struct detector : std::false_type {};
-//template <template <class...> class Trait, class... Args>
-//struct detector<Trait, void_t<Trait<Args...>>, Args...> : std::true_type {};
-
-
-// Inspired by https://stackoverflow.com/a/71574097/1987466
-// Useful for member function names like "operator[]" that would break the build if used as is
-#define MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(Alias, FunctionName, Param1) \
-	template <typename ContainerType>\
-	using Alias##_method_t = decltype(std::declval< ContainerType >().FunctionName(Param1));\
-	template <typename ContainerType COMMA typename = std::void_t<>>\
-	struct has_##Alias : std::false_type {};\
-	template <typename ContainerType>\
-	struct has_##Alias<ContainerType COMMA std::void_t<Alias##_method_t< ContainerType >>> :\
-		std::true_type {};\
-	template <typename ContainerType>\
-	inline constexpr bool has_##Alias##_v = has_##Alias<ContainerType>::value;
-
-#define MEMBER_FUNCTION_DETECTOR_PARAM1(FunctionName, Param1) \
-	template <typename ContainerType>\
-	using FunctionName##_method_t = decltype(std::declval< ContainerType >().FunctionName(Param1));\
-	template <typename ContainerType COMMA typename = std::void_t<>>\
-	struct has_##FunctionName : std::false_type {};\
-	template <typename ContainerType>\
-	struct has_##FunctionName<ContainerType COMMA std::void_t<FunctionName##_method_t< ContainerType >>> :\
-		std::true_type {};\
-	template <typename ContainerType>\
-	inline constexpr bool has_##FunctionName##_v = has_##FunctionName<ContainerType>::value;
-
-#define MEMBER_FUNCTION_DETECTOR_PARAM2(FunctionName, Param1, Param2) \
-	template <typename ContainerType>\
-	using FunctionName##_method_t = decltype(std::declval< ContainerType >().FunctionName(Param1, Param2));\
-	template <typename ContainerType COMMA typename = std::void_t<>>\
-	struct has_##FunctionName : std::false_type {};\
-	template <typename ContainerType>\
-	struct has_##FunctionName<ContainerType COMMA std::void_t<FunctionName##_method_t< ContainerType >>> :\
-		std::true_type {};\
-	template <typename ContainerType>\
-	inline constexpr bool has_##FunctionName##_v = has_##FunctionName<ContainerType>::value;
-
-#define MEMBER_FUNCTION_DETECTOR(FunctionName) \
-	template <typename ContainerType>\
-	using FunctionName##_method_t = decltype(std::declval< ContainerType >().FunctionName());\
-	template <typename ContainerType COMMA typename = std::void_t<>>\
-	struct has_##FunctionName : std::false_type {};\
-	template <typename ContainerType>\
-	struct has_##FunctionName<ContainerType COMMA std::void_t<FunctionName##_method_t< ContainerType >>> :\
-		std::true_type {};\
-	template <typename ContainerType>\
-	inline constexpr bool has_##FunctionName##_v = has_##FunctionName<ContainerType>::value;
-
-MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(Brackets, operator[], 0)
-MEMBER_FUNCTION_DETECTOR_PARAM2(insert, std::declval<ContainerType>().begin(), std::declval<ContainerType>()[0])
-MEMBER_FUNCTION_DETECTOR_PARAM1(erase, std::declval<ContainerType>().begin())
-MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(MapErase, erase, typename ContainerType::key_type())
-MEMBER_FUNCTION_DETECTOR(clear)
-MEMBER_FUNCTION_DETECTOR(size)
-
-// Inspired by https://stackoverflow.com/a/62203640/1987466
-
-#define DECLARE_HAS_TYPE_DETECTOR(DetectorName, DetectedType) \
-template <class T, class = void>\
-struct DetectorName\
-{\
-	using type = std::false_type;\
-};\
-template <class T>\
-struct DetectorName <T, std::void_t<typename T::DetectedType >>\
-{\
-	using type = std::true_type;\
-};\
-template <class T>\
-inline constexpr bool DetectorName##_v = DetectorName<T>::type::value;
-
-DECLARE_HAS_TYPE_DETECTOR(HasValueType, value_type)
-DECLARE_HAS_TYPE_DETECTOR(HasKeyType, key_type)
-DECLARE_HAS_TYPE_DETECTOR(HasMappedType, mapped_type)
-
-template<typename T>
-inline constexpr bool HasMapSemantics_v = has_Brackets_v<T> && HasKeyType_v<T> && HasValueType_v<T> && HasMappedType_v<T>;
-
-template<typename T>
-using HasMapSemantics_t = std::enable_if_t<HasMapSemantics_v<T> >;
-
-template<typename T>
-inline constexpr bool HasArraySemantics_v = std::is_array_v<T> || has_Brackets_v<T> && HasValueType_v<T> && !HasMapSemantics_v<T>;
-
-template<typename T>
-using HasArraySemantics_t = std::enable_if_t<HasArraySemantics_v<T>>;
-
-
-
-#if USE_SERIALIZE_API && RAPIDJSON_REFLECTION_SERIALIZER
-# include <rapidjson/rapidjson.h>
-# include <rapidjson/stringbuffer.h>	// wrapper of C stream for prettywriter as output
-# include <rapidjson/prettywriter.h>	// for stringify JSON
-# include "rapidjson/document.h"		// rapidjson's DOM-style API
-# include "rapidjson/error/en.h"		// rapidjson's error encoding into messages
-
-
-#define SERIALIZE_VALUE_CASE(TypeEnum, JsonFunc) \
-case Type::TypeEnum:\
-	myJsonWriter.JsonFunc(*static_cast<FromEnumTypeToActualType<Type::TypeEnum>::ActualType const*>(pPropPtr));\
-	break;
-
-#define SERIALIZE_VALUE_SPECIALIZATION(Type, JsonFunc) \
-template <>\
-void	SerializeValueT<Type>(void const* pPropPtr, AbstractPropertyHandler const* /*unused: pHandler*/)\
-{\
-	myJsonWriter.JsonFunc(*static_cast<Type const*>(pPropPtr));\
-}
-
-#define SERIALIZE_PROPERTY_SPECIALIZATION(Type) \
-template <>\
-void	SerializeProperty<Type>(TypeInfo2 const& pSerializedTypeInfo, void const* pPropPtr)\
-{\
-	myJsonWriter.String(pSerializedTypeInfo.name.data(), pSerializedTypeInfo.name.size());\
-	SerializeValueT<Type>(pPropPtr, &pSerializedTypeInfo.GetDataStructureHandler());\
-}
-
-
-#define DESERIALIZE_VALUE_SPECIALIZATION(Type, JsonFunc) \
-template <>\
-void	DeserializeValue<Type>(void const* pSerializedVal, void* pPropPtr, AbstractPropertyHandler const* /*unused: pHandler*/) const\
-{\
-	auto* jsonVal = static_cast<const rapidjson::Value*>(pSerializedVal);\
-	*static_cast<Type*>(pPropPtr) = jsonVal->Get##JsonFunc();\
-}
-
-
-#define DESERIALIZE_PROPERTY_SPECIALIZATION(Type) \
-template <>\
-void	DeserializeProperty<Type>(void const* pOpaqueVal, TypeInfo2 const& pSerializedTypeInfo, void* pPropPtr) const\
-{\
-	auto* pDocument = static_cast<rapidjson::Value const*>(pOpaqueVal);\
-	rapidjson::Value::ConstMemberIterator itr = pDocument->FindMember(pSerializedTypeInfo.name.data());\
-	if (itr != pDocument->MemberEnd())\
-		DeserializeValue<Type>(&itr->value, pPropPtr, &pSerializedTypeInfo.GetDataStructureHandler());\
-}
-
-
 namespace ReflectorConversions
 {
 	// inspired by https://stackoverflow.com/a/33399801/1987466
@@ -1822,6 +1781,23 @@ namespace ReflectorConversions
 	}
 }
 
+#if USE_SERIALIZE_API && RAPIDJSON_REFLECTION_SERIALIZER
+# include <rapidjson/rapidjson.h>
+# include <rapidjson/stringbuffer.h>	// wrapper of C stream for prettywriter as output
+# include <rapidjson/prettywriter.h>	// for stringify JSON
+# include "rapidjson/document.h"		// rapidjson's DOM-style API
+# include "rapidjson/error/en.h"		// rapidjson's error encoding into messages
+
+#define SERIALIZE_VALUE_CASE(TypeEnum, JsonFunc) \
+case Type::TypeEnum:\
+	myJsonWriter.JsonFunc(*static_cast<FromEnumTypeToActualType<Type::TypeEnum>::ActualType const*>(pPropPtr));\
+	break;
+
+#define DESERIALIZE_VALUE_CASE(TypeEnum, JsonFunc) \
+	case Type::TypeEnum:\
+	*static_cast<FromEnumTypeToActualType<Type::TypeEnum>::ActualType *>(pPropPtr) = jsonVal->Get##JsonFunc();\
+	break;
+
 struct RapidJsonReflectorSerializer
 {
 	using Value = rapidjson::Value;
@@ -1833,29 +1809,6 @@ struct RapidJsonReflectorSerializer
 	using SerializeWriter = rapidjson::Writer<rapidjson::StringBuffer>;
 
 	const char*	Serialize(Reflectable2 const& serializedObject);
-
-	template <typename T>
-	void	SerializeValueT(void const* pPropPtr, AbstractPropertyHandler const* pHandler = nullptr)
-	{
-		if constexpr (HasArraySemantics_v<T>)
-		{
-			if (pHandler != nullptr)
-			{
-				SerializeArrayValue(pPropPtr, pHandler->ArrayHandler);
-			}
-		}
-		else if constexpr (HasMapSemantics_v<T>)
-		{
-			if (pHandler != nullptr)
-			{
-				SerializeMapValue(pPropPtr, pHandler->MapHandler);
-			}
-		}
-		else if constexpr (std::is_class_v<T>)
-		{
-			SerializeCompoundValue(pPropPtr);
-		}
-	}
 
 	void	SerializeValue(Type pPropType, void const* pPropPtr, AbstractPropertyHandler const* pHandler = nullptr)
 	{
@@ -1889,74 +1842,11 @@ struct RapidJsonReflectorSerializer
 		}
 	}
 
-
-	SERIALIZE_VALUE_SPECIALIZATION(bool, Bool)
-	SERIALIZE_VALUE_SPECIALIZATION(int, Int)
-	SERIALIZE_VALUE_SPECIALIZATION(unsigned, Uint)
-	SERIALIZE_VALUE_SPECIALIZATION(int64_t, Int64)
-	SERIALIZE_VALUE_SPECIALIZATION(uint64_t, Uint64)
-	SERIALIZE_VALUE_SPECIALIZATION(float, Double)
-	SERIALIZE_VALUE_SPECIALIZATION(double, Double)
-
 	void	SerializeArrayValue(void const* pPropPtr, ArrayPropertyCRUDHandler const* pArrayHandler);
 
 	void	SerializeMapValue(void const* pPropPtr, MapPropertyCRUDHandler const* pMapHandler);
 
-	template <typename K, typename V>
-	void	SerializeMapKeyValuePair(K const& pKey, V const& pVal, AbstractPropertyHandler const& pValueHandler)
-	{
-		auto const keyStr = ReflectorConversions::to_string(pKey);
-		myJsonWriter.String(keyStr.data(), keyStr.length());
-		SerializeValueT<V>(&pVal, &pValueHandler);
-	}
-
 	void	SerializeCompoundValue(void const* pPropPtr);
-
-
-	void	SerializeCompoundProperty(TypeInfo2 const& pSerializedTypeInfo, void const* pPropPtr);
-
-	void	SerializeArrayProperty(TypeInfo2 const& pSerializedTypeInfo, void const* pPropPtr)
-	{
-		myJsonWriter.String(pSerializedTypeInfo.name.data(), pSerializedTypeInfo.name.size());
-
-		SerializeArrayValue(pPropPtr, pSerializedTypeInfo.DataStructurePropertyHandler.ArrayHandler);
-	}
-
-	void	SerializeMapProperty(TypeInfo2 const& pSerializedTypeInfo, void const* pPropPtr)
-	{
-		myJsonWriter.String(pSerializedTypeInfo.name.data(), pSerializedTypeInfo.name.size());
-
-		SerializeMapValue(pPropPtr, pSerializedTypeInfo.DataStructurePropertyHandler.MapHandler);
-	}
-
-	template <typename T>
-	void	SerializeProperty(TypeInfo2 const& pSerializedTypeInfo, void const* pPropPtr)
-	{
-		// The generic version has to analyze the type of prop to know what to do.
-		switch (pSerializedTypeInfo.type)
-		{
-		case Type::Array:
-			SerializeArrayProperty(pSerializedTypeInfo, pPropPtr);
-			break;
-		case Type::Map:
-			SerializeMapProperty(pSerializedTypeInfo, pPropPtr);
-			break;
-		case Type::Object:
-			SerializeCompoundProperty(pSerializedTypeInfo, pPropPtr);
-			break;
-		default:
-			assert(false); // not supposed to happen
-		}
-	}
-
-	SERIALIZE_PROPERTY_SPECIALIZATION(bool)
-	SERIALIZE_PROPERTY_SPECIALIZATION(int)
-	SERIALIZE_PROPERTY_SPECIALIZATION(unsigned)
-	SERIALIZE_PROPERTY_SPECIALIZATION(int64_t)
-	SERIALIZE_PROPERTY_SPECIALIZATION(uint64_t)
-	SERIALIZE_PROPERTY_SPECIALIZATION(float)
-	SERIALIZE_PROPERTY_SPECIALIZATION(double)
-
 
 	template <typename T, typename... Args>
 	T* Deserialize(char const* pJson, Args&&... pArgs)
@@ -1989,82 +1879,46 @@ struct RapidJsonReflectorSerializer
 
 	void	DeserializeInto(char const* pJson, Reflectable2& pDeserializedObject);
 
-	void DeserializeArrayValue(const rapidjson::Value& pVal, void* pPropPtr, ArrayPropertyCRUDHandler const* pArrayHandler) const;
+	void	DeserializeArrayValue(const rapidjson::Value& pVal, void* pPropPtr, ArrayPropertyCRUDHandler const* pArrayHandler) const;
 
-	void DeserializeMapValue(const rapidjson::Value& pVal, void* pPropPtr, MapPropertyCRUDHandler const* pMapHandler) const;
+	void	DeserializeMapValue(const rapidjson::Value& pVal, void* pPropPtr, MapPropertyCRUDHandler const* pMapHandler) const;
 
-	template <typename K, typename V>
-	void	DeserializeMapKeyValuePair(void const* pValue, void* pMap, MapPropertyCRUDHandler const& pMapHandler, AbstractPropertyHandler const& pValueHandler) const;
+	void	DeserializeCompoundValue(const rapidjson::Value& pVal, void* pPropPtr) const;
 
-	void DeserializeCompoundValue(const rapidjson::Value& pVal, void* pPropPtr) const;
 
-	template <typename T>
-	void	DeserializeValue(void const* pSerializedVal, void* pPropPtr, AbstractPropertyHandler const* pHandler = nullptr) const
+	void	DeserializeValue(void const* pSerializedVal, Type pPropType, void* pPropPtr, AbstractPropertyHandler const* pHandler = nullptr) const
 	{
 		auto* jsonVal = static_cast<const rapidjson::Value*>(pSerializedVal);
-		if constexpr (HasArraySemantics_v<T>)
+
+		switch (pPropType)
 		{
+			DESERIALIZE_VALUE_CASE(Bool, Bool)
+			DESERIALIZE_VALUE_CASE(Int, Int)
+			DESERIALIZE_VALUE_CASE(Uint, Uint)
+			DESERIALIZE_VALUE_CASE(Int64, Int64)
+			DESERIALIZE_VALUE_CASE(Uint64, Uint64)
+			DESERIALIZE_VALUE_CASE(Float, Double)
+			DESERIALIZE_VALUE_CASE(Double, Double)
+		case Type::Array:
 			if (pHandler != nullptr)
 			{
 				DeserializeArrayValue(*jsonVal, pPropPtr, pHandler->ArrayHandler);
 			}
-		}
-		else if constexpr (HasMapSemantics_v<T>)
-		{
+			break;
+		case Type::Map:
 			if (pHandler != nullptr)
 			{
 				DeserializeMapValue(*jsonVal, pPropPtr, pHandler->MapHandler);
 			}
-		}
-		else if constexpr (std::is_class_v<T>)
-		{
-			DeserializeCompoundValue(*jsonVal, pPropPtr);
-		}
-	}
-
-	DESERIALIZE_VALUE_SPECIALIZATION(bool, Bool)
-	DESERIALIZE_VALUE_SPECIALIZATION(int, Int)
-	DESERIALIZE_VALUE_SPECIALIZATION(unsigned, Uint)
-	DESERIALIZE_VALUE_SPECIALIZATION(int64_t, Int64)
-	DESERIALIZE_VALUE_SPECIALIZATION(uint64_t, Uint64)
-	DESERIALIZE_VALUE_SPECIALIZATION(float, Double)
-	DESERIALIZE_VALUE_SPECIALIZATION(double, Double)
-
-	void DeserializeArrayProperty(void const* pOpaqueVal, TypeInfo2 const& pSerializedTypeInfo, void* pPropPtr) const;
-
-	void DeserializeMapProperty(void const* pOpaqueVal, TypeInfo2 const& pSerializedTypeInfo, void* pPropPtr) const;
-
-	void DeserializeCompoundProperty(void const* pOpaqueVal, TypeInfo2 const& pSerializedTypeInfo, void* pPropPtr) const;
-
-	template <typename T>
-	void	DeserializeProperty(void const* pOpaqueVal, TypeInfo2 const& pSerializedTypeInfo, void* pPropPtr) const
-	{
-		auto* pDocument = static_cast<rapidjson::Value const*>(pOpaqueVal);
-
-		// The generic version has to analyze the type of prop to know what to do.
-		switch (pSerializedTypeInfo.type)
-		{
-		case Type::Array:
-			DeserializeArrayProperty(pDocument, pSerializedTypeInfo, pPropPtr);
-			break;
-		case Type::Map:
-			DeserializeMapProperty(pDocument, pSerializedTypeInfo, pPropPtr);
 			break;
 		case Type::Object:
-			DeserializeCompoundProperty(pDocument, pSerializedTypeInfo, pPropPtr);
+			DeserializeCompoundValue(*jsonVal, pPropPtr);
 			break;
 		default:
-			assert(false); // not supposed to happen
+			std::cerr << "Unmanaged type in SerializeValue!";
+			assert(false); // TODO: for now
 		}
 	}
-
-	DESERIALIZE_PROPERTY_SPECIALIZATION(bool)
-	DESERIALIZE_PROPERTY_SPECIALIZATION(int)
-	DESERIALIZE_PROPERTY_SPECIALIZATION(unsigned)
-	DESERIALIZE_PROPERTY_SPECIALIZATION(int64_t)
-	DESERIALIZE_PROPERTY_SPECIALIZATION(uint64_t)
-	DESERIALIZE_PROPERTY_SPECIALIZATION(float)
-	DESERIALIZE_PROPERTY_SPECIALIZATION(double)
 
 
 private:
@@ -2073,8 +1927,6 @@ private:
 	rapidjson::Writer<rapidjson::StringBuffer>	myJsonWriter;
 };
 
-typedef RapidJsonReflectorSerializer REFLECTOR_SERIALIZER_TYPE;
-
 #endif
 
 
@@ -2082,12 +1934,14 @@ struct MapPropertyCRUDHandler
 {
 	using MapReadFptr = void const* (*)(void const*, std::string_view);
 	using MapUpdateFptr = void (*)(void*, std::string_view, void const*);
-	using MapCreateFptr = void (*)(void*, std::string_view, void const*);
+	using MapCreateFptr = void* (*)(void*, std::string_view, void const*);
 	using MapEraseFptr = void	(*)(void*, std::string_view);
 	using MapClearFptr = void	(*)(void*);
 	using MapSizeFptr = size_t(*)(void const*);
 	using MapValueHandlerFptr = AbstractPropertyHandler (*)();
 	using MapElementReflectableIDFptr = unsigned (*)();
+	using MapKeyTypeFptr = Type(*)();
+	using MapValueTypeFptr = MapKeyTypeFptr;
 
 	MapReadFptr		Read = nullptr;
 	MapUpdateFptr	Update = nullptr;
@@ -2095,18 +1949,21 @@ struct MapPropertyCRUDHandler
 	MapEraseFptr	Erase = nullptr;
 	MapClearFptr	Clear = nullptr;
 	MapSizeFptr		Size = nullptr;
-	MapValueHandlerFptr		ValueHandler = nullptr;
+	MapValueHandlerFptr			ValueHandler = nullptr;
 	MapElementReflectableIDFptr	ValueReflectableID = nullptr;
+	MapKeyTypeFptr		KeyTypeGetter = nullptr;
+	MapValueTypeFptr	ValueTypeGetter = nullptr;
 
 #if USE_SERIALIZE_API
-	using OpaqueMapSerializedType = void const*;
-	using MapSerializeFptr = void (*)(OpaqueMapSerializedType, REFLECTOR_SERIALIZER_TYPE&);
-	MapSerializeFptr KeyValueSerializer = nullptr;
-
-	using OpaqueSerializerValue = void const*;
-	using OpaqueDeserializedMapType = void*;
-	using MapDeserializeFptr = void (*)(OpaqueSerializerValue, OpaqueDeserializedMapType, REFLECTOR_SERIALIZER_TYPE const&);
-	MapDeserializeFptr KeyValueDeserializer = nullptr;
+	using OpaqueSerializerType = void*;
+	using OpaqueMapType = void const*;
+	using OpaqueKeyType = void const*;
+	using OpaqueValueType = OpaqueKeyType;
+	using KeyValuePairSerializeFptr = void (*)(OpaqueSerializerType, OpaqueKeyType, OpaqueValueType, MapPropertyCRUDHandler const&, AbstractPropertyHandler const&);
+	using MapSerializeForeachPairFptr = void (*)(OpaqueMapType, OpaqueSerializerType, KeyValuePairSerializeFptr);
+	using MapSerializeKeyToStringFptr = std::string(*)(OpaqueKeyType); // TODO: customize string type
+	MapSerializeForeachPairFptr	SerializeForEachPair = nullptr;
+	MapSerializeKeyToStringFptr	KeyToString = nullptr;
 #endif
 };
 
@@ -2138,10 +1995,12 @@ struct TypedMapPropertyCRUDHandler2<T,
 		Size = &MapSize;
 		ValueHandler = &MapValueHandler;
 		ValueReflectableID = &MapElementReflectableID;
+		KeyTypeGetter = &GetKeyType;
+		ValueTypeGetter = &GetValueType;
 
 #if USE_SERIALIZE_API
-		KeyValueSerializer = &MapSerialize;
-		KeyValueDeserializer = &MapDeserialize;
+		SerializeForEachPair = &MapSerializeForEachPair;
+		KeyToString = &MapKeyToString;
 #endif
 	}
 
@@ -2185,11 +2044,11 @@ struct TypedMapPropertyCRUDHandler2<T,
 		(*valuePtr) = *newValue;
 	}
 
-	static void	MapCreate(void* pMap, std::string_view pKey, void const* pInitData)
+	static void* MapCreate(void* pMap, std::string_view pKey, void const* pInitData)
 	{
 		if (pMap == nullptr)
 		{
-			return;
+			return nullptr;
 		}
 
 		T * thisMap = static_cast<T *>(pMap);
@@ -2197,13 +2056,13 @@ struct TypedMapPropertyCRUDHandler2<T,
 
 		if (pInitData == nullptr)
 		{
-			thisMap->insert({ key, ValueType()});
+			auto [it, inserted] = thisMap->insert({ key, ValueType()});
+			return &it->second;
 		}
-		else
-		{
-			ValueType const& valuePtr = *static_cast<ValueType const*>(pInitData);
-			thisMap->insert({ key, valuePtr });
-		}
+
+		ValueType const& initValue = *static_cast<ValueType const*>(pInitData);
+		auto [it, inserted] = thisMap->insert({ key, initValue });
+		return &it->second;
 	}
 
 	static void	MapErase(void* pMap, std::string_view pKey)
@@ -2264,8 +2123,18 @@ struct TypedMapPropertyCRUDHandler2<T,
 		}
 	}
 
+	static Type	GetKeyType()
+	{
+		return FromActualTypeToEnumType<KeyType>::EnumType;
+	}
+
+	static Type	GetValueType()
+	{
+		return FromActualTypeToEnumType<ValueType>::EnumType;
+	}
+
 #if USE_SERIALIZE_API
-	static void	MapSerialize(void const* pMap, REFLECTOR_SERIALIZER_TYPE& pSerializer)
+	static void	MapSerializeForEachPair(const OpaqueMapType pMap, OpaqueSerializerType pSerializer, KeyValuePairSerializeFptr pForEachPairCallback)
 	{
 		if (pMap != nullptr)
 		{
@@ -2273,17 +2142,15 @@ struct TypedMapPropertyCRUDHandler2<T,
 			AbstractPropertyHandler mapValueHandler = MapValueHandler();
 			for (auto it = thisMap->begin(); it != thisMap->end(); ++it)
 			{
-				pSerializer.SerializeMapKeyValuePair(it->first, it->second, mapValueHandler);
+				pForEachPairCallback(pSerializer, &it->first, &it->second, GetInstance(), mapValueHandler);
 			}
 		}
 	}
 
-	static void	MapDeserialize(OpaqueSerializerValue pValue, OpaqueDeserializedMapType pMap, REFLECTOR_SERIALIZER_TYPE const& pSerializer)
+	static std::string	MapKeyToString(OpaqueKeyType pKey)
 	{
-		if (pMap != nullptr)
-		{
-			pSerializer.DeserializeMapKeyValuePair<KeyType, ValueType>(pValue, pMap, GetInstance(), MapValueHandler());
-		}
+		auto& keyRef = *static_cast<const KeyType*>(pKey);
+		return ReflectorConversions::to_string(keyRef);
 	}
 #endif
 
@@ -2306,10 +2173,7 @@ struct ArrayPropertyCRUDHandler
 	using ArraySizeFptr = size_t(*)(void const*);
 	using ArrayElementHandlerFptr = AbstractPropertyHandler (*)();
 	using ArrayElementReflectableIDFptr = unsigned (*)();
-#if USE_SERIALIZE_API
-	using SerializeValueFptr = void(REFLECTOR_SERIALIZER_TYPE::*)(void const* pPropPtr, AbstractPropertyHandler const* pHandler);
-	using DeserializeValueFptr = void(REFLECTOR_SERIALIZER_TYPE::*)(void const*, void* pPropPtr, AbstractPropertyHandler const* pHandler) const;
-#endif
+	using ArrayElementType = Type (*)();
 
 	ArrayReadFptr	Read = nullptr;
 	ArrayUpdateFptr Update = nullptr;
@@ -2319,10 +2183,7 @@ struct ArrayPropertyCRUDHandler
 	ArraySizeFptr	Size = nullptr;
 	ArrayElementHandlerFptr	ElementHandler = nullptr;
 	ArrayElementReflectableIDFptr ElementReflectableID = nullptr;
-#if USE_SERIALIZE_API
-	SerializeValueFptr ElementSerializer = nullptr;
-	DeserializeValueFptr ElementDeserializer = nullptr;
-#endif
+	ArrayElementType	ElementType = nullptr;
 
 };
 
@@ -2331,9 +2192,9 @@ template <typename T>
 struct TypedArrayPropertyCRUDHandler2<T,
 	typename std::enable_if_t<!std::is_array_v<T> && has_Brackets_v<T>>> : ArrayPropertyCRUDHandler
 {
-	using ElementType = decltype(std::declval<T>()[0]);
+	using RawElementType = decltype(std::declval<T>()[0]);
 	// Decaying removes the references and fixes the compile error "pointer to reference is illegal"
-	using ElementValueType = std::decay_t<ElementType>;
+	using ElementValueType = std::decay_t<RawElementType>;
 
 	TypedArrayPropertyCRUDHandler2()
 	{
@@ -2345,10 +2206,7 @@ struct TypedArrayPropertyCRUDHandler2<T,
 		Size = &ArraySize;
 		ElementHandler = &ArrayElementHandler;
 		ElementReflectableID = &ArrayElementReflectableID;
-#if USE_SERIALIZE_API
-		ElementSerializer = &REFLECTOR_SERIALIZER_TYPE::template SerializeValueT<ElementValueType>;
-		ElementDeserializer = &REFLECTOR_SERIALIZER_TYPE::template DeserializeValue<ElementValueType>;
-#endif
+		ElementType = &ArrayElementType;
 	}
 
 	static_assert(has_Brackets_v<T>
@@ -2453,6 +2311,11 @@ struct TypedArrayPropertyCRUDHandler2<T,
 		}
 	}
 
+	static Type ArrayElementType()
+	{
+		return FromActualTypeToEnumType<ElementValueType>::EnumType;
+	}
+
 	static TypedArrayPropertyCRUDHandler2 const&	GetInstance()
 	{
 		static TypedArrayPropertyCRUDHandler2 instance{};
@@ -2465,9 +2328,9 @@ template <typename T>
 struct TypedArrayPropertyCRUDHandler2<T,
 	typename std::enable_if_t<std::is_array_v<T>>> : ArrayPropertyCRUDHandler
 {
-	using ElementType = decltype(std::declval<T>()[0]);
+	using RawElementType = decltype(std::declval<T>()[0]);
 	// remove_reference_t removes the references and fixes the compile error "pointer to reference is illegal"
-	using ElementValueType = std::remove_reference_t<ElementType>;
+	using ElementValueType = std::remove_reference_t<RawElementType>;
 
 	inline static const size_t ARRAY_SIZE = std::extent_v<T>;
 
@@ -2481,10 +2344,7 @@ struct TypedArrayPropertyCRUDHandler2<T,
 		Size = &ArraySize;
 		ElementHandler = &ArrayElementHandler;
 		ElementReflectableID = &ArrayElementReflectableID;
-#if USE_SERIALIZE_API
-		ElementSerializer = &REFLECTOR_SERIALIZER_TYPE::template SerializeValueT<ElementValueType>;
-		ElementDeserializer = &REFLECTOR_SERIALIZER_TYPE::template DeserializeValue<ElementValueType>;
-#endif
+		ElementType = &ArrayElementType;
 	}
 
 	static void const* ArrayRead(void const* pArray, size_t pIndex)
@@ -2599,6 +2459,11 @@ struct TypedArrayPropertyCRUDHandler2<T,
 		}
 	}
 
+	static Type ArrayElementType()
+	{
+		return FromActualTypeToEnumType<ElementValueType>::EnumType;
+	}
+
 	static TypedArrayPropertyCRUDHandler2 const& GetInstance()
 	{
 		static TypedArrayPropertyCRUDHandler2 instance{};
@@ -2668,10 +2533,6 @@ struct ReflectProperty3 : TypeInfo2
 				(*actualDestination) = *actualOther;
 			};
 		}
-
-#if USE_SERIALIZE_API
-		SetupSerializerFunction();
-#endif
 	}
 
 #if USE_SERIALIZE_API
@@ -3527,52 +3388,6 @@ private:
 };
 
 
-#if USE_SERIALIZE_API
-template <typename K, typename V>
-void RapidJsonReflectorSerializer::DeserializeMapKeyValuePair(void const* pValue, void* pMap, MapPropertyCRUDHandler const& pMapHandler,
-																AbstractPropertyHandler const& pValueHandler) const
-{
-	if (pValue == nullptr || pMap == nullptr)
-		return;
-
-	auto* jsonVal = static_cast<const rapidjson::Value*>(pValue);
-
-	for (Value::ConstMemberIterator itr = jsonVal->MemberBegin();
-	     itr != jsonVal->MemberEnd(); ++itr)
-	{
-		pMapHandler.Create(pMap, itr->name.GetString(), nullptr);
-		V * createdValue = const_cast<V *>((V const*) pMapHandler.Read(pMap, itr->name.GetString()));
-		DeserializeValue<V>(&itr->value, createdValue, &pValueHandler);
-	}
-}
-
-template <typename T, typename TProp>
-void ReflectProperty3<T, TProp>::SetupSerializerFunction()
-{
-	if constexpr (HasArraySemantics_v<TProp>)
-	{
-		SerializerFunction = &REFLECTOR_SERIALIZER_TYPE::SerializeArrayProperty;
-		DeserializerFunction = &REFLECTOR_SERIALIZER_TYPE::DeserializeArrayProperty;
-	}
-	else if constexpr (HasMapSemantics_v<TProp>)
-	{
-		SerializerFunction = &REFLECTOR_SERIALIZER_TYPE::SerializeMapProperty;
-		DeserializerFunction = &REFLECTOR_SERIALIZER_TYPE::DeserializeMapProperty;
-	}
-	else if constexpr (std::is_class_v<TProp>)
-	{
-		SerializerFunction = &REFLECTOR_SERIALIZER_TYPE::SerializeCompoundProperty;
-		DeserializerFunction = &REFLECTOR_SERIALIZER_TYPE::DeserializeCompoundProperty;
-	}
-	// TODO: that doesnt manage custom enums
-	else
-	{
-		SerializerFunction = &REFLECTOR_SERIALIZER_TYPE::template SerializeProperty<TProp>;
-		DeserializerFunction = &REFLECTOR_SERIALIZER_TYPE::template DeserializeProperty<TProp>;
-	}
-}
-#endif
-
 
 template<typename... TypeList>
 constexpr size_t SizeofSumOfAllTypes()
@@ -4045,88 +3860,6 @@ reflectable_struct(Test)
 };
 
 
-void RapidJsonReflectorSerializer::DeserializeArrayValue(const rapidjson::Value& pVal, void* pPropPtr, ArrayPropertyCRUDHandler const* pArrayHandler) const
-{
-	assert(pVal.IsArray()); // TODO: custom assert
-
-	if (pArrayHandler != nullptr)
-	{
-		AbstractPropertyHandler elemHandler = pArrayHandler->ElementHandler();
-
-		auto elementDeserializer = pArrayHandler->ElementDeserializer;
-		if (elementDeserializer != nullptr)
-		{
-			for (auto iElem = 0; iElem < pVal.Size(); ++iElem)
-			{
-				void * elemVal = const_cast<void*>(pArrayHandler->Read(pPropPtr, iElem));
-				(this->*elementDeserializer)(&pVal[iElem], elemVal, &elemHandler);
-			}
-		}
-	}
-}
-
-
-void RapidJsonReflectorSerializer::DeserializeMapValue(const rapidjson::Value& pVal, void* pPropPtr, MapPropertyCRUDHandler const* pMapHandler) const
-{
-	assert(pVal.IsObject()); // TODO: custom assert
-
-	if (pMapHandler != nullptr && pMapHandler->KeyValueDeserializer != nullptr)
-	{
-		pMapHandler->KeyValueDeserializer(&pVal, pPropPtr, *this);
-	}
-}
-
-
-void RapidJsonReflectorSerializer::DeserializeCompoundValue(const rapidjson::Value& pVal, void* pPropPtr) const
-{
-	assert(pVal.IsObject());
-	// TODO: Casting to Reflectable feels easy here... Shouldn't there be a way to properly reflect structs without making them reflectable ?
-	auto* reflectableProp = static_cast<Reflectable2*>(pPropPtr);
-	ReflectableTypeInfo const* compTypeInfo = Reflector3::GetSingleton().GetTypeInfo(reflectableProp->GetReflectableClassID());
-	assert(compTypeInfo != nullptr); // TODO: customize assert
-
-	compTypeInfo->ForEachPropertyInHierarchy([this, &pVal, reflectableProp](TypeInfo2 const& pProperty)
-	{
-		auto deserializeFunc = pProperty.DeserializerFunction;
-		if (deserializeFunc != nullptr)
-		{
-			void* compProp = const_cast<void*>(reflectableProp->GetProperty(pProperty.name));
-			(this->*deserializeFunc)(&pVal, pProperty, compProp);
-		}
-	});
-}
-
-
-void RapidJsonReflectorSerializer::DeserializeArrayProperty(void const* pOpaqueVal, TypeInfo2 const& pSerializedTypeInfo, void* pPropPtr) const
-{
-	auto& seriaValue = *static_cast<rapidjson::Value const*>(pOpaqueVal);
-	Value::ConstMemberIterator itr = seriaValue.FindMember(pSerializedTypeInfo.name.data());
-	if (itr != seriaValue.MemberEnd())
-	{
-		DeserializeArrayValue(itr->value, pPropPtr, pSerializedTypeInfo.GetArrayHandler());
-	}
-}
-
-void RapidJsonReflectorSerializer::DeserializeMapProperty(void const* pOpaqueVal, TypeInfo2 const& pSerializedTypeInfo, void* pPropPtr) const
-{
-	auto& seriaValue = *static_cast<rapidjson::Value const*>(pOpaqueVal);
-	Value::ConstMemberIterator itr = seriaValue.FindMember(pSerializedTypeInfo.name.data());
-	if (itr != seriaValue.MemberEnd())
-	{
-		DeserializeMapValue(itr->value, pPropPtr, pSerializedTypeInfo.GetMapHandler());
-	}
-}
-
-void RapidJsonReflectorSerializer::DeserializeCompoundProperty(void const* pOpaqueVal, TypeInfo2 const& pSerializedTypeInfo, void* pPropPtr) const
-{
-	auto& seriaValue = *static_cast<rapidjson::Value const*>(pOpaqueVal);
-	Value::ConstMemberIterator itr = seriaValue.FindMember(pSerializedTypeInfo.name.data());
-	if (itr != seriaValue.MemberEnd())
-	{
-		DeserializeCompoundValue(itr->value, pPropPtr);
-	}
-}
-
 void Test::passbyref(int& test)
 {
 	test = 42;
@@ -4507,6 +4240,7 @@ int main()
 			megaSerialized.toto[i].titi[j] = i + j;
 		}
 	}
+
 	serialized = jsonSerializer.Serialize(megaSerialized);
 	assert(serialized == "{\"toto\":[{\"titi\":[0,1,2,3,4]},{\"titi\":[1,2,3,4,5]},{\"titi\":[2,3,4,5,6]}],\"compleet\":{\"copyable\":{\"aUselessProp\":4.0},\"leet\":1337},\"compint\":10794}");
 
@@ -4558,7 +4292,6 @@ int main()
 	mapType deSerializedMap;
 	jsonSerializer.DeserializeInto(serialized.data(), deSerializedMap);
 	assert(serializedMap.aEvenOddMap == deSerializedMap.aEvenOddMap);
-#endif
 
 	// test serializing compound, map in map, and compound value in map
 	serialized = jsonSerializer.Serialize(aD);
@@ -4568,11 +4301,14 @@ int main()
 	std::string serialized2 = jsonSerializer.Serialize(deserializedD);
 	assert(serialized == serialized2); // in theory, if serialization output is the same, objects are the same as far as reflection is concerned
 
+#endif
+
 	return 0;
 }
 
 
 #if USE_SERIALIZE_API && RAPIDJSON_REFLECTION_SERIALIZER
+
 const char* RapidJsonReflectorSerializer::Serialize(Reflectable2 const& serializedObject)
 {
 	myBuffer.Clear(); // to clean any previously written information
@@ -4583,12 +4319,8 @@ const char* RapidJsonReflectorSerializer::Serialize(Reflectable2 const& serializ
 	Reflector3::GetSingleton().GetTypeInfo(serializedObject.GetReflectableClassID())->ForEachPropertyInHierarchy([&serializedObject, this](TypeInfo2 const& pProperty)
 	{
 		void const* propPtr = serializedObject.GetProperty(pProperty.name);
-		auto serializeFunc = pProperty.SerializerFunction;
-		if (serializeFunc != nullptr)
-		{
-			//this->SerializeValue(pProperty.type, propPtr, &pProperty.GetDataStructureHandler())
-			(this->*serializeFunc)(pProperty, propPtr);
-		}
+		myJsonWriter.String(pProperty.name.data(), pProperty.name.size());
+		this->SerializeValue(pProperty.type, propPtr, &pProperty.GetDataStructureHandler());
 	});
 
 	myJsonWriter.EndObject();
@@ -4597,23 +4329,22 @@ const char* RapidJsonReflectorSerializer::Serialize(Reflectable2 const& serializ
 }
 
 
-void RapidJsonReflectorSerializer::SerializeArrayValue(void const* pPropPtr,
-	ArrayPropertyCRUDHandler const* pArrayHandler)
+void RapidJsonReflectorSerializer::SerializeArrayValue(void const* pPropPtr, ArrayPropertyCRUDHandler const* pArrayHandler)
 {
 	myJsonWriter.StartArray();
 
 	if (pArrayHandler != nullptr)
 	{
-		size_t arraySize = pArrayHandler->Size(pPropPtr);
-		AbstractPropertyHandler elemHandler = pArrayHandler->ElementHandler();
-
-		auto elementSerializer = pArrayHandler->ElementSerializer;
-		if (elementSerializer != nullptr)
+		Type elemType = pArrayHandler->ElementType();
+		if (elemType != Type::Unknown)
 		{
+			size_t arraySize = pArrayHandler->Size(pPropPtr);
+			AbstractPropertyHandler elemHandler = pArrayHandler->ElementHandler();
+
 			for (int iElem = 0; iElem < arraySize; ++iElem)
 			{
 				void const* elemVal = pArrayHandler->Read(pPropPtr, iElem);
-				(this->*elementSerializer)(elemVal, &elemHandler);
+				SerializeValue(elemType, elemVal, &elemHandler);
 			}
 		}
 	}
@@ -4625,9 +4356,19 @@ void RapidJsonReflectorSerializer::SerializeMapValue(void const* pPropPtr, MapPr
 {
 	myJsonWriter.StartObject();
 
-	if (pMapHandler != nullptr && pMapHandler->KeyValueSerializer != nullptr)
+	if (pPropPtr != nullptr && pMapHandler != nullptr)
 	{
-		pMapHandler->KeyValueSerializer(pPropPtr, *this);
+		pMapHandler->SerializeForEachPair(pPropPtr, this, [](void* pSerializer, const void* pKey, const void* pVal, MapPropertyCRUDHandler const& pMapHandler,
+			AbstractPropertyHandler const& pValueHandler)
+		{
+			auto* myself = static_cast<RapidJsonReflectorSerializer*>(pSerializer);
+
+			const std::string keyStr = pMapHandler.KeyToString(pKey);
+			myself->myJsonWriter.String(keyStr.data(), keyStr.length());
+
+			Type valueType = pMapHandler.ValueTypeGetter();
+			myself->SerializeValue(valueType, pVal, &pValueHandler);
+		});
 	}
 
 	myJsonWriter.EndObject();
@@ -4645,24 +4386,13 @@ void RapidJsonReflectorSerializer::SerializeCompoundValue(void const* pPropPtr)
 	compTypeInfo->ForEachPropertyInHierarchy([this, reflectableProp](TypeInfo2 const& pProperty)
 		{
 			void const* compProp = reflectableProp->GetProperty(pProperty.name);
-			auto serializeFunc = pProperty.SerializerFunction;
-			if (serializeFunc != nullptr)
-			{
-				(this->*serializeFunc)(pProperty, compProp);
-			}
+			myJsonWriter.String(pProperty.name.data(), pProperty.name.size());
+			Type propType = pProperty.type;
+			SerializeValue(propType, compProp, &pProperty.DataStructurePropertyHandler);
 		});
 
 	myJsonWriter.EndObject();
 }
-
-
-void RapidJsonReflectorSerializer::SerializeCompoundProperty(TypeInfo2 const& pSerializedTypeInfo, void const* pPropPtr)
-{
-	myJsonWriter.String(pSerializedTypeInfo.name.data(), pSerializedTypeInfo.name.size());
-
-	SerializeCompoundValue(pPropPtr);
-}
-
 
 void RapidJsonReflectorSerializer::DeserializeInto(char const* pJson, Reflectable2& pDeserializedObject)
 {
@@ -4678,15 +4408,65 @@ void RapidJsonReflectorSerializer::DeserializeInto(char const* pJson, Reflectabl
 
 	Reflector3::GetSingleton().GetTypeInfo(pDeserializedObject.GetReflectableClassID())->ForEachPropertyInHierarchy([&pDeserializedObject, &doc, this](TypeInfo2 const& pProperty)
 		{
-			auto deserializeFunc = pProperty.DeserializerFunction;
-			if (deserializeFunc != nullptr)
-			{
-				void* propPtr = const_cast<void*>(pDeserializedObject.GetProperty(pProperty.name));
-				(this->*deserializeFunc)(&doc, pProperty, propPtr);
-			}
+			void* propPtr = const_cast<void*>(pDeserializedObject.GetProperty(pProperty.name));
+			Value const& propValue = doc[pProperty.name.data()];
+			DeserializeValue(&propValue, pProperty.type, propPtr, &pProperty.DataStructurePropertyHandler);
 		});
 }
 
+void RapidJsonReflectorSerializer::DeserializeArrayValue(const rapidjson::Value& pVal, void* pPropPtr, ArrayPropertyCRUDHandler const* pArrayHandler) const
+{
+	assert(pVal.IsArray()); // TODO: custom assert
+
+	if (pArrayHandler != nullptr)
+	{
+		AbstractPropertyHandler elemHandler = pArrayHandler->ElementHandler();
+
+		Type elemType = pArrayHandler->ElementType();
+		if (elemType != Type::Unknown)
+		{
+			for (auto iElem = 0; iElem < pVal.Size(); ++iElem)
+			{
+				void* elemVal = const_cast<void*>(pArrayHandler->Read(pPropPtr, iElem));
+				DeserializeValue(&pVal[iElem], elemType, elemVal, &elemHandler);
+			}
+		}
+	}
+}
+
+
+void RapidJsonReflectorSerializer::DeserializeMapValue(const rapidjson::Value& pVal, void* pPropPtr, MapPropertyCRUDHandler const* pMapHandler) const
+{
+	if (pPropPtr == nullptr || pMapHandler == nullptr)
+		return;
+
+	assert(pVal.IsObject()); // TODO: custom assert
+
+	const Type valueType = pMapHandler->ValueTypeGetter();
+	const AbstractPropertyHandler valueHandler = pMapHandler->ValueHandler();
+	for (Value::ConstMemberIterator itr = pVal.MemberBegin(); itr != pVal.MemberEnd(); ++itr)
+	{
+		void* createdValue = pMapHandler->Create(pPropPtr, itr->name.GetString(), nullptr);
+		DeserializeValue(&itr->value, valueType, createdValue, &valueHandler);
+	}
+}
+
+
+void RapidJsonReflectorSerializer::DeserializeCompoundValue(const rapidjson::Value& pVal, void* pPropPtr) const
+{
+	assert(pVal.IsObject());
+	// TODO: Casting to Reflectable feels easy here... Shouldn't there be a way to properly reflect structs without making them reflectable ?
+	auto* reflectableProp = static_cast<Reflectable2*>(pPropPtr);
+	ReflectableTypeInfo const* compTypeInfo = Reflector3::GetSingleton().GetTypeInfo(reflectableProp->GetReflectableClassID());
+	assert(compTypeInfo != nullptr); // TODO: customize assert
+
+	compTypeInfo->ForEachPropertyInHierarchy([this, &pVal, reflectableProp](TypeInfo2 const& pProperty)
+		{
+			void* propPtr = const_cast<void*>(reflectableProp->GetProperty(pProperty.name));
+			Value const& propValue = pVal[pProperty.name.data()];
+			DeserializeValue(&propValue, pProperty.type, propPtr, &pProperty.DataStructurePropertyHandler);
+		});
+}
 #endif
 
 /**
