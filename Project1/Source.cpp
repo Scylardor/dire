@@ -78,7 +78,9 @@ struct ArrayPropertyCRUDHandler;
 	template <typename ContainerType>\
 	inline constexpr bool has_##FunctionName##_v = has_##FunctionName<ContainerType>::value;
 
-MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(Brackets, operator[], 0)
+MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(ArrayBrackets, operator[], 0)
+MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(MapBrackets, operator[], ContainerType::key_type())
+
 MEMBER_FUNCTION_DETECTOR_PARAM2(insert, std::declval<ContainerType>().begin(), std::declval<ContainerType>()[0])
 MEMBER_FUNCTION_DETECTOR_PARAM1(erase, std::declval<ContainerType>().begin())
 MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(MapErase, erase, typename ContainerType::key_type())
@@ -106,21 +108,30 @@ DECLARE_HAS_TYPE_DETECTOR(HasKeyType, key_type)
 DECLARE_HAS_TYPE_DETECTOR(HasMappedType, mapped_type)
 
 template<typename T>
-inline constexpr bool HasMapSemantics_v = has_Brackets_v<T> && HasKeyType_v<T> && HasValueType_v<T> && HasMappedType_v<T>;
+inline constexpr bool HasMapSemantics_v = HasKeyType_v<T> && HasValueType_v<T> && HasMappedType_v<T> && has_MapBrackets_v<T>;
 
 template<typename T>
 using HasMapSemantics_t = std::enable_if_t<HasMapSemantics_v<T> >;
 
 template<typename T>
-inline constexpr bool HasArraySemantics_v = std::is_array_v<T> || has_Brackets_v<T> && HasValueType_v<T> && !HasMapSemantics_v<T>;
+inline constexpr bool HasArraySemantics_v = std::is_array_v<T> || (has_ArrayBrackets_v<T> && HasValueType_v<T>) && !HasMapSemantics_v<T>;
 
 template<typename T>
 using HasArraySemantics_t = std::enable_if_t<HasArraySemantics_v<T>>;
 
+struct Enum
+{
+
+};
+
+template <typename T>
+constexpr bool IsEnum = std::is_enum_v<T> || std::is_base_of_v<Enum, T>;
+
+
 enum class Type : uint8_t
 {
 	Unknown,
-	Void,
+	Void, // TODO: TO REMOVE? Probably useless
 	Bool,
 	Int,
 	Uint,
@@ -128,13 +139,24 @@ enum class Type : uint8_t
 	Uint64,
 	Float,
 	Double,
-	String,
+	String, // TODO: TO REMOVE? Strings are considered as arrays of char
 	Array,
 	Map,
 	Enum,
-	Object
+	Object,
+	Char,
+	UChar,
+	Short,
+	UShort
 };
-// TODO: what about char, short? String is not covered either?
+
+
+enum class Faces : uint8_t
+{
+	Jack,
+	Queen,
+	King
+};
 
 template <Type T>
 struct FromEnumTypeToActualType;
@@ -166,13 +188,17 @@ DECLARE_TYPE_TRANSLATOR(Type::Int64, int64_t)
 DECLARE_TYPE_TRANSLATOR(Type::Uint64, uint64_t)
 DECLARE_TYPE_TRANSLATOR(Type::Float, float)
 DECLARE_TYPE_TRANSLATOR(Type::Double, double)
+DECLARE_TYPE_TRANSLATOR(Type::Char, char)
+DECLARE_TYPE_TRANSLATOR(Type::UChar, unsigned char)
+DECLARE_TYPE_TRANSLATOR(Type::Short, short)
+DECLARE_TYPE_TRANSLATOR(Type::UShort, unsigned short)
 
 // Note: adding the void at the end here is important as
 // "the types of default template parameter have to match, or else the specialization is not taken into account,
 // as a specialization is only taken when every template argument matches the specialization."
 // see https://stackoverflow.com/a/44858464/1987466
 template <typename T>
-struct FromActualTypeToEnumType<T, typename std::enable_if_t<std::is_class_v<T> && !HasMapSemantics_v<T> && !HasArraySemantics_v<T>, void>>
+struct FromActualTypeToEnumType<T, typename std::enable_if_t<std::is_class_v<T> && !HasMapSemantics_v<T> && !HasArraySemantics_v<T> && !IsEnum<T>, void>>
 {
 	static const Type EnumType = Type::Object;
 };
@@ -328,11 +354,10 @@ private:
 
 struct AbstractPropertyHandler
 {
-	// TODO: try to find a way to merge these two,
-	// because a property can either be an array or map, but not both...
 	ArrayPropertyCRUDHandler const* ArrayHandler = nullptr;
 	MapPropertyCRUDHandler const* MapHandler = nullptr;
-} ;
+	struct EnumDataHandler const* EnumHandler = nullptr;
+};
 
 
 // TODO: put in proper place
@@ -1209,14 +1234,46 @@ struct FunctionTypeInfo<Ret(Class::*)(Args...)> : FunctionInfo
 
 #define VA_MACRO(MACRO, ...) MSVC_BUG(CONCAT2, (MACRO, NARGS(__VA_ARGS__)))(__VA_ARGS__)
 
+template <typename T>
+constexpr Type	FromEnumToUnderlyingType()
+{
+	static_assert(IsEnum<T>);
+
+	switch (sizeof T)
+	{
+	case sizeof(int8_t) :
+		return Type::Char;
+	case sizeof(int16_t) :
+		return Type::Short;
+	case sizeof(int32_t) :
+		return Type::Int;
+	case sizeof(int64_t) :
+		return Type::Int64;
+	default:
+		return Type::Unknown;
+	}
+}
+
+template <typename T>
+struct FromActualTypeToEnumType<T, typename std::enable_if_t<std::is_enum_v<T>, void>>
+{
+	static const Type EnumType = FromEnumToUnderlyingType<T>();
+};
+
+template <typename T>
+struct FromActualTypeToEnumType<T, typename std::enable_if_t<std::is_base_of_v<Enum, T>, void>>
+{
+	static const Type EnumType = Type::Enum;
+};
+
 // This idea of storing a "COUNTER_BASE" has been stolen from https://stackoverflow.com/a/52770279/1987466
 #define LINEAR_ENUM(EnumName, UnderlyingType, ...) \
-	struct EnumName\
+	struct EnumName : Enum \
 	{\
 		private:\
-			using Underlying = UnderlyingType; \
 			enum LocalCounter_t { COUNTER_BASE = __COUNTER__, OFFSET = COUNTER_BASE+1 };\
 		public:\
+			using Underlying = UnderlyingType; \
 			enum Type : UnderlyingType\
 			{\
 				VA_MACRO(COMMA_ARGS_MINUS_COUNTER, __VA_ARGS__)\
@@ -1255,6 +1312,10 @@ struct FunctionTypeInfo<Ret(Class::*)(Args...)> : FunctionInfo
 			operator Type() const\
 			{\
 				return Value;\
+			}\
+			friend std::string	to_string(EnumName const& pSelf)\
+			{\
+				return std::string(FromSafeEnum(pSelf.Value));\
 			}\
 			private:\
 			inline static std::pair<const char*, Type> nameEnumPairs[] {\
@@ -1344,11 +1405,11 @@ FindFirstSetBit(T value)
 #endif
 
 #define BITFLAGS_ENUM(EnumName, UnderlyingType, ...) \
-	struct EnumName { \
+	struct EnumName : Enum { \
 			private:\
-			using Underlying = UnderlyingType; \
 			enum LocalCounter_t { COUNTER_BASE = __COUNTER__, OFFSET = (COUNTER_BASE == 0 ? 0 : 1) };\
 		public:\
+			using Underlying = UnderlyingType; \
 			enum Type : UnderlyingType\
 			{\
 				VA_MACRO(COMMA_ARGS_LSHIFT_COUNTER, __VA_ARGS__)\
@@ -1388,6 +1449,10 @@ FindFirstSetBit(T value)
 				return Value;\
 			}\
 			Type	Value{};\
+			friend std::string	to_string(EnumName const& pSelf)\
+			{\
+				return std::string(FromSafeEnum(pSelf.Value));\
+			}\
 		private:\
 			inline static std::pair<const char*, Type> nameEnumPairs[] {\
 				VA_MACRO(BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)\
@@ -1442,18 +1507,45 @@ FindFirstSetBit(T value)
 	};
 
 
-#define TYPED_ENUM(EnumName, UnderlyingType, ...) \
-	struct EnumName { \
-		using Underlying = UnderlyingType; \
-		typedef enum Type : UnderlyingType { \
-			VA_MACRO(COMMA_ARGS, __VA_ARGS__)\
-		} Type; \
-		inline static std::pair<const char*, Type> nameEnumPairs[] {\
-			VA_MACRO(BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)\
-		};\
-	};
+#define ENUM(EnumName, ...) LINEAR_ENUM(EnumName, int, __VA_ARGS__)
 
-#define ENUM(EnumName, ...) TYPED_ENUM(EnumName, int, __VA_ARGS__)
+struct EnumDataHandler
+{
+	using EnumToStringFptr = const char* (*)(const void*);
+	using SetFromStringFptr = void (*)(const char*, void*);
+	using EnumTypeFptr = Type(*)();
+
+	EnumToStringFptr	EnumToString = nullptr;
+	SetFromStringFptr	SetFromString = nullptr;
+	EnumTypeFptr		EnumType = nullptr;
+};
+
+template <class T>
+struct TypedEnumDataHandler : EnumDataHandler
+{
+	TypedEnumDataHandler()
+	{
+		EnumToString = [](const void* pVal) { return T::FromSafeEnum(*(const typename T::Type*)pVal); };
+		SetFromString = &SetEnumFromString;
+		EnumType = &FromEnumToUnderlyingType<T>;
+	}
+
+	static void	SetEnumFromString(const char* pEnumStr, void* pEnumAddr)
+	{
+		T* theEnum = (T*)pEnumAddr;
+		const typename T::Type* enumValue = T::FromString(pEnumStr);
+		if (theEnum && enumValue != nullptr)
+		{
+			*theEnum = *enumValue;
+		}
+	}
+
+	static TypedEnumDataHandler const& GetInstance()
+	{
+		static TypedEnumDataHandler instance{};
+		return instance;
+	}
+};
 
 LINEAR_ENUM(LinearEnum33, int, un, deux);
 LINEAR_ENUM(LinearEnum, int, un, deux);
@@ -1461,8 +1553,8 @@ LINEAR_ENUM(LinearEnum, int, un, deux);
 
 BITFLAGS_ENUM(BitEnum, int, un, deux, quatre, seize);
 
-TYPED_ENUM(TestEnum, int, un, deux);
-
+LINEAR_ENUM(Kings, int, Philippe, Alexandre, Cesar, Charles);
+BITFLAGS_ENUM(Queens, short, Judith, Rachel, Pallas, Argine);
 
 template <typename Class, typename Ret, typename... Args >
 struct FunctionTypeInfo2
@@ -1780,15 +1872,23 @@ namespace ReflectorConversions
 		return ADL::AsString(std::forward<T>(t));
 	}
 
-	// Default conversion version to be overloaded by custom types if need be.
-	// TODO: make it a single function from_chars and use SFINAE to cover only the arithmetic cases in the default impl
-	template <typename T>
-	T	FromChars(std::string_view const& pChars);
 
-	template <class T>
-	T from_chars(std::string_view const& pChars)
+	template<typename T, typename = void>
+	struct FromCharsConverter;
+
+	template <typename T>
+	struct FromCharsConverter<T, typename std::enable_if_t<std::is_base_of_v<Enum, T>, void>>
 	{
-		if constexpr (std::is_arithmetic_v<T>)
+		static T Convert(const std::string_view& pChars)
+		{
+			return T::FromSafeString(pChars.data());
+		}
+	};
+
+	template <typename T>
+	struct FromCharsConverter<T, typename std::enable_if_t<std::is_arithmetic_v<T>, void>>
+	{
+		static T Convert(const std::string_view& pChars)
 		{
 			T result;
 			if constexpr (std::is_same_v<T, bool>)
@@ -1803,11 +1903,13 @@ namespace ReflectorConversions
 			// TODO: check for errors
 			return result;
 		}
-		else
-		{
-			T key = FromChars<T>(pChars);
-			return key;
-		}
+	};
+
+	template <class T>
+	T from_chars(std::string_view const& pChars)
+	{
+		T key = FromCharsConverter<T>::Convert(pChars);
+		return key;
 	}
 }
 
@@ -1964,7 +2066,12 @@ class RapidJsonReflectorSerializer : public BaseSerializer<RapidJsonReflectorSer
 	{
 		switch (pPropType)
 		{
-			JSON_SERIALIZE_VALUE_CASE(Bool,  Bool)
+			JSON_SERIALIZE_VALUE_CASE(Bool, Bool)
+			// JSON doesn't have a concept of "small types" like char and short so just encode them as int.
+			JSON_SERIALIZE_VALUE_CASE(Char, Int)
+			JSON_SERIALIZE_VALUE_CASE(UChar, Int)
+			JSON_SERIALIZE_VALUE_CASE(Short, Int)
+			JSON_SERIALIZE_VALUE_CASE(UShort, Int)
 			JSON_SERIALIZE_VALUE_CASE(Int, Int)
 			JSON_SERIALIZE_VALUE_CASE(Uint, Uint)
 			JSON_SERIALIZE_VALUE_CASE(Int64, Int64)
@@ -1985,6 +2092,12 @@ class RapidJsonReflectorSerializer : public BaseSerializer<RapidJsonReflectorSer
 			break;
 		case Type::Object:
 			SerializeCompoundValue(pPropPtr);
+			break;
+		case Type::Enum:
+			{
+				const char* enumStr = pHandler->EnumHandler->EnumToString(pPropPtr);
+				myJsonWriter.String(enumStr);
+			}
 			break;
 		default:
 			std::cerr << "Unmanaged type in SerializeValue!";
@@ -2025,6 +2138,11 @@ private:
 		switch (pPropType)
 		{
 			JSON_DESERIALIZE_VALUE_CASE(Bool, Bool)
+			// JSON doesn't have a concept of "small types" like char and short so just decode it as int.
+			JSON_DESERIALIZE_VALUE_CASE(Char, Int)
+			JSON_DESERIALIZE_VALUE_CASE(UChar, Int)
+			JSON_DESERIALIZE_VALUE_CASE(Short, Int)
+			JSON_DESERIALIZE_VALUE_CASE(UShort, Int)
 			JSON_DESERIALIZE_VALUE_CASE(Int, Int)
 			JSON_DESERIALIZE_VALUE_CASE(Uint, Uint)
 			JSON_DESERIALIZE_VALUE_CASE(Int64, Int64)
@@ -2045,6 +2163,9 @@ private:
 				break;
 			case Type::Object:
 				DeserializeCompoundValue(*jsonVal, pPropPtr);
+				break;
+		case Type::Enum:
+				pHandler->EnumHandler->SetFromString(jsonVal->GetString(), pPropPtr);
 				break;
 			default:
 				std::cerr << "Unmanaged type in SerializeValue!";
@@ -2212,6 +2333,10 @@ class BinaryReflectorDeserializer : public BaseDeserializer<BinaryReflectorDeser
 		switch (pPropType)
 		{
 			BINARY_DESERIALIZE_VALUE_CASE(Bool)
+			BINARY_DESERIALIZE_VALUE_CASE(Char)
+			BINARY_DESERIALIZE_VALUE_CASE(UChar)
+			BINARY_DESERIALIZE_VALUE_CASE(Short)
+			BINARY_DESERIALIZE_VALUE_CASE(UShort)
 			BINARY_DESERIALIZE_VALUE_CASE(Int)
 			BINARY_DESERIALIZE_VALUE_CASE(Uint)
 			BINARY_DESERIALIZE_VALUE_CASE(Int64)
@@ -2232,6 +2357,12 @@ class BinaryReflectorDeserializer : public BaseDeserializer<BinaryReflectorDeser
 			break;
 		case Type::Object:
 			DeserializeCompoundValue(pPropPtr);
+			break;
+		case Type::Enum:
+			{
+				Type underlyingType = pHandler->EnumHandler->EnumType();
+				DeserializeValue(underlyingType, pPropPtr);
+			}
 			break;
 		default:
 			std::cerr << "Unmanaged type in SerializeValue!";
@@ -2263,6 +2394,7 @@ struct MapPropertyCRUDHandler
 	using MapValueTypeFptr = MapKeyTypeFptr;
 	using MapSizeofKeyFptr = size_t(*)();
 	using MapSizeofValueFptr = MapSizeofKeyFptr;
+	using MapKeyDataHandlerFptr = AbstractPropertyHandler(*)();
 
 	MapReadFptr		Read = nullptr;
 	MapUpdateFptr	Update = nullptr;
@@ -2277,13 +2409,14 @@ struct MapPropertyCRUDHandler
 	MapValueTypeFptr	GetValueType = nullptr;
 	MapSizeofKeyFptr	SizeofKey = nullptr;
 	MapSizeofValueFptr	SizeofValue = nullptr;
+	MapKeyDataHandlerFptr	GetKeyDataHandler = nullptr;
 
 #if USE_SERIALIZE_API
 	using OpaqueSerializerType = void*;
 	using OpaqueMapType = void const*;
 	using OpaqueKeyType = void const*;
 	using OpaqueValueType = OpaqueKeyType;
-	using KeyValuePairSerializeFptr = void (*)(OpaqueSerializerType, OpaqueKeyType, OpaqueValueType, MapPropertyCRUDHandler const&, AbstractPropertyHandler const&);
+	using KeyValuePairSerializeFptr = void (*)(OpaqueSerializerType, OpaqueKeyType, OpaqueValueType, MapPropertyCRUDHandler const&, AbstractPropertyHandler const&, AbstractPropertyHandler const&);
 	using MapSerializeForeachPairFptr = void (*)(OpaqueMapType, OpaqueSerializerType, KeyValuePairSerializeFptr);
 	using MapSerializeKeyToStringFptr = std::string(*)(OpaqueKeyType); // TODO: customize string type
 	MapSerializeForeachPairFptr	SerializeForEachPair = nullptr;
@@ -2324,6 +2457,7 @@ struct TypedMapPropertyCRUDHandler2<T,
 		GetValueType = &MapGetValueType;
 		SizeofKey = [] { return sizeof(KeyType); };
 		SizeofValue = [] { return sizeof(ValueType); };
+		GetKeyDataHandler = &MapKeyHandler;
 
 #if USE_SERIALIZE_API
 		SerializeForEachPair = &MapSerializeForEachPair;
@@ -2444,10 +2578,29 @@ struct TypedMapPropertyCRUDHandler2<T,
 		return 0;
 	}
 
+	static AbstractPropertyHandler MapKeyHandler()
+	{
+		AbstractPropertyHandler handler;
+
+		if constexpr (HasMapSemantics_v<KeyType>)
+		{
+			handler.MapHandler = &TypedMapPropertyCRUDHandler2<KeyType>::GetInstance();
+		}
+		else if constexpr (HasArraySemantics_v<KeyType>)
+		{
+			handler.ArrayHandler = &TypedArrayPropertyCRUDHandler2<KeyType>::GetInstance();
+		}
+		else if constexpr (std::is_base_of_v<Enum, KeyType>)
+		{
+			handler.EnumHandler = &TypedEnumDataHandler<KeyType>::GetInstance();
+		}
+		return handler;
+	}
+
 	static AbstractPropertyHandler MapValueHandler()
 	{
 		AbstractPropertyHandler handler;
-		handler.ArrayHandler = nullptr;
+
 		if constexpr (HasMapSemantics_v<ValueType>)
 		{
 			handler.MapHandler = &TypedMapPropertyCRUDHandler2<ValueType>::GetInstance();
@@ -2455,6 +2608,10 @@ struct TypedMapPropertyCRUDHandler2<T,
 		else if constexpr(HasArraySemantics_v<ValueType>)
 		{
 			handler.ArrayHandler = &TypedArrayPropertyCRUDHandler2<ValueType>::GetInstance();
+		}
+		else if constexpr (std::is_base_of_v<Enum, ValueType>)
+		{
+			handler.EnumHandler = &TypedEnumDataHandler<ValueType>::GetInstance();
 		}
 		return handler;
 	}
@@ -2487,10 +2644,11 @@ struct TypedMapPropertyCRUDHandler2<T,
 		if (pMap != nullptr)
 		{
 			T const* thisMap = static_cast<T const*>(pMap);
+			AbstractPropertyHandler mapKeyHandler = MapKeyHandler();
 			AbstractPropertyHandler mapValueHandler = MapValueHandler();
 			for (auto it = thisMap->begin(); it != thisMap->end(); ++it)
 			{
-				pForEachPairCallback(pSerializer, &it->first, &it->second, GetInstance(), mapValueHandler);
+				pForEachPairCallback(pSerializer, &it->first, &it->second, GetInstance(), mapKeyHandler, mapValueHandler);
 			}
 		}
 	}
@@ -2539,7 +2697,7 @@ struct ArrayPropertyCRUDHandler
 // Base class for reflectable properties that have brackets operator to be able to make operations on the underlying array
 template <typename T>
 struct TypedArrayPropertyCRUDHandler2<T,
-	typename std::enable_if_t<!std::is_array_v<T> && has_Brackets_v<T>>> : ArrayPropertyCRUDHandler
+	typename std::enable_if_t<!std::is_array_v<T> && has_ArrayBrackets_v<T>>> : ArrayPropertyCRUDHandler
 {
 	using RawElementType = decltype(std::declval<T>()[0]);
 	// Decaying removes the references and fixes the compile error "pointer to reference is illegal"
@@ -2559,7 +2717,7 @@ struct TypedArrayPropertyCRUDHandler2<T,
 		ElementSize = [] { return sizeof(ElementValueType); };
 	}
 
-	static_assert(has_Brackets_v<T>
+	static_assert(has_ArrayBrackets_v<T>
 		&& has_insert_v<T>
 		&& has_erase_v<T>
 		&& has_clear_v<T>
@@ -2637,7 +2795,7 @@ struct TypedArrayPropertyCRUDHandler2<T,
 	static AbstractPropertyHandler	ArrayElementHandler()
 	{
 		AbstractPropertyHandler handler;
-		handler.ArrayHandler = nullptr;
+
 		if constexpr (HasMapSemantics_v<ElementValueType>)
 		{
 			handler.MapHandler = &TypedMapPropertyCRUDHandler2<ElementValueType>::GetInstance();
@@ -2645,6 +2803,10 @@ struct TypedArrayPropertyCRUDHandler2<T,
 		else if constexpr (HasArraySemantics_v<ElementValueType>)
 		{
 			handler.ArrayHandler = &TypedArrayPropertyCRUDHandler2<ElementValueType>::GetInstance();
+		}
+		else if constexpr (std::is_base_of_v<Enum, ElementValueType>)
+		{
+			handler.EnumHandler = &TypedEnumDataHandler<ElementValueType>::GetInstance();
 		}
 		return handler;
 	}
@@ -2660,7 +2822,7 @@ struct TypedArrayPropertyCRUDHandler2<T,
 			return INVALID_REFLECTABLE_ID;
 		}
 	}
-	
+
 	static TypedArrayPropertyCRUDHandler2 const&	GetInstance()
 	{
 		static TypedArrayPropertyCRUDHandler2 instance{};
@@ -2818,6 +2980,7 @@ struct ReflectProperty3 : TypeInfo2
 	ReflectProperty3(const char* pName, std::ptrdiff_t pOffset) :
 		TypeInfo2(pName, pOffset, sizeof(TProp))
 	{
+		// TODO: use type traits instead
 		if constexpr (HasArraySemantics_v<TProp>)
 		{
 			SetType(Type::Array);
@@ -2830,7 +2993,15 @@ struct ReflectProperty3 : TypeInfo2
 		{
 			SetType(Type::Object);
 		}
-		// TODO: that doesnt manage custom enums
+		else if constexpr (std::is_enum_v<TProp>)
+		{
+			SetType(FromEnumToUnderlyingType<TProp>());
+		}
+		else if constexpr (std::is_base_of_v<Enum, TProp>)
+		{
+			SetType(Type::Enum);
+			DataStructurePropertyHandler.EnumHandler = &TypedEnumDataHandler<TProp>::GetInstance();
+		}
 		else
 		{
 			// primary type
@@ -4107,6 +4278,20 @@ reflectable_struct(mapType)
 	DECLARE_PROPERTY((std::map<int, bool>), aEvenOddMap);
 };
 
+reflectable_struct(enumTestType)
+{
+	DECLARE_REFLECTABLE_INFO()
+
+	DECLARE_PROPERTY(Faces, aTestFace);
+	DECLARE_PROPERTY((std::vector<Kings>), playableKings);
+	DECLARE_PROPERTY((std::map<Queens, bool>), allowedQueens);
+
+	bool operator==(const enumTestType& pRhs) const
+	{
+		return aTestFace == pRhs.aTestFace && playableKings == pRhs.playableKings && allowedQueens == pRhs.allowedQueens;
+	}
+};
+
 template <typename T>
 struct Subclass
 {
@@ -4225,6 +4410,10 @@ void BinaryReflectorSerializer::CRTP_SerializeValue(Type pPropType, void const* 
 	switch (pPropType)
 	{
 		BINARY_SERIALIZE_VALUE_CASE(Bool)
+		BINARY_SERIALIZE_VALUE_CASE(Char)
+		BINARY_SERIALIZE_VALUE_CASE(UChar)
+		BINARY_SERIALIZE_VALUE_CASE(Short)
+		BINARY_SERIALIZE_VALUE_CASE(UShort)
 		BINARY_SERIALIZE_VALUE_CASE(Int)
 		BINARY_SERIALIZE_VALUE_CASE(Uint)
 		BINARY_SERIALIZE_VALUE_CASE(Int64)
@@ -4245,6 +4434,12 @@ void BinaryReflectorSerializer::CRTP_SerializeValue(Type pPropType, void const* 
 		break;
 	case Type::Object:
 		SerializeCompoundValue(pPropPtr);
+		break;
+	case Type::Enum:
+		{
+			Type underlyingType = pHandler->EnumHandler->EnumType();
+			CRTP_SerializeValue(underlyingType, pPropPtr);
+		}
 		break;
 	default:
 		std::cerr << "Unmanaged type in SerializeValue!";
@@ -4287,12 +4482,12 @@ void BinaryReflectorSerializer::SerializeMapValue(void const* pPropPtr, MapPrope
 	WriteAsBytes<BinaryMapHeader>(keyType, keySize, valueType, valueSize, mapSize);
 
 	pMapHandler->SerializeForEachPair(pPropPtr, this, [](void* pSerializer, const void* pKey, const void* pVal, MapPropertyCRUDHandler const& pMapHandler,
-		AbstractPropertyHandler const& pValueHandler)
+		AbstractPropertyHandler const& pKeyHandler, AbstractPropertyHandler const& pValueHandler)
 	{
 		auto* myself = static_cast<BinaryReflectorSerializer*>(pSerializer);
 
 		const Type keyType = pMapHandler.GetKeyType();
-		myself->SerializeValue(keyType, pKey, nullptr);
+		myself->SerializeValue(keyType, pKey, &pKeyHandler);
 
 		Type valueType = pMapHandler.GetValueType();
 		myself->SerializeValue(valueType, pVal, &pValueHandler);
@@ -4619,9 +4814,9 @@ int main()
 	edited = anotherInstance->SetProperty<int>("compvar.compleet.leet", 0x2a2a);
 	assert(edited && anotherInstance->compvar.compleet.leet == 0x2a2a);
 
-	constexpr bool hasBrackets1 = has_Brackets_v< std::string>;
-	constexpr bool hasBrackets2 = has_Brackets_v< std::vector<int>>;
-	constexpr bool hasBrackets3 = has_Brackets_v<int[]>;
+	constexpr bool hasBrackets1 = has_ArrayBrackets_v< std::string>;
+	constexpr bool hasBrackets2 = has_ArrayBrackets_v< std::vector<int>>;
+	constexpr bool hasBrackets3 = has_ArrayBrackets_v<int[]>;
 
 	constexpr bool hasINsert4 = has_insert_v< std::string>;
 	constexpr bool hasINsert5 = has_insert_v< std::vector<int>>;
@@ -4755,7 +4950,6 @@ int main()
 
 	GetParenthesizedType<void(std::map<int, bool>)>::Type mymap;
 
-
 	assert(aD.xp == 42);
 	aD.aBoolMap[0] = false;
 
@@ -4881,12 +5075,23 @@ int main()
 		std::string serialized2 = serializer.Serialize(deserializedD);
 		assert(serialized == serialized2); // in theory, if serialization output is the same, objects are the same as far as reflection is concerned
 
+		// Test enumerations
+		enumTestType enums;
+		enums.aTestFace = Faces::Queen;
+		enums.playableKings = { Kings::Cesar, Kings::Alexandre };
+		enums.allowedQueens = { {Queens::Judith, true}, {Queens::Rachel, false} };
+		serialized = serializer.Serialize(enums);
+		assert(serialized == "{\"aTestFace\":1,\"playableKings\":[\"Cesar\",\"Alexandre\"],\"allowedQueens\":{\"Judith\":true,\"Rachel\":false}}");
+
+		enumTestType deserializedEnums;
+		deserializer.DeserializeInto(serialized.data(), deserializedEnums);
+		assert(enums == deserializedEnums);
 	};
 
 	JSONTests(jsonSerializer, jsonDeserializer);
 
 	auto binaryTests = [=](ISerializer& serializer, IDeserializer& deserializer)
-	{
+ 	{
 		ISerializer::Result serializedBytes = serializer.Serialize(clonedComp);
 		std::string binarized = serializedBytes.AsString();
 
@@ -4992,6 +5197,20 @@ int main()
 		std::string serialized2 = serializer.Serialize(deserializedD);
 		assert(binarized == serialized2); // in theory, if serialization output is the same, objects are the same as far as reflection is concerned
 
+		// Test enumerations
+		enumTestType enums;
+		enums.aTestFace = Faces::Queen;
+		enums.playableKings = { Kings::Cesar, Kings::Alexandre };
+		enums.allowedQueens = { {Queens::Judith, true}, {Queens::Rachel, false} };
+		binarized = serializer.Serialize(enums);
+		writeBinaryString(binarized);
+		assert(memcmp(binarized.data(),
+			"\x0e\x00\x00\x00\x03\x00\x00\x00\x0e\x00\x00\x00\x05\x00\x00\x00\x01\x0a\x00\x00\x00\x08\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x01\x00\x00\x00\x0b\x00\x00\x00\x28\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x01\x00\x01\x02\x00\x00"
+			, binarized.size()) == 0);
+
+		enumTestType deserializedEnums;
+		deserializer.DeserializeInto(binarized.data(), deserializedEnums);
+		assert(enums == deserializedEnums);
 	};
 
 	BinaryReflectorSerializer binarySerializer;
@@ -5056,7 +5275,7 @@ void RapidJsonReflectorSerializer::SerializeMapValue(void const* pPropPtr, MapPr
 	if (pPropPtr != nullptr && pMapHandler != nullptr)
 	{
 		pMapHandler->SerializeForEachPair(pPropPtr, this, [](void* pSerializer, const void* pKey, const void* pVal, MapPropertyCRUDHandler const& pMapHandler,
-			AbstractPropertyHandler const& pValueHandler)
+			AbstractPropertyHandler const& /*pKeyHandler*/, AbstractPropertyHandler const& pValueHandler)
 		{
 			auto* myself = static_cast<RapidJsonReflectorSerializer*>(pSerializer);
 
@@ -5193,3 +5412,4 @@ void Test::zdzdzdz(float bibi)
 // http://msinilo.pl/blog2/post/p517/
 // https://replicaisland.blogspot.com/2010/11/building-reflective-object-system-in-c.html
 // https://medium.com/geekculture/c-inheritance-memory-model-eac9eb9c56b5
+// https://stackoverflow.com/a/282006/1987466
