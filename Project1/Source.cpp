@@ -10,11 +10,11 @@
 #include <unordered_map>
 #include <fstream>
 #include <map>
-#include <sstream>
 
 #define USE_SERIALIZE_API 1
 #define RAPIDJSON_REFLECTION_SERIALIZER 1
 #define BINARY_REFLECTION_SERIALIZER 1
+#define PROPERTIES_SERIALIZABLE_BY_DEFAULT 1
 
 class ReflectableTypeInfo;
 struct Reflectable2;
@@ -359,6 +359,459 @@ struct AbstractPropertyHandler
 	struct EnumDataHandler const* EnumHandler = nullptr;
 };
 
+template <typename Derived>
+struct CRTP
+{
+protected:
+
+	Derived& Underlying() { return static_cast<Derived&>(*this); }
+	Derived const& Underlying() const { return static_cast<Derived const&>(*this); }
+
+	// To protect from misuse
+	CRTP() {}
+	friend Derived;
+};
+
+// TODO: Stolen from Monocle
+#define MOE_CRTP_CALL(Method, ...) \
+	this->Underlying().CRTP_##Method(##__VA_ARGS__)
+
+
+class ReflectableFactory
+{
+public:
+	using InstantiateFunction = Reflectable2 * (*)(std::any const&);
+
+	ReflectableFactory() = default;
+
+	void	RegisterInstantiator(unsigned pID, InstantiateFunction pFunc)
+	{
+		// Replace the existing one, if any.
+		auto [it, inserted] = myInstantiators.try_emplace(pID, pFunc);
+		if (!inserted)
+		{
+			it->second = pFunc;
+		}
+	}
+
+	InstantiateFunction	GetInstantiator(unsigned pID) const
+	{
+		auto it = myInstantiators.find(pID);
+		if (it == myInstantiators.end())
+		{
+			return nullptr;
+		}
+
+		return it->second;
+	}
+
+private:
+
+	std::unordered_map<unsigned, InstantiateFunction>	myInstantiators;
+};
+
+
+template <class T>
+class Singleton
+{
+public:
+
+	static T& EditSingleton()
+	{
+		static T theSingleton; // Thread-safe since C++11!
+		return theSingleton;
+	}
+
+	static T const& GetSingleton()
+	{
+		return EditSingleton();
+	}
+
+	template <typename... Args>
+	T& ReinitializeSingleton(Args&&... pCtorParams)
+	{
+		EditSingleton() = T(std::forward<Args>(pCtorParams)...);
+		return EditSingleton();
+	}
+
+protected:
+	Singleton() = default;
+	~Singleton() = default;
+
+private:
+
+	Singleton(Singleton const&) = delete;   // Copy construct
+	Singleton(Singleton&&) = delete;   // Move construct
+	Singleton& operator=(Singleton const&) = delete;   // Copy assign
+	Singleton& operator=(Singleton&&) = delete;   // Move assign
+
+};
+
+template <typename T, typename IDType = int>
+class AutomaticTypeCounter
+{
+public:
+	AutomaticTypeCounter() = default;
+
+	static IDType	TakeNextID()
+	{
+		return theCounter++;
+	}
+
+	static IDType	PeekNextID()
+	{
+		return theCounter;
+	}
+
+private:
+	inline static IDType theCounter = 0;
+};
+
+// TODO: replace all the unsigned by a unified typedef
+struct Reflector3 : Singleton<Reflector3>, AutomaticTypeCounter<Reflector3, unsigned>
+{
+	inline static const int REFLECTOR_VERSION = 0;
+
+public:
+
+	Reflector3() = default;
+
+	[[nodiscard]] size_t	GetTypeInfoCount() const
+	{
+		return myReflectableTypeInfos.size();
+	}
+
+	[[nodiscard]] ReflectableTypeInfo const* GetTypeInfo(unsigned classID) const
+	{
+		if (classID < myReflectableTypeInfos.size())
+		{
+			return myReflectableTypeInfos[classID];
+		}
+
+		return nullptr;
+	}
+
+	[[nodiscard]] ReflectableTypeInfo* EditTypeInfo(unsigned classID)
+	{
+		if (classID < myReflectableTypeInfos.size())
+		{
+			return myReflectableTypeInfos[classID];
+		}
+
+		return nullptr;
+	}
+
+
+	void	RegisterInstantiateFunction(unsigned pClassID, ReflectableFactory::InstantiateFunction pInstantiateFunction)
+	{
+		myInstantiateFactory.RegisterInstantiator(pClassID, pInstantiateFunction);
+	}
+
+	[[nodiscard]] Reflectable2* TryInstantiate(unsigned pClassID, std::any const& pAnyParameterPack) const
+	{
+		ReflectableFactory::InstantiateFunction anInstantiateFunc = myInstantiateFactory.GetInstantiator(pClassID);
+		if (anInstantiateFunc == nullptr)
+		{
+			return nullptr;
+		}
+
+		Reflectable2* newInstance = anInstantiateFunc(pAnyParameterPack);
+		return newInstance;
+	}
+
+
+	// This follows a very simple binary serialization process right now. It encodes:
+	// - the reflectable type ID
+	// - the typename string
+	struct ExportedTypeInfoData
+	{
+		unsigned	ReflectableID;
+		std::string	TypeName;
+	};
+
+	bool	ExportTypeInfoSettings(std::string_view pWrittenSettingsFile) const;
+	bool	ImportTypeInfoSettings(std::string_view pReadSettingsFile);
+
+private:
+	friend ReflectableTypeInfo;
+
+	[[nodiscard]] unsigned	RegisterTypeInfo(ReflectableTypeInfo* pTypeInfo)
+	{
+		myReflectableTypeInfos.push_back(pTypeInfo);
+		return GetTypeInfoCount() - 1;
+	}
+
+	std::vector<ReflectableTypeInfo*>	myReflectableTypeInfos;
+	ReflectableFactory	myInstantiateFactory;
+};
+
+
+#if USE_SERIALIZE_API
+
+class ISerializer
+{
+public:
+
+	struct Result
+	{
+		using ByteVector = std::vector<std::byte>;
+
+		Result() = default;
+
+		Result(const char* pBuffer, size_t pBufferSize)
+		{
+			SerializedBuffer.resize(pBufferSize);
+			memcpy(SerializedBuffer.data(), pBuffer, sizeof(char) * pBufferSize);
+		}
+
+		Result(ByteVector&& pMovedVec) :
+			SerializedBuffer(std::move(pMovedVec))
+		{}
+
+		[[nodiscard]] std::string AsString() const // TODO: customize string
+		{
+			std::string serializedString;
+			serializedString.resize(SerializedBuffer.size());
+			memcpy(serializedString.data(), SerializedBuffer.data(), sizeof(std::byte) * SerializedBuffer.size());
+			return serializedString;
+		}
+
+		operator std::string() const
+		{
+			return AsString();
+		}
+
+	private:
+		ByteVector	SerializedBuffer;
+	};
+
+	virtual ~ISerializer() = default;
+
+	virtual Result	Serialize(Reflectable2 const& serializedObject) = 0;
+
+	virtual bool	SerializesMetadata() const = 0;
+
+	virtual void	SerializeString(std::string_view pSerializedString) = 0;
+	virtual void	SerializeInt(int32_t pSerializedInt) = 0;
+	virtual void	SerializeFloat(float pSerializedFloat) = 0;
+	virtual void	SerializeBool(bool pSerializedBool) = 0;
+
+	using SerializedValueFiller = void (*)(ISerializer& pSerializer);
+	virtual void	SerializeValuesForObject(std::string_view pObjectName, SerializedValueFiller pFillerFunction) = 0;
+};
+
+
+class IDeserializer
+{
+public:
+	virtual ~IDeserializer() = default;
+
+	template <typename T, typename... Args>
+	T* Deserialize(const char* pSerialized, Args&&... pArgs)
+	{
+		static_assert(std::is_base_of_v<Reflectable2, T>, "Deserialize is only able to process Reflectable-derived classes");
+		T* deserializedReflectable = new T(std::forward<Args>(pArgs)...); // TODO: allow customization of new
+		DeserializeInto(pSerialized, *deserializedReflectable);
+		return deserializedReflectable;
+	}
+
+	template <typename... Args>
+	Reflectable2* Deserialize(const char* pSerialized, unsigned pReflectableClassID, Args&&... pArgs)
+	{
+		ReflectableTypeInfo const* typeInfo = Reflector3::GetSingleton().GetTypeInfo(pReflectableClassID);
+		if (typeInfo == nullptr) // bad ID
+		{
+			return nullptr;
+		}
+
+		Reflectable2* deserializedReflectable =
+			Reflector3::GetSingleton().TryInstantiate(pReflectableClassID, std::tuple<Args...>(std::forward<Args>(pArgs)...));
+
+		if (deserializedReflectable)
+		{
+			DeserializeInto(pSerialized, *deserializedReflectable);
+		}
+
+		return deserializedReflectable;
+	}
+
+	virtual void	DeserializeInto(const char* pSerialized, Reflectable2& pDeserializedObject) = 0;
+
+};
+
+#endif
+
+struct IMetadataAttribute
+{
+};
+
+
+// inspired by https://stackoverflow.com/a/41171291/1987466
+template <typename T, typename Tuple>
+struct has_type;
+
+template <typename T, typename... Us>
+struct has_type<T, std::tuple<Us...>> : std::disjunction<std::is_same<T, Us>...> {};
+
+template <typename... Ts>
+struct Metadata
+{
+	static_assert((std::is_base_of_v<IMetadataAttribute, std::remove_reference_t<Ts&&>> && ...), "You passed a type parameter to TMetadata that is not a IMetadataAttribute");
+
+	Metadata() = default;
+
+	template <typename T>
+	void	RegisterAttribute(const T& pMetadataAttribute)
+	{
+		pMetadataAttribute.Register(*this);
+	}
+
+	template <typename T>
+	[[nodiscard]] static constexpr bool	HasAttribute()
+	{
+		return has_type<T, std::tuple<Ts...>>::value;
+	}
+
+
+	[[nodiscard]] static constexpr auto	GetAttributesCount()
+	{
+		return sizeof...(Ts);
+	}
+
+#ifdef USE_SERIALIZE_API
+
+	template <typename T>
+	static void	SerializeAttribute(class ISerializer& pSerializer)
+	{
+		T::Serialize(pSerializer);
+	}
+
+	static void	Serialize(class ISerializer& pSerializer)
+	{
+		(Ts::Serialize(pSerializer), ...);
+	}
+#endif
+
+
+
+	static const Metadata& Empty()
+	{
+		static const Metadata empty;
+		return empty;
+	}
+
+};
+
+
+struct Serializable : IMetadataAttribute
+{
+
+	static void	Serialize(ISerializer&)
+	{}
+};
+
+struct NotSerializable : IMetadataAttribute
+{
+
+	static void	Serialize(ISerializer&)
+	{}
+};
+
+
+
+struct Transient : IMetadataAttribute
+{
+	static void	Serialize(ISerializer& pSerializer)
+	{
+		pSerializer.SerializeValuesForObject("Transient", [](ISerializer& pSerializer)
+		{
+		}); // nothing to do for "boolean" attribute
+	}
+};
+
+// We need C++20 (and later) for complicated non-type template parameters like floats and string literals.
+#if (defined(_MSC_VER) && _MSVC_LANG >= 202002L) || __cplusplus >= 202002L // MSVC doesn't use __cplusplus unless you use /Zc:__cplusplus :/
+
+// inspired by https://vector-of-bool.github.io/2021/10/22/string-templates.html
+template<unsigned N>
+struct FixedString
+{
+	char	String[N + 1]{}; // +1 for null terminator
+
+	constexpr FixedString(char const* pInitStr)
+	{
+		for (unsigned i = 0; i != N; ++i)
+			String[i] = pInitStr[i];
+	}
+	constexpr operator const char* () const
+	{
+		return String;
+	}
+};
+
+// important deduction guide
+template<unsigned N>
+FixedString(char const (&)[N])->FixedString<N - 1>; // Drop the null terminator
+
+template<FixedString Str>
+struct DisplayName : IMetadataAttribute
+{
+# if USE_SERIALIZE_API
+	static void	Serialize(ISerializer& pSerializer)
+	{
+		pSerializer.SerializeValuesForObject("DisplayName", [](ISerializer& pSerializer)
+		{
+			pSerializer.SerializeString("Name");
+			pSerializer.SerializeString(Name);
+		});
+	}
+
+private:
+	inline static constexpr char const* Name = Str;
+# endif
+};
+
+
+template <float Min, float Max>
+struct FValueRange : IMetadataAttribute
+{
+	static_assert(Min <= Max, "Min and Max values are inverted!");
+
+# if USE_SERIALIZE_API
+	static void	Serialize(ISerializer& pSerializer)
+	{
+		pSerializer.SerializeValuesForObject("FValueRange", [](ISerializer& pSerializer)
+		{
+			pSerializer.SerializeString("Min");
+			pSerializer.SerializeFloat(Min);
+			pSerializer.SerializeString("Max");
+			pSerializer.SerializeFloat(Max);
+		});
+	}
+# endif
+};
+
+#endif
+
+template <int32_t Min, int32_t Max>
+struct IValueRange : IMetadataAttribute
+{
+	static_assert(Min <= Max, "Min and Max values are inverted!");
+
+#if USE_SERIALIZE_API
+	static void	Serialize(ISerializer& pSerializer)
+	{
+		pSerializer.SerializeValuesForObject("IValueRange", [](ISerializer& pSerializer)
+		{
+			pSerializer.SerializeString("Min");
+			pSerializer.SerializeInt(Min);
+			pSerializer.SerializeString("Max");
+			pSerializer.SerializeInt(Max);
+		});
+	}
+#endif
+};
+
 
 // TODO: put in proper place
 static unsigned const INVALID_REFLECTABLE_ID = UINT32_MAX;
@@ -385,6 +838,20 @@ struct TypeInfo2 : IntrusiveListNode<TypeInfo2>
 	{
 		return DataStructurePropertyHandler;
 	}
+
+#if USE_SERIALIZE_API
+	virtual void	SerializeAttributes(class ISerializer& pSerializer) const = 0;
+
+	struct SerializationState
+	{
+		bool	IsSerializable = false;
+
+		using AttributesCount = uint8_t; // 255 possible attributes is *extremely* likely to be enough
+		AttributesCount	SerializableAttributesCount = 0;
+	};
+
+	virtual SerializationState	GetSerializableState() const = 0;
+#endif
 
 	std::string		name; // TODO: try storing a string view?
 	Type			type;
@@ -507,173 +974,8 @@ protected:
 
 
 
-template <class T>
-class Singleton
-{
-public:
-
-	static T& EditSingleton()
-	{
-		static T theSingleton; // Thread-safe since C++11!
-		return theSingleton;
-	}
-
-	static T const& GetSingleton()
-	{
-		return EditSingleton();
-	}
-
-	template <typename... Args>
-	T& ReinitializeSingleton(Args&&... pCtorParams)
-	{
-		EditSingleton() = T(std::forward<Args>(pCtorParams)...);
-		return EditSingleton();
-	}
-
-protected:
-	Singleton() = default;
-	~Singleton() = default;
-
-private:
-
-	Singleton(Singleton const&) = delete;   // Copy construct
-	Singleton(Singleton&&) = delete;   // Move construct
-	Singleton& operator=(Singleton const&) = delete;   // Copy assign
-	Singleton& operator=(Singleton&&) = delete;   // Move assign
-
-};
 
 
-template <typename T, typename IDType = int>
-class AutomaticTypeCounter
-{
-public:
-	AutomaticTypeCounter() = default;
-
-	static IDType	TakeNextID()
-	{
-		return theCounter++;
-	}
-
-	static IDType	PeekNextID()
-	{
-		return theCounter;
-	}
-
-private:
-	inline static IDType theCounter = 0;
-};
-
-class ReflectableFactory
-{
-public:
-	using InstantiateFunction = Reflectable2 * (*)(std::any const&);
-
-	ReflectableFactory() = default;
-
-	void	RegisterInstantiator(unsigned pID, InstantiateFunction pFunc)
-	{
-		// Replace the existing one, if any.
-		auto [it, inserted] = myInstantiators.try_emplace(pID, pFunc);
-		if (!inserted)
-		{
-			it->second = pFunc;
-		}
-	}
-
-	InstantiateFunction	GetInstantiator(unsigned pID) const
-	{
-		auto it = myInstantiators.find(pID);
-		if (it == myInstantiators.end())
-		{
-			return nullptr;
-		}
-
-		return it->second;
-	}
-
-private:
-
-	std::unordered_map<unsigned, InstantiateFunction>	myInstantiators;
-};
-
-// TODO: replace all the unsigned by a unified typedef
-struct Reflector3 : Singleton<Reflector3>, AutomaticTypeCounter<Reflector3, unsigned>
-{
-	inline static const int REFLECTOR_VERSION = 0;
-
-public:
-
-	Reflector3() = default;
-
-	[[nodiscard]] size_t	GetTypeInfoCount() const
-	{
-		return myReflectableTypeInfos.size();
-	}
-
-	[[nodiscard]] ReflectableTypeInfo const* GetTypeInfo(unsigned classID) const
-	{
-		if (classID < myReflectableTypeInfos.size())
-		{
-			return myReflectableTypeInfos[classID];
-		}
-
-		return nullptr;
-	}
-
-	[[nodiscard]] ReflectableTypeInfo* EditTypeInfo(unsigned classID)
-	{
-		if (classID < myReflectableTypeInfos.size())
-		{
-			return myReflectableTypeInfos[classID];
-		}
-
-		return nullptr;
-	}
-
-
-	void	RegisterInstantiateFunction(unsigned pClassID, ReflectableFactory::InstantiateFunction pInstantiateFunction)
-	{
-		myInstantiateFactory.RegisterInstantiator(pClassID, pInstantiateFunction);
-	}
-
-	[[nodiscard]] Reflectable2*	TryInstantiate(unsigned pClassID, std::any const& pAnyParameterPack) const
-	{
-		ReflectableFactory::InstantiateFunction anInstantiateFunc = myInstantiateFactory.GetInstantiator(pClassID);
-		if (anInstantiateFunc == nullptr)
-		{
-			return nullptr;
-		}
-
-		Reflectable2* newInstance = anInstantiateFunc(pAnyParameterPack);
-		return newInstance;
-	}
-
-
-	// This follows a very simple binary serialization process right now. It encodes:
-	// - the reflectable type ID
-	// - the typename string
-	struct ExportedTypeInfoData
-	{
-		unsigned	ReflectableID;
-		std::string	TypeName;
-	};
-
-	bool	ExportTypeInfoSettings(std::string_view pWrittenSettingsFile) const;
-	bool	ImportTypeInfoSettings(std::string_view pReadSettingsFile);
-
-private:
-	friend ReflectableTypeInfo;
-
-	[[nodiscard]] unsigned	RegisterTypeInfo(ReflectableTypeInfo* pTypeInfo)
-	{
-		myReflectableTypeInfos.push_back(pTypeInfo);
-		return GetTypeInfoCount() - 1;
-	}
-
-	std::vector<ReflectableTypeInfo*>	myReflectableTypeInfos;
-	ReflectableFactory	myInstantiateFactory;
-};
 
 class ReflectableTypeInfo
 {
@@ -1647,6 +1949,44 @@ struct GetParenthesizedType<R(P1)>
 	typedef P1 Type;
 };
 
+// inspired by https://stackoverflow.com/questions/53503124/get-a-new-tuple-containing-all-but-first-element-of-a-tuple
+template <typename T1, typename... Ts>
+std::tuple<Ts...> ExtractTupleWithoutFirstType(const std::tuple<T1, Ts...>& tuple)
+{
+	return std::apply([](auto&&, const auto&... args) {return std::tie(args...); }, tuple);
+}
+
+/* Version for any number of parameters, but no Metadata */
+template <typename T>
+struct ParameterExtractor
+{
+	typedef T	CtorParamsType;
+	typedef Metadata<>	MetadataType;
+
+	static CtorParamsType CtorParameters(const T& tuple)
+	{
+		return tuple;
+	}
+};
+
+
+/* Version for when the parameter list includes Metadata */
+template <typename... Ts, typename... Us>
+struct ParameterExtractor<std::tuple<Metadata<Ts...>, Us...>>
+{
+	typedef std::tuple<Us...>	CtorParamsType;
+	typedef Metadata<Ts...>	MetadataType;
+	using ParamPackTuple = std::tuple<Metadata<Ts...>, Us...>;
+
+	template <typename... Vs>
+	static CtorParamsType CtorParameters(const ParamPackTuple& tuple)
+	{
+		return ExtractTupleWithoutFirstType(tuple);
+	}
+};
+
+
+
 #define PROPERTY(type, name, value) \
 	struct Typeinfo_##name {};
 
@@ -1654,13 +1994,15 @@ struct GetParenthesizedType<R(P1)>
 #define DECLARE_PROPERTY(type, name, ...) \
 	struct name##_tag\
 	{ \
+		using ParamsTupleType = decltype(std::make_tuple(__VA_ARGS__));\
+		using ParamExtractor = ParameterExtractor<ParamsTupleType>;\
 		static ptrdiff_t Offset()\
 		{ \
 			return offsetof(Self, name); \
 		} \
     }; \
-	GetParenthesizedType<void LPAREN UNPAREN(type) RPAREN>::Type name{__VA_ARGS__};\
-	inline static ReflectProperty3<Self, UNPAREN(type)> name##_TYPEINFO_PROPERTY{STRINGIZE(name), name##_tag::Offset() };
+	GetParenthesizedType<void LPAREN UNPAREN(type) RPAREN>::Type name{ std::make_from_tuple< UNPAREN(type) >(name##_tag::ParamExtractor::CtorParameters(std::make_tuple(__VA_ARGS__))) };\
+	inline static ReflectProperty3<Self, UNPAREN(type), name##_tag::ParamExtractor::MetadataType> name##_TYPEINFO_PROPERTY{STRINGIZE(name), name##_tag::Offset() };
 
 // inspired by https://www.mikeash.com/pyblog/friday-qa-2015-03-20-preprocessor-abuse-and-optional-parentheses.html
 #define EXTRACT(...) EXTRACT __VA_ARGS__
@@ -1675,29 +2017,18 @@ struct GetParenthesizedType<R(P1)>
 #define Merge(a, b)   Helper(a, b)
 
 
-#define DECLARE_PROPERTY3(type, name, ...) \
-	struct name##_tag\
-	{ \
-		static ptrdiff_t Offset()\
-		{ \
-			return offsetof(Self, name); \
-		} \
-    }; \
-	GetParenthesizedType<void LPAREN UNPAREN(type) RPAREN>::Type name{__VA_ARGS__};\
-	inline static ReflectProperty3<Self, UNPAREN(type)> name##_TYPEINFO_PROPERTY{STRINGIZE(name), name##_tag::Offset() };
-
-
 #define DECLARE_ARRAY_PROPERTY(type, name, size, ...) \
 	struct name##_tag\
 	{ \
+		using ParamsTupleType = decltype(std::make_tuple(__VA_ARGS__));\
+		using ParamExtractor = ParameterExtractor<ParamsTupleType>;\
 		static ptrdiff_t Offset()\
 		{ \
-			return offsetof(Self, name); \
+		return offsetof(Self, name); \
 		} \
 	}; \
-	GetParenthesizedType<void LPAREN UNPAREN(type) RPAREN>::Type name##size{ __VA_ARGS__ }; \
-	inline static ReflectProperty3<Self, UNPAREN(type) ## size> name##_TYPEINFO_PROPERTY{ STRINGIZE(name), name##_tag::Offset() };
-
+	GetParenthesizedType<void LPAREN UNPAREN(type) RPAREN>::Type name##size{ std::make_from_tuple< UNPAREN(type) >(name##_tag::ParamExtractor::CtorParameters(std::make_tuple(__VA_ARGS__))) }; \
+	inline static ReflectProperty3<Self, UNPAREN(type) ## size, name##_tag::ParamExtractor::MetadataType> name##_TYPEINFO_PROPERTY{ STRINGIZE(name), name##_tag::Offset()};
 
 #ifdef _MSC_VER // MSVC compilers
 #define FUNCTION_NAME() __FUNCTION__
@@ -1911,133 +2242,9 @@ namespace ReflectorConversions
 		T key = FromCharsConverter<T>::Convert(pChars);
 		return key;
 	}
+
 }
 
-#if USE_SERIALIZE_API
-template <typename Derived>
-struct CRTP
-{
-protected:
-
-	Derived& Underlying()				{ return static_cast<Derived&>(*this); }
-	Derived const& Underlying() const	{ return static_cast<Derived const&>(*this); }
-
-	// To protect from misuse
-	CRTP() {}
-	friend Derived;
-};
-
-// TODO: Stolen from Monocle
-#define MOE_CRTP_CALL(Method, ...) \
-	this->Underlying().CRTP_##Method(##__VA_ARGS__)
-
-
-class ISerializer
-{
-public:
-
-	struct Result
-	{
-		using ByteVector = std::vector<std::byte>;
-
-		Result() = default;
-
-		Result(const char* pBuffer, size_t pBufferSize)
-		{
-			SerializedBuffer.resize(pBufferSize);
-			memcpy(SerializedBuffer.data(), pBuffer, sizeof(char) * pBufferSize);
-		}
-
-		Result(ByteVector&& pMovedVec) :
-			SerializedBuffer(std::move(pMovedVec))
-		{}
-
-		std::string AsString() const // TODO: customize string
-		{
-			std::string serializedString;
-			serializedString.resize(SerializedBuffer.size());
-			memcpy(serializedString.data(), SerializedBuffer.data(), sizeof(std::byte) * SerializedBuffer.size());
-			return serializedString;
-		}
-
-		operator std::string() const
-		{
-			return AsString();
-		}
-
-	private:
-		ByteVector	SerializedBuffer;
-
-	};
-
-	virtual ~ISerializer() = default;
-	virtual Result Serialize(Reflectable2 const& serializedObject) = 0;
-};
-
-template <typename Derived>
-class BaseSerializer : public CRTP<Derived>, public ISerializer
-{
-public:
-
-	virtual Result Serialize(Reflectable2 const& serializedObject) override
-	{
-		return MOE_CRTP_CALL(Serialize, serializedObject);
-	}
-
-	void	SerializeValue(Type pPropType, void const* pPropPtr, AbstractPropertyHandler const* pHandler = nullptr)
-	{
-		MOE_CRTP_CALL(SerializeValue, pPropType, pPropPtr, pHandler);
-	}
-};
-
-class IDeserializer
-{
-public:
-	virtual ~IDeserializer() = default;
-
-	template <typename T, typename... Args>
-	T* Deserialize(const char* pSerialized, Args&&... pArgs)
-	{
-		static_assert(std::is_base_of_v<Reflectable2, T>, "Deserialize is only able to process Reflectable-derived classes");
-		T* deserializedReflectable = new T(std::forward<Args>(pArgs)...); // TODO: allow customization of new
-		DeserializeInto(pSerialized, *deserializedReflectable);
-		return deserializedReflectable;
-	}
-
-	template <typename... Args>
-	Reflectable2* Deserialize(const char* pSerialized, unsigned pReflectableClassID, Args&&... pArgs)
-	{
-		ReflectableTypeInfo const* typeInfo = Reflector3::GetSingleton().GetTypeInfo(pReflectableClassID);
-		if (typeInfo == nullptr) // bad ID
-		{
-			return nullptr;
-		}
-
-		Reflectable2* deserializedReflectable =
-			Reflector3::GetSingleton().TryInstantiate(pReflectableClassID, std::tuple<Args...>(std::forward<Args>(pArgs)...));
-
-		if (deserializedReflectable)
-		{
-			DeserializeInto(pSerialized, *deserializedReflectable);
-		}
-
-		return deserializedReflectable;
-	}
-
-	virtual void	DeserializeInto(const char* pSerialized, Reflectable2& pDeserializedObject) = 0;
-
-};
-
-template <typename Derived>
-class BaseDeserializer : public CRTP<Derived>, public IDeserializer
-{
-public:
-	virtual void	DeserializeInto(const char* pSerialized, Reflectable2& pDeserializedObject) override
-	{
-		MOE_CRTP_CALL(DeserializeInto, pSerialized, pDeserializedObject);
-	}
-};
-#endif
 
 #if USE_SERIALIZE_API && RAPIDJSON_REFLECTION_SERIALIZER
 # include <rapidjson/rapidjson.h>
@@ -2056,13 +2263,22 @@ case Type::TypeEnum:\
 	*static_cast<FromEnumTypeToActualType<Type::TypeEnum>::ActualType *>(pPropPtr) = jsonVal->Get##JsonFunc();\
 	break;
 
-class RapidJsonReflectorSerializer : public BaseSerializer<RapidJsonReflectorSerializer>
+class RapidJsonReflectorSerializer : public ISerializer
 {
-	friend BaseSerializer<RapidJsonReflectorSerializer>;
+	virtual Result Serialize(Reflectable2 const& serializedObject) override;
 
-	Result CRTP_Serialize(Reflectable2 const& serializedObject);
+	virtual bool	SerializesMetadata() const override
+	{
+		return true;
+	}
 
-	void	CRTP_SerializeValue(Type pPropType, void const* pPropPtr, AbstractPropertyHandler const* pHandler = nullptr)
+	virtual void	SerializeString(std::string_view pSerializedString) override;
+	virtual void	SerializeInt(int32_t pSerializedInt) override;
+	virtual void	SerializeFloat(float pSerializedFloat) override;
+	virtual void	SerializeBool(bool pSerializedBool) override;
+	virtual void	SerializeValuesForObject(std::string_view pObjectName, SerializedValueFiller pFillerFunction) override;
+
+	void	SerializeValue(Type pPropType, void const* pPropPtr, AbstractPropertyHandler const* pHandler = nullptr)
 	{
 		switch (pPropType)
 		{
@@ -2117,13 +2333,44 @@ class RapidJsonReflectorSerializer : public BaseSerializer<RapidJsonReflectorSer
 	rapidjson::Writer<rapidjson::StringBuffer>	myJsonWriter;
 };
 
-class RapidJsonReflectorDeserializer : public BaseDeserializer<RapidJsonReflectorDeserializer>
+void RapidJsonReflectorSerializer::SerializeString(std::string_view pSerializedString)
+{
+	myJsonWriter.String(pSerializedString.data(), pSerializedString.size());
+}
+
+void RapidJsonReflectorSerializer::SerializeInt(int32_t pSerializedInt)
+{
+	myJsonWriter.Int(pSerializedInt);
+}
+
+void RapidJsonReflectorSerializer::SerializeFloat(float pSerializedFloat)
+{
+	myJsonWriter.Double(pSerializedFloat);
+}
+
+void RapidJsonReflectorSerializer::SerializeBool(bool pSerializedBool)
+{
+	myJsonWriter.Bool(pSerializedBool);
+}
+
+void RapidJsonReflectorSerializer::SerializeValuesForObject(std::string_view pObjectName, SerializedValueFiller pFillerFunction)
+{
+	myJsonWriter.String(pObjectName.data(), pObjectName.size());
+
+	myJsonWriter.StartObject();
+
+	pFillerFunction(*this);
+
+	myJsonWriter.EndObject();
+}
+
+
+class RapidJsonReflectorDeserializer : public IDeserializer
 {
 public:
-	void	CRTP_DeserializeInto(char const* pJson, Reflectable2& pDeserializedObject);
+	virtual void	DeserializeInto(char const* pJson, Reflectable2& pDeserializedObject) override;
 
 private:
-	friend BaseDeserializer<RapidJsonReflectorDeserializer>;
 
 	void	DeserializeArrayValue(const rapidjson::Value& pVal, void* pPropPtr, ArrayPropertyCRUDHandler const* pArrayHandler) const;
 
@@ -2186,15 +2433,14 @@ case Type::TypeEnum:\
 	break;\
 }
 
-
-class BinaryReflectorSerializer : public BaseSerializer<BinaryReflectorSerializer>
+class BinarySerializationHeaders
 {
-	friend BaseSerializer<BinaryReflectorSerializer>;
+	friend class BinaryReflectorSerializer;
 	friend class BinaryReflectorDeserializer;
 
-	struct BinaryObjectHeader
+	struct Object
 	{
-		BinaryObjectHeader(const uint32_t pID) :
+		Object(const uint32_t pID) :
 			ReflectableID(pID)
 		{}
 
@@ -2202,9 +2448,9 @@ class BinaryReflectorSerializer : public BaseSerializer<BinaryReflectorSerialize
 		uint32_t	PropertiesCount = 0; // TODO: customizable property count
 	};
 
-	struct BinaryPropertyHeader
+	struct Property
 	{
-		BinaryPropertyHeader(const Type pType, const uint32_t pOffset) :
+		Property(const Type pType, const uint32_t pOffset) :
 			PropertyType(pType), PropertyOffset(pOffset)
 		{}
 
@@ -2212,10 +2458,9 @@ class BinaryReflectorSerializer : public BaseSerializer<BinaryReflectorSerialize
 		uint32_t	PropertyOffset = 0; // TODO: customizable offset size
 	};
 
-
-	struct BinaryArrayHeader
+	struct Array
 	{
-		BinaryArrayHeader(const Type pType, const size_t pSizeofElem, const size_t pArraySize) :
+		Array(const Type pType, const size_t pSizeofElem, const size_t pArraySize) :
 			ElementType(pType), ElementSize(pSizeofElem), ArraySize(pArraySize)
 		{}
 
@@ -2224,19 +2469,9 @@ class BinaryReflectorSerializer : public BaseSerializer<BinaryReflectorSerialize
 		size_t		ArraySize = 0;
 	};
 
-	struct BinaryArrayPropertyHeader
+	struct Map
 	{
-		BinaryArrayPropertyHeader(const Type pType, const size_t pSizeofElem, const size_t pArraySize) :
-			ValueHeader(pType, pSizeofElem, pArraySize)
-		{}
-
-		Type	HeaderType = Type::Array;
-		BinaryArrayHeader	ValueHeader;
-	};
-
-	struct BinaryMapHeader
-	{
-		BinaryMapHeader(const Type pKType, const size_t pSizeofKey, const Type pVType, const size_t pSizeofValue, const size_t pMapSize) :
+		Map(const Type pKType, const size_t pSizeofKey, const Type pVType, const size_t pSizeofValue, const size_t pMapSize) :
 			KeyType(pKType), SizeofKeyType(pSizeofKey), ValueType(pVType), SizeofValueType(pSizeofValue), MapSize(pMapSize)
 		{}
 
@@ -2246,7 +2481,26 @@ class BinaryReflectorSerializer : public BaseSerializer<BinaryReflectorSerialize
 		size_t		SizeofValueType = 0;	// TODO: maybe to remove because we actually have it in the map handler
 		size_t		MapSize = 0;
 	};
+};
 
+class BinaryReflectorSerializer : public ISerializer
+{
+public:
+
+	virtual Result	Serialize(Reflectable2 const& serializedObject) override;
+
+	virtual bool	SerializesMetadata() const override
+	{
+		return false;
+	}
+
+	virtual void	SerializeString(std::string_view pSerializedString) override;
+	virtual void	SerializeInt(int32_t pSerializedInt) override;
+	virtual void	SerializeFloat(float pSerializedFloat) override;
+	virtual void	SerializeBool(bool pSerializedBool) override;
+	virtual void	SerializeValuesForObject(std::string_view pObjectName, SerializedValueFiller pFillerFunction) override;
+
+private:
 
 	template <typename T>
 	class Handle
@@ -2256,7 +2510,7 @@ class BinaryReflectorSerializer : public BaseSerializer<BinaryReflectorSerialize
 			SerializedData(pSerializedBytes), Offset(pOffset)
 		{}
 
-		T&	Edit() const
+		[[nodiscard]] T&	Edit() const
 		{
 			return reinterpret_cast<T&>(SerializedData[Offset]);
 		}
@@ -2275,9 +2529,15 @@ class BinaryReflectorSerializer : public BaseSerializer<BinaryReflectorSerialize
 		return Handle<T>(mySerializedBuffer, oldSize);
 	}
 
-	Result	CRTP_Serialize(Reflectable2 const& serializedObject);
+	void	WriteRawBytes(const char* pBytes, const size_t pNbBytes)
+	{
+		auto oldSize = mySerializedBuffer.size();
+		mySerializedBuffer.resize(mySerializedBuffer.size() + pNbBytes);
+		memcpy(&mySerializedBuffer[oldSize], pBytes, pNbBytes);
+	}
 
-	void	CRTP_SerializeValue(Type pPropType, void const* pPropPtr, AbstractPropertyHandler const* pHandler = nullptr);
+
+	void	SerializeValue(Type pPropType, void const* pPropPtr, AbstractPropertyHandler const* pHandler = nullptr);
 
 	void	SerializeArrayValue(void const* pPropPtr, ArrayPropertyCRUDHandler const* pArrayHandler);
 
@@ -2285,10 +2545,35 @@ class BinaryReflectorSerializer : public BaseSerializer<BinaryReflectorSerialize
 
 	void	SerializeCompoundValue(void const* pPropPtr);
 
-
 	Result::ByteVector	mySerializedBuffer;
 };
 
+
+void BinaryReflectorSerializer::SerializeString(std::string_view pSerializedString)
+{
+	WriteAsBytes<size_t>(pSerializedString.size());
+	WriteRawBytes(pSerializedString.data(), pSerializedString.size());
+}
+
+void BinaryReflectorSerializer::SerializeInt(int32_t pSerializedInt)
+{
+	WriteAsBytes<int32_t>(pSerializedInt);
+}
+
+void BinaryReflectorSerializer::SerializeFloat(float pSerializedFloat)
+{
+	WriteAsBytes<float>(pSerializedFloat);
+}
+
+void BinaryReflectorSerializer::SerializeBool(bool pSerializedBool)
+{
+	WriteAsBytes<bool>(pSerializedBool);
+}
+
+void BinaryReflectorSerializer::SerializeValuesForObject(std::string_view /*pObjectName*/, SerializedValueFiller /*pFillerFunction*/)
+{
+	// TODO: not implemented for now (mostly used for JSON metadata)
+}
 
 
 #define BINARY_DESERIALIZE_VALUE_CASE(TypeEnum) \
@@ -2299,10 +2584,12 @@ case Type::TypeEnum:\
 	break;\
 }
 
-class BinaryReflectorDeserializer : public BaseDeserializer<BinaryReflectorDeserializer>
+class BinaryReflectorDeserializer : public IDeserializer
 {
-	friend BaseDeserializer<BinaryReflectorDeserializer>;
+public:
+	virtual void	DeserializeInto(char const* pSerialized, Reflectable2& pDeserializedObject) override;
 
+private:
 
 	template <typename T>
 	const T&	ReadFromBytes() const
@@ -2318,9 +2605,6 @@ class BinaryReflectorDeserializer : public BaseDeserializer<BinaryReflectorDeser
 		myReadingOffset += pNbBytesRead;
 		return dataPtr;
 	}
-
-
-	void	CRTP_DeserializeInto(char const* pSerialized, Reflectable2& pDeserializedObject);
 
 	void	DeserializeArrayValue(void* pPropPtr, ArrayPropertyCRUDHandler const* pArrayHandler) const;
 
@@ -2372,7 +2656,6 @@ class BinaryReflectorDeserializer : public BaseDeserializer<BinaryReflectorDeser
 
 	const char*	mySerializedBytes = nullptr;
 	mutable size_t	myReadingOffset = 0;
-
 };
 
 
@@ -2974,7 +3257,7 @@ struct TypedArrayPropertyCRUDHandler2<T,
 	}
 };
 
-template <typename T, typename TProp>
+template <typename T, typename TProp, typename MetadataType>
 struct ReflectProperty3 : TypeInfo2
 {
 	ReflectProperty3(const char* pName, std::ptrdiff_t pOffset) :
@@ -3047,8 +3330,34 @@ struct ReflectProperty3 : TypeInfo2
 		}
 	}
 
+	template <typename T>
+	[[nodiscard]] bool	HasMetadataAttribute() const
+	{
+		return MetadataType::template HasAttribute<T>();
+	}
+
 #if USE_SERIALIZE_API
-	void	SetupSerializerFunction();
+	virtual void	SerializeAttributes(class ISerializer& pSerializer) const override
+	{
+		MetadataType::Serialize(pSerializer);
+	}
+
+	virtual SerializationState	GetSerializableState() const override
+	{
+#	if PROPERTIES_SERIALIZABLE_BY_DEFAULT
+		if (HasMetadataAttribute<NotSerializable>())
+#	else
+		if (!HasMetadataAttribute<Serializable>())
+#	endif
+		{
+			return SerializationState(); // No serialization for you
+		}
+
+		SerializationState state;
+		state.IsSerializable = true;
+		state.SerializableAttributesCount = MetadataType::GetAttributesCount();
+		return state;
+	}
 #endif
 };
 
@@ -4075,7 +4384,7 @@ reflectable_struct(LogCopyable)
 {
 	DECLARE_REFLECTABLE_INFO()
 
-	DECLARE_PROPERTY(float, aUselessProp, 4.f);
+	DECLARE_PROPERTY(float, aUselessProp, 4.f)
 
 	LogCopyable() = default;
 	LogCopyable(LogCopyable const& pOther)
@@ -4206,15 +4515,13 @@ reflectable_struct(yolo, a, FatOfTheLand) // an example of multiple inheritance
 
 };
 
-
 reflectable_struct(c,yolo)
 {
 	DECLARE_REFLECTABLE_INFO()
 
 	DECLARE_PROPERTY(unsigned, ctoto, 0xDEADBEEF)
 
-
-	DECLARE_PROPERTY(std::vector<int>, aVector, 1, 2, 3)
+	DECLARE_PROPERTY((std::vector<int>), aVector, std::initializer_list<int>{1, 2, 3})
 	DECLARE_ARRAY_PROPERTY(int, anArray, [10])
 	DECLARE_ARRAY_PROPERTY(int, aMultiArray, [10][10])
 
@@ -4380,32 +4687,32 @@ reflectable_struct(Test)
 
 
 #if USE_SERIALIZE_API && BINARY_REFLECTION_SERIALIZER
-ISerializer::Result BinaryReflectorSerializer::CRTP_Serialize(Reflectable2 const& serializedObject)
+ISerializer::Result BinaryReflectorSerializer::Serialize(Reflectable2 const& serializedObject)
 {
 	// write the header last because we don't know in advance the total number of props
-	Handle<BinaryObjectHeader> theHeader = WriteAsBytes<BinaryObjectHeader>(serializedObject.GetReflectableClassID());
+	auto objectHandle = WriteAsBytes<BinarySerializationHeaders::Object>(serializedObject.GetReflectableClassID());
 
 	ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(serializedObject.GetReflectableClassID());
 
 	// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
 	std::byte const* reflectableAddr = reinterpret_cast<std::byte const*>(&serializedObject) - thisTypeInfo->GetVptrOffset();
 
-	Reflector3::GetSingleton().GetTypeInfo(serializedObject.GetReflectableClassID())->ForEachPropertyInHierarchy([this, &theHeader, reflectableAddr](TypeInfo2 const& pProperty)
+	Reflector3::GetSingleton().GetTypeInfo(serializedObject.GetReflectableClassID())->ForEachPropertyInHierarchy([this, &objectHandle, reflectableAddr](TypeInfo2 const& pProperty)
 	{
 		std::byte const* propertyAddr = reflectableAddr + pProperty.offset;
 
 		// Uniquely identify props by their offset. Not "change proof", will need a reconcile method it case something changed location (TODO)
-		WriteAsBytes<BinaryPropertyHeader>(pProperty.type, pProperty.offset);
+		WriteAsBytes<BinarySerializationHeaders::Property>(pProperty.type, pProperty.offset);
 		this->SerializeValue(pProperty.type, propertyAddr, &pProperty.GetDataStructureHandler());
 
 		// Dont forget to count properties
-		theHeader.Edit().PropertiesCount++;
+		objectHandle.Edit().PropertiesCount++;
 	});
 
 	return Result(std::move(mySerializedBuffer));
 }
 
-void BinaryReflectorSerializer::CRTP_SerializeValue(Type pPropType, void const* pPropPtr, AbstractPropertyHandler const* pHandler)
+void BinaryReflectorSerializer::SerializeValue(Type pPropType, void const* pPropPtr, AbstractPropertyHandler const* pHandler)
 {
 	switch (pPropType)
 	{
@@ -4438,7 +4745,7 @@ void BinaryReflectorSerializer::CRTP_SerializeValue(Type pPropType, void const* 
 	case Type::Enum:
 		{
 			Type underlyingType = pHandler->EnumHandler->EnumType();
-			CRTP_SerializeValue(underlyingType, pPropPtr);
+			SerializeValue(underlyingType, pPropPtr);
 		}
 		break;
 	default:
@@ -4458,7 +4765,7 @@ void BinaryReflectorSerializer::SerializeArrayValue(void const* pPropPtr, ArrayP
 	{
 		size_t arraySize = pArrayHandler->Size(pPropPtr);
 		size_t elemSize = pArrayHandler->ElementSize(); // TODO: perhaps use a sizeof LUT instead....
-		WriteAsBytes<BinaryArrayHeader>(elemType, elemSize, arraySize);
+		WriteAsBytes<BinarySerializationHeaders::Array>(elemType, elemSize, arraySize);
 		AbstractPropertyHandler elemHandler = pArrayHandler->ElementHandler();
 
 		for (int iElem = 0; iElem < arraySize; ++iElem)
@@ -4479,7 +4786,7 @@ void BinaryReflectorSerializer::SerializeMapValue(void const* pPropPtr, MapPrope
 	const size_t mapSize = pMapHandler->Size(pPropPtr);
 	const size_t keySize = pMapHandler->SizeofKey();
 	const size_t valueSize = pMapHandler->SizeofValue();
-	WriteAsBytes<BinaryMapHeader>(keyType, keySize, valueType, valueSize, mapSize);
+	WriteAsBytes<BinarySerializationHeaders::Map>(keyType, keySize, valueType, valueSize, mapSize);
 
 	pMapHandler->SerializeForEachPair(pPropPtr, this, [](void* pSerializer, const void* pKey, const void* pVal, MapPropertyCRUDHandler const& pMapHandler,
 		AbstractPropertyHandler const& pKeyHandler, AbstractPropertyHandler const& pValueHandler)
@@ -4503,21 +4810,21 @@ void BinaryReflectorSerializer::SerializeCompoundValue(void const* pPropPtr)
 	// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
 	std::byte const* reflectableAddr = reinterpret_cast<std::byte const*>(reflectableProp) - compTypeInfo->GetVptrOffset();
 
-	Handle<BinaryObjectHeader> objectHeader = WriteAsBytes<BinaryObjectHeader>(reflectableProp->GetReflectableClassID());
+	auto objectHandle = WriteAsBytes<BinarySerializationHeaders::Object>(reflectableProp->GetReflectableClassID());
 	compTypeInfo->ForEachPropertyInHierarchy([&](TypeInfo2 const& pProperty)
 		{
 			std::byte const* propertyAddr = reflectableAddr + pProperty.offset;
 
 			// Uniquely identify props by their offset. TODO: Not "change proof", will need a reconcile method it case something changed location
-			WriteAsBytes<BinaryPropertyHeader>(pProperty.type, pProperty.offset);
+			WriteAsBytes<BinarySerializationHeaders::Property>(pProperty.type, pProperty.offset);
 			this->SerializeValue(pProperty.type, propertyAddr, &pProperty.GetDataStructureHandler());
 
 			// Dont forget to count properties
-			objectHeader.Edit().PropertiesCount++;
+			objectHandle.Edit().PropertiesCount++;
 		});
 }
 
-void BinaryReflectorDeserializer::CRTP_DeserializeInto(char const* pSerialized, Reflectable2& pDeserializedObject)
+void BinaryReflectorDeserializer::DeserializeInto(char const* pSerialized, Reflectable2& pDeserializedObject)
 {
 	if (pSerialized == nullptr)
 		return;
@@ -4526,14 +4833,14 @@ void BinaryReflectorDeserializer::CRTP_DeserializeInto(char const* pSerialized, 
 	myReadingOffset = 0;
 
 	// should start with a header...
-	auto& header = ReadFromBytes<BinaryReflectorSerializer::BinaryObjectHeader>();
+	auto& header = ReadFromBytes<BinarySerializationHeaders::Object>();
 	if (header.PropertiesCount == 0)
 		return;
 
 	Reflectable2::SetReflectableClassID_Attorney setter;
 	setter.SetReflectableClassID(pDeserializedObject, header.ReflectableID);
 
-	const BinaryReflectorSerializer::BinaryPropertyHeader* nextPropertyHeader = &ReadFromBytes<BinaryReflectorSerializer::BinaryPropertyHeader>();
+	const auto* nextPropertyHeader = &ReadFromBytes<BinarySerializationHeaders::Property>();
 
 	const ReflectableTypeInfo* objTypeInfo = Reflector3::GetSingleton().GetTypeInfo(pDeserializedObject.GetReflectableClassID());
 
@@ -4552,7 +4859,7 @@ void BinaryReflectorDeserializer::CRTP_DeserializeInto(char const* pSerialized, 
 			if (iProp < header.PropertiesCount)
 			{
 				// Only read a following property header if we're sure there are more properties coming
-				nextPropertyHeader = &ReadFromBytes<BinaryReflectorSerializer::BinaryPropertyHeader>();
+				nextPropertyHeader = &ReadFromBytes<BinarySerializationHeaders::Property>();
 			}
 		}
 	});
@@ -4563,7 +4870,7 @@ void BinaryReflectorDeserializer::DeserializeArrayValue(void* pPropPtr, ArrayPro
 	if (pArrayHandler != nullptr)
 	{
 		AbstractPropertyHandler elemHandler = pArrayHandler->ElementHandler();
-		auto& arrayHeader = ReadFromBytes<BinaryReflectorSerializer::BinaryArrayHeader>();
+		auto& arrayHeader = ReadFromBytes<BinarySerializationHeaders::Array>();
 
 		if (arrayHeader.ElementType != Type::Unknown)
 		{
@@ -4585,7 +4892,7 @@ void BinaryReflectorDeserializer::DeserializeMapValue(void* pPropPtr, MapPropert
 	const Type valueType = pMapHandler->GetValueType();
 	const size_t sizeofKeyType = pMapHandler->SizeofKey();
 
-	auto& mapHeader = ReadFromBytes<BinaryReflectorSerializer::BinaryMapHeader>();
+	auto& mapHeader = ReadFromBytes<BinarySerializationHeaders::Map>();
 	for (int i = 0; i < mapHeader.MapSize; ++i)
 	{
 		const char* keyData = ReadBytes(sizeofKeyType);
@@ -4605,7 +4912,7 @@ void BinaryReflectorDeserializer::DeserializeCompoundValue(void* pPropPtr) const
 		return;
 
 	// should start with a header...
-	auto& header = ReadFromBytes<BinaryReflectorSerializer::BinaryObjectHeader>();
+	const auto& header = ReadFromBytes<BinarySerializationHeaders::Object>();
 	if (header.PropertiesCount == 0)
 		return;
 
@@ -4617,7 +4924,7 @@ void BinaryReflectorDeserializer::DeserializeCompoundValue(void* pPropPtr) const
 
 	char* objectPtr = (char*)pPropPtr + objTypeInfo->GetVptrOffset();
 
-	const BinaryReflectorSerializer::BinaryPropertyHeader* nextPropertyHeader = &ReadFromBytes<BinaryReflectorSerializer::BinaryPropertyHeader>();
+	const auto* nextPropertyHeader = &ReadFromBytes<BinarySerializationHeaders::Property>();
 	unsigned iProp = 0;
 
 	objTypeInfo->ForEachPropertyInHierarchy([&](const TypeInfo2& pProperty)
@@ -4631,7 +4938,7 @@ void BinaryReflectorDeserializer::DeserializeCompoundValue(void* pPropPtr) const
 			if (iProp < header.PropertiesCount)
 			{
 				// Only read a following property header if we're sure there are more properties coming
-				nextPropertyHeader = &ReadFromBytes<BinaryReflectorSerializer::BinaryPropertyHeader>();
+				nextPropertyHeader = &ReadFromBytes<BinarySerializationHeaders::Property>();
 			}
 		}
 	});
@@ -5003,6 +5310,7 @@ int main()
 
 		// test serializing an array
 		SuperCompound seriaArray;
+
 		for (int i = 0; i < 5; ++i)
 			seriaArray.titi[i] = i;
 		serialized = serializer.Serialize(seriaArray);
@@ -5203,7 +5511,7 @@ int main()
 		enums.playableKings = { Kings::Cesar, Kings::Alexandre };
 		enums.allowedQueens = { {Queens::Judith, true}, {Queens::Rachel, false} };
 		binarized = serializer.Serialize(enums);
-		writeBinaryString(binarized);
+
 		assert(memcmp(binarized.data(),
 			"\x0e\x00\x00\x00\x03\x00\x00\x00\x0e\x00\x00\x00\x05\x00\x00\x00\x01\x0a\x00\x00\x00\x08\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x01\x00\x00\x00\x0b\x00\x00\x00\x28\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x01\x00\x01\x02\x00\x00"
 			, binarized.size()) == 0);
@@ -5225,7 +5533,7 @@ int main()
 
 #if USE_SERIALIZE_API && RAPIDJSON_REFLECTION_SERIALIZER
 
-ISerializer::Result RapidJsonReflectorSerializer::CRTP_Serialize(Reflectable2 const& serializedObject)
+ISerializer::Result RapidJsonReflectorSerializer::Serialize(Reflectable2 const& serializedObject)
 {
 	myBuffer.Clear(); // to clean any previously written information
 	myJsonWriter.Reset(myBuffer); // to wipe the root of a previously serialized object
@@ -5234,9 +5542,26 @@ ISerializer::Result RapidJsonReflectorSerializer::CRTP_Serialize(Reflectable2 co
 
 	Reflector3::GetSingleton().GetTypeInfo(serializedObject.GetReflectableClassID())->ForEachPropertyInHierarchy([&serializedObject, this](TypeInfo2 const& pProperty)
 	{
-		void const* propPtr = serializedObject.GetProperty(pProperty.name);
-		myJsonWriter.String(pProperty.name.data(), pProperty.name.size());
-		this->SerializeValue(pProperty.type, propPtr, &pProperty.GetDataStructureHandler());
+		TypeInfo2::SerializationState serializableState = pProperty.GetSerializableState();
+		if (serializableState.IsSerializable == true)
+		{
+			void const* propPtr = serializedObject.GetProperty(pProperty.name);
+			myJsonWriter.String(pProperty.name.data(), pProperty.name.size());
+			this->SerializeValue(pProperty.type, propPtr, &pProperty.GetDataStructureHandler());
+
+			if (SerializesMetadata() && serializableState.SerializableAttributesCount > 0)
+			{
+				const std::string metadataName = pProperty.name + "_metadata";
+				myJsonWriter.String(metadataName.data(), metadataName.size());
+
+				myJsonWriter.StartObject();
+
+				pProperty.SerializeAttributes(*this);
+
+				myJsonWriter.EndObject();
+			}
+		}
+
 	});
 
 	myJsonWriter.EndObject();
@@ -5299,18 +5624,35 @@ void RapidJsonReflectorSerializer::SerializeCompoundValue(void const* pPropPtr)
 
 	myJsonWriter.StartObject();
 
+	// TODO: Should be refactored with Serialize()
 	compTypeInfo->ForEachPropertyInHierarchy([this, reflectableProp](TypeInfo2 const& pProperty)
 		{
-			void const* compProp = reflectableProp->GetProperty(pProperty.name);
-			myJsonWriter.String(pProperty.name.data(), pProperty.name.size());
-			Type propType = pProperty.type;
-			SerializeValue(propType, compProp, &pProperty.DataStructurePropertyHandler);
+			TypeInfo2::SerializationState serializableState = pProperty.GetSerializableState();
+			if (serializableState.IsSerializable == true)
+			{
+				void const* compProp = reflectableProp->GetProperty(pProperty.name);
+				myJsonWriter.String(pProperty.name.data(), pProperty.name.size());
+				Type propType = pProperty.type;
+				SerializeValue(propType, compProp, &pProperty.DataStructurePropertyHandler);
+
+				if (SerializesMetadata() && serializableState.SerializableAttributesCount > 0)
+				{
+					const std::string metadataName = pProperty.name + "_metadata";
+					myJsonWriter.String(metadataName.data(), metadataName.size());
+
+					myJsonWriter.StartObject();
+
+					pProperty.SerializeAttributes(*this);
+
+					myJsonWriter.EndObject();
+				}
+			}
 		});
 
 	myJsonWriter.EndObject();
 }
 
-void RapidJsonReflectorDeserializer::CRTP_DeserializeInto(char const* pJson, Reflectable2& pDeserializedObject)
+void RapidJsonReflectorDeserializer::DeserializeInto(char const* pJson, Reflectable2& pDeserializedObject)
 {
 	rapidjson::Document doc;
 	rapidjson::ParseResult ok = doc.Parse(pJson);
@@ -5399,7 +5741,6 @@ int Test::grostoto(bool)
 {
 	return 0;
 }
-
 
 void Test::zdzdzdz(float bibi)
 {
