@@ -648,10 +648,10 @@ struct IMetadataAttribute
 
 // inspired by https://stackoverflow.com/a/41171291/1987466
 template <typename T, typename Tuple>
-struct has_type;
+struct TupleHasType;
 
 template <typename T, typename... Us>
-struct has_type<T, std::tuple<Us...>> : std::disjunction<std::is_same<T, Us>...> {};
+struct TupleHasType<T, std::tuple<Us...>> : std::disjunction<std::is_same<T, Us>...> {};
 
 template <typename... Ts>
 struct Metadata
@@ -669,7 +669,7 @@ struct Metadata
 	template <typename T>
 	[[nodiscard]] static constexpr bool	HasAttribute()
 	{
-		return has_type<T, std::tuple<Ts...>>::value;
+		return TupleHasType<T, std::tuple<Ts...>>::value;
 	}
 
 
@@ -686,10 +686,17 @@ struct Metadata
 		T::Serialize(pSerializer);
 	}
 
-	static void	Serialize(class ISerializer& pSerializer)
+public:
+	static void	Serialize(ISerializer& pSerializer)
 	{
 		(Ts::Serialize(pSerializer), ...);
 	}
+
+	static 	bool	HasAttributesToSerialize()
+	{
+		return GetAttributesCount() > 0;
+	}
+
 #endif
 
 
@@ -845,9 +852,7 @@ struct TypeInfo2 : IntrusiveListNode<TypeInfo2>
 	struct SerializationState
 	{
 		bool	IsSerializable = false;
-
-		using AttributesCount = uint8_t; // 255 possible attributes is *extremely* likely to be enough
-		AttributesCount	SerializableAttributesCount = 0;
+		bool	HasAttributesToSerialize = false;
 	};
 
 	virtual SerializationState	GetSerializableState() const = 0;
@@ -1497,12 +1502,6 @@ struct FunctionTypeInfo<Ret(Class::*)(Args...)> : FunctionInfo
 #define GLUE_ARGS8(a1,a2,a3,a4,a5,a6,a7,a8) a1 a2 COMMA a3 a4 COMMA a5 a6 COMMA a7 a8
 #define GLUE_ARGUMENT_PAIRS(...) EXPAND(CONCAT2(GLUE_ARGS, NARGS(__VA_ARGS__)))(EXPAND(__VA_ARGS__)) // TODO : on dirait que EXPAND(__VA_ARGS__) c'est pete avec plus d'1 argument. verifier si il y a des warning msvc
 
-#define COMMA_ARGS_MINUS_COUNTER1(a1) a1 = __COUNTER__ - OFFSET
-#define COMMA_ARGS_MINUS_COUNTER2(a1, a2, a3, a4) a1 = __COUNTER__ - OFFSET COMMA a2 = __COUNTER__ - OFFSET
-#define COMMA_ARGS_MINUS_COUNTER3(a1, a2, a3) a1= __COUNTER__ - OFFSET  COMMA a2= __COUNTER__ - OFFSET  COMMA a3= __COUNTER__ - OFFSET
-#define COMMA_ARGS_MINUS_COUNTER4(a1, a2, a3, a4) a1= __COUNTER__ - OFFSET  COMMA a2= __COUNTER__ - OFFSET  COMMA a3= __COUNTER__ - OFFSET  COMMA a4= __COUNTER__ - OFFSET 
-#define COMMA_ARGS_MINUS_COUNTER5(a1, a2, a3, a4, a5) a1= __COUNTER__ - OFFSET COMMA a2= __COUNTER__ - OFFSET COMMA a3= __COUNTER__ - OFFSET COMMA a4= __COUNTER__ - OFFSET  COMMA a5= __COUNTER__ - OFFSET
-
 #define COMMA_ARGS_LSHIFT_COUNTER1(a1) a1 = 1 << (__COUNTER__ - COUNTER_BASE-OFFSET)
 #define COMMA_ARGS_LSHIFT_COUNTER2(a1, a2, a3, a4) a1 = 1 << (__COUNTER__ - COUNTER_BASE-OFFSET) COMMA a2 = 1 << (__COUNTER__ - COUNTER_BASE-OFFSET)
 #define COMMA_ARGS_LSHIFT_COUNTER3(a1, a2, a3) a1= 1 << (__COUNTER__ - COUNTER_BASE-OFFSET)  COMMA a2= 1 << (__COUNTER__ - COUNTER_BASE-OFFSET)  COMMA a3= 1 << (__COUNTER__ - COUNTER_BASE-OFFSET) 
@@ -1578,7 +1577,7 @@ struct FromActualTypeToEnumType<T, typename std::enable_if_t<std::is_base_of_v<E
 			using Underlying = UnderlyingType; \
 			enum Type : UnderlyingType\
 			{\
-				VA_MACRO(COMMA_ARGS_MINUS_COUNTER, __VA_ARGS__)\
+				__VA_ARGS__\
 			};\
 			Type Value{};\
 			EnumName() = default;\
@@ -1656,7 +1655,17 @@ struct FromActualTypeToEnumType<T, typename std::enable_if_t<std::is_base_of_v<E
 				}\
 				return Type(); /* should never happen!*/ \
 			}\
-	};
+			template <typename F>\
+			static void	Enumerate(F&& pEnumerator)\
+			{\
+				for (UnderlyingType i = 0; i < NARGS(__VA_ARGS__); ++i)\
+					pEnumerator((Type) i);\
+			}\
+			static const char*	GetEnumName()\
+			{\
+				return STRINGIZE(EnumName);\
+			}\
+};
 
 
 #ifdef _MSC_VER // Microsoft compilers
@@ -1806,6 +1815,16 @@ FindFirstSetBit(T value)
 				}\
 				return Type(); /* should never happen!*/ \
 			}\
+			template <typename F>\
+			static void	Enumerate(F&& pEnumerator)\
+			{\
+				for (UnderlyingType i = 0; i < NARGS(__VA_ARGS__); ++i)\
+					pEnumerator((Type)(1 << i));\
+			}\
+			static const char*	GetEnumName()\
+			{\
+				return STRINGIZE(EnumName);\
+			}\
 	};
 
 
@@ -1857,6 +1876,7 @@ BITFLAGS_ENUM(BitEnum, int, un, deux, quatre, seize);
 
 LINEAR_ENUM(Kings, int, Philippe, Alexandre, Cesar, Charles);
 BITFLAGS_ENUM(Queens, short, Judith, Rachel, Pallas, Argine);
+BITFLAGS_ENUM(Jacks, short, Ogier, Lahire, Hector, Lancelot);
 
 template <typename Class, typename Ret, typename... Args >
 struct FunctionTypeInfo2
@@ -3235,6 +3255,10 @@ struct TypedArrayPropertyCRUDHandler2<T,
 		{
 			handler.ArrayHandler = &TypedArrayPropertyCRUDHandler2<ElementValueType>::GetInstance();
 		}
+		else if constexpr (std::is_base_of_v<Enum, ElementValueType>)
+		{
+			handler.EnumHandler = &TypedEnumDataHandler<ElementValueType>::GetInstance();
+		}
 		return handler;
 	}
 
@@ -3257,7 +3281,7 @@ struct TypedArrayPropertyCRUDHandler2<T,
 	}
 };
 
-template <typename T, typename TProp, typename MetadataType>
+template <typename TOwner, typename TProp, typename MetadataType>
 struct ReflectProperty3 : TypeInfo2
 {
 	ReflectProperty3(const char* pName, std::ptrdiff_t pOffset) :
@@ -3272,7 +3296,7 @@ struct ReflectProperty3 : TypeInfo2
 		{
 			SetType(Type::Map);
 		}
-		else if constexpr (std::is_class_v<TProp>)
+		else if constexpr (std::is_class_v<TProp> && !IsEnum<TProp>)
 		{
 			SetType(Type::Object);
 		}
@@ -3291,7 +3315,7 @@ struct ReflectProperty3 : TypeInfo2
 			SetType(FromActualTypeToEnumType<TProp>::EnumType);
 		}
 
-		ReflectableTypeInfo& typeInfo = T::EditClassReflectableTypeInfo(); // TODO: maybe just give it as a parameter to the function
+		ReflectableTypeInfo& typeInfo = TOwner::EditClassReflectableTypeInfo(); // TODO: maybe just give it as a parameter to the function
 		typeInfo.PushTypeInfo(*this);
 
 		if constexpr (std::is_base_of_v<Reflectable2, TProp>)
@@ -3314,18 +3338,28 @@ struct ReflectProperty3 : TypeInfo2
 
 		if constexpr (std::is_trivially_copyable_v<TProp>)
 		{
-			CopyCtor = [](void* pDestAddr, void const* pOther, size_t pOffset)
+			CopyCtor = [](void* pDestAddr, void const* pSrc, size_t pOffset)
 			{
-				memcpy((std::byte*)pDestAddr + pOffset, (std::byte const*)pOther + pOffset, sizeof(TProp));
+				memcpy((std::byte*)pDestAddr + pOffset, (std::byte const*)pSrc + pOffset, sizeof(TProp));
 			};
 		}
-		else if constexpr (!std::is_trivially_copy_assignable_v<TProp>)
+		else if constexpr (std::is_assignable_v<TProp, TProp> && !std::is_trivially_copy_assignable_v<TProp>)
+		{ // class has an overloaded operator=
+			CopyCtor = [](void* pDestAddr, void const* pSrc, size_t pOffset)
+			{
+				TProp* actualDestination = (TProp*)((std::byte*)pDestAddr + pOffset);
+				TProp const* actualSrc = (TProp const*)((std::byte const*)pSrc + pOffset);
+				(*actualDestination) = *actualSrc;
+			};
+		}
+		else // C-style arrays, for example...
 		{
 			CopyCtor = [](void* pDestAddr, void const* pOther, size_t pOffset)
 			{
 				TProp* actualDestination = (TProp*)((std::byte*)pDestAddr + pOffset);
-				TProp const* actualOther = (TProp const*)((std::byte const*)pOther + pOffset);
-				(*actualDestination) = *actualOther;
+				TProp const* actualSrc = (TProp const*)((std::byte const*)pOther + pOffset);
+
+				std::copy(std::begin(*actualSrc), std::end(*actualSrc), std::begin(*actualDestination));
 			};
 		}
 	}
@@ -3355,7 +3389,7 @@ struct ReflectProperty3 : TypeInfo2
 
 		SerializationState state;
 		state.IsSerializable = true;
-		state.SerializableAttributesCount = MetadataType::GetAttributesCount();
+		state.HasAttributesToSerialize = MetadataType::HasAttributesToSerialize();
 		return state;
 	}
 #endif
@@ -4590,12 +4624,16 @@ reflectable_struct(enumTestType)
 	DECLARE_REFLECTABLE_INFO()
 
 	DECLARE_PROPERTY(Faces, aTestFace);
+	DECLARE_PROPERTY(Kings, bestKing, Kings::Alexandre);
+	DECLARE_ARRAY_PROPERTY(Kings, worstKings, [2])
 	DECLARE_PROPERTY((std::vector<Kings>), playableKings);
 	DECLARE_PROPERTY((std::map<Queens, bool>), allowedQueens);
+	DECLARE_PROPERTY((std::map<int, Jacks>), pointsPerJack);
 
-	bool operator==(const enumTestType& pRhs) const
+	bool operator==(const enumTestType & pRhs) const
 	{
-		return aTestFace == pRhs.aTestFace && playableKings == pRhs.playableKings && allowedQueens == pRhs.allowedQueens;
+		return aTestFace == pRhs.aTestFace && bestKing == pRhs.bestKing && memcmp(worstKings, pRhs.worstKings, sizeof(Kings)*2) == 0
+		&& playableKings == pRhs.playableKings && allowedQueens == pRhs.allowedQueens && pointsPerJack == pRhs.pointsPerJack;
 	}
 };
 
@@ -5221,7 +5259,6 @@ int main()
 	//Reflector3::EditSingleton().ExportTypeInfoSettings("reflector2.bin");
 
 	//Reflector3::EditSingleton().ImportTypeInfoSettings("reflector2.bin");
-
 	int testarray2[10];
 	std::map<int, bool> testmap;
 	std::unordered_map<int, bool> testhashmap;
@@ -5384,12 +5421,27 @@ int main()
 		assert(serialized == serialized2); // in theory, if serialization output is the same, objects are the same as far as reflection is concerned
 
 		// Test enumerations
+		Kings::Enumerate([](Kings pValue)
+		{
+			std::cout << Kings::FromSafeEnum(pValue) << std::endl;
+		});
+
+		BitEnum::Enumerate([](auto pValue)
+		{
+			std::cout << BitEnum::FromSafeEnum(pValue) << std::endl;
+		});
+
 		enumTestType enums;
 		enums.aTestFace = Faces::Queen;
+		enums.worstKings[0] = Kings::Philippe;
+		enums.worstKings[1] = Kings::Charles;
 		enums.playableKings = { Kings::Cesar, Kings::Alexandre };
 		enums.allowedQueens = { {Queens::Judith, true}, {Queens::Rachel, false} };
+		enums.pointsPerJack = { {10, Jacks::Ogier}, {20, Jacks::Lahire}, {30, Jacks::Hector}, {40, Jacks::Lancelot} };
 		serialized = serializer.Serialize(enums);
-		assert(serialized == "{\"aTestFace\":1,\"playableKings\":[\"Cesar\",\"Alexandre\"],\"allowedQueens\":{\"Judith\":true,\"Rachel\":false}}");
+		assert(serialized ==
+			"{\"aTestFace\":1,\"bestKing\":\"Alexandre\",\"worstKings\":[\"Philippe\",\"Charles\"],\"playableKings\":[\"Cesar\",\"Alexandre\"],\"allowedQueens\":{\"Judith\":true,\"Rachel\":false},\"pointsPerJack\":{\"10\":\"Ogier\",\"20\":\"Lahire\",\"30\":\"Hector\",\"40\":\"Lancelot\"}}"
+		);
 
 		enumTestType deserializedEnums;
 		deserializer.DeserializeInto(serialized.data(), deserializedEnums);
@@ -5508,12 +5560,15 @@ int main()
 		// Test enumerations
 		enumTestType enums;
 		enums.aTestFace = Faces::Queen;
+		enums.worstKings[0] = Kings::Philippe;
+		enums.worstKings[1] = Kings::Charles;
 		enums.playableKings = { Kings::Cesar, Kings::Alexandre };
 		enums.allowedQueens = { {Queens::Judith, true}, {Queens::Rachel, false} };
+		enums.pointsPerJack = { {10, Jacks::Ogier}, {20, Jacks::Lahire}, {30, Jacks::Hector}, {40, Jacks::Lancelot} };
 		binarized = serializer.Serialize(enums);
-
+		writeBinaryString(binarized);
 		assert(memcmp(binarized.data(),
-			"\x0e\x00\x00\x00\x03\x00\x00\x00\x0e\x00\x00\x00\x05\x00\x00\x00\x01\x0a\x00\x00\x00\x08\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x01\x00\x00\x00\x0b\x00\x00\x00\x28\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x01\x00\x01\x02\x00\x00"
+			"\x0e\x00\x00\x00\x06\x00\x00\x00\x0e\x00\x00\x00\x05\x00\x00\x00\x01\x0c\x00\x00\x00\x08\x00\x00\x00\x01\x00\x00\x00\x0a\x00\x00\x00\x0c\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00\x0a\x00\x00\x00\x18\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x01\x00\x00\x00\x0b\x00\x00\x00\x38\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x01\x00\x01\x02\x00\x00\x0b\x00\x00\x00\x50\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x0a\x00\x00\x00\x01\x00\x14\x00\x00\x00\x02\x00\x1e\x00\x00\x00\x04\x00\x28\x00\x00\x00\x08\x00"
 			, binarized.size()) == 0);
 
 		enumTestType deserializedEnums;
@@ -5549,7 +5604,7 @@ ISerializer::Result RapidJsonReflectorSerializer::Serialize(Reflectable2 const& 
 			myJsonWriter.String(pProperty.name.data(), pProperty.name.size());
 			this->SerializeValue(pProperty.type, propPtr, &pProperty.GetDataStructureHandler());
 
-			if (SerializesMetadata() && serializableState.SerializableAttributesCount > 0)
+			if (SerializesMetadata() && serializableState.HasAttributesToSerialize)
 			{
 				const std::string metadataName = pProperty.name + "_metadata";
 				myJsonWriter.String(metadataName.data(), metadataName.size());
@@ -5635,7 +5690,7 @@ void RapidJsonReflectorSerializer::SerializeCompoundValue(void const* pPropPtr)
 				Type propType = pProperty.type;
 				SerializeValue(propType, compProp, &pProperty.DataStructurePropertyHandler);
 
-				if (SerializesMetadata() && serializableState.SerializableAttributesCount > 0)
+				if (SerializesMetadata() && serializableState.HasAttributesToSerialize)
 				{
 					const std::string metadataName = pProperty.name + "_metadata";
 					myJsonWriter.String(metadataName.data(), metadataName.size());
