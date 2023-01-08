@@ -1519,8 +1519,6 @@ struct FunctionTypeInfo<Ret(Class::*)(Args...)> : FunctionInfo
 #define CONCAT(a, b) a ## b
 #define CONCAT2(a, b) CONCAT(a, b)
 
-#define PAREN_TEST(Type, Name, b) Type Name ## b ## ;
-
 #define STRINGIZE(a) #a
 
  // Stolen from https://stackoverflow.com/questions/48710758/how-to-fix-variadic-macro-related-issues-with-macro-overloading-in-msvc-mic
@@ -1610,28 +1608,32 @@ struct FromActualTypeToEnumType<T, typename std::enable_if_t<std::is_base_of_v<E
 			}\
 			friend std::string	to_string(EnumName const& pSelf)\
 			{\
-				return std::string(FromSafeEnum(pSelf.Value));\
+				return std::string(GetStringFromSafeEnum(pSelf.Value));\
 			}\
 			private:\
 			inline static std::pair<const char*, Type> nameEnumPairs[] {\
 				VA_MACRO(BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)\
 			};\
 		public:\
+			const char*	GetString() const\
+			{\
+				return GetStringFromSafeEnum(Value);\
+			}\
 			/* This one assumes that the parameter value is guaranteed to be within bounds and thus doesn't even bounds check. */\
-			static char const* FromSafeEnum(Type enumValue) \
+			static char const*	GetStringFromSafeEnum(Type enumValue) \
 			{ \
 				return nameEnumPairs[(int)enumValue].first; \
 			}\
 			/* We have the guarantee that linear enums values start from 0 and increase 1 by 1 so we can make this function O(1).*/ \
-			static char const* FromEnum(Type enumValue) \
+			static char const*	GetStringFromEnum(Type enumValue) \
 			{ \
 				if( (int)enumValue >= NARGS(__VA_ARGS__))\
 				{\
 					return nullptr;\
 				}\
-				return FromSafeEnum(enumValue);\
+				return GetStringFromSafeEnum(enumValue);\
 			}\
-			static Type const* FromString(char const* enumStr) \
+			static Type const*	GetValueFromString(char const* enumStr) \
 			{ \
 				for (auto const& pair : nameEnumPairs)\
 				{\
@@ -1640,22 +1642,13 @@ struct FromActualTypeToEnumType<T, typename std::enable_if_t<std::is_base_of_v<E
 				}\
 				return nullptr;\
 			}\
-			static Type FromSafeString(char const* enumStr) \
-			{ \
-				for (auto const& pair : nameEnumPairs)\
-				{\
-					if (strcmp(pair.first, enumStr) == 0)\
-						return pair.second;\
-				}\
-				return Type(); /* should never happen!*/ \
-			}\
 			template <typename F>\
 			static void	Enumerate(F&& pEnumerator)\
 			{\
 				for (UnderlyingType i = 0; i < NARGS(__VA_ARGS__); ++i)\
 					pEnumerator((Type) i);\
 			}\
-			static const char*	GetEnumName()\
+			static const char*	GetTypeName()\
 			{\
 				return STRINGIZE(EnumName);\
 			}\
@@ -1756,32 +1749,40 @@ FindFirstSetBit(T value)
 			Type	Value{};\
 			friend std::string	to_string(EnumName const& pSelf)\
 			{\
-				return std::string(FromSafeEnum(pSelf.Value));\
+				return std::string(GetStringFromSafeEnum(pSelf.Value));\
 			}\
 		private:\
 			inline static std::pair<const char*, Type> nameEnumPairs[] {\
 				VA_MACRO(BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)\
 			};\
 		public:\
-			void Set(Type pSetBit)\
+			void SetBit(Type pSetBit)\
 			{\
 				Value = (Type)((Underlying)Value | (Underlying)pSetBit);\
 			}\
-			void Clear(Type pClearedBit)\
+			void ClearBit(Type pClearedBit)\
 			{\
 				Value = (Type)((Underlying)Value & ~((Underlying)pClearedBit));\
 			}\
-			bool IsSet(Type pBit) const\
+			void Clear()\
 			{\
-				return ((Underlying)Value & (Underlying)pBit) == 0;\
+				Value = (Type)(Underlying)0;\
+			}\
+			bool IsBitSet(Type pBit) const\
+			{\
+				return ((Underlying)Value & (Underlying)pBit) != 0;\
+			}\
+			const char*	GetString() const\
+			{\
+				return GetStringFromSafeEnum(Value);\
 			}\
 			/*This one assumes that the parameter value is guaranteed to be within bounds and thus doesn't even bounds check. */\
-			static char const* FromSafeEnum(Type pEnumValue) \
+			static char const*	GetStringFromSafeEnum(Type pEnumValue) \
 			{ \
 				return nameEnumPairs[FindFirstSetBit((UnderlyingType)pEnumValue)].first; \
 			}\
 			/* We have the guarantee that bitflags enums values are powers of 2 so we can make this function O(1).*/ \
-			static char const* FromEnum(Type pEnumValue)\
+			static char const*	GetStringFromEnum(Type pEnumValue)\
 			{ \
 				/* If value is 0 OR not a power of 2 OR bigger than our biggest power of 2, it cannot be valid */\
 				const bool isPowerOf2 = ((UnderlyingType)pEnumValue & ((UnderlyingType)pEnumValue - 1)) == 0;\
@@ -1789,9 +1790,9 @@ FindFirstSetBit(T value)
 				{\
 					return nullptr;\
 				}\
-				return FromSafeEnum(pEnumValue);\
+				return GetStringFromSafeEnum(pEnumValue);\
 			}\
-			static Type const* FromString(char const* enumStr) \
+			static Type const*	GetValueFromString(char const* enumStr) \
 			{ \
 				for (auto const& pair : nameEnumPairs)\
 				{\
@@ -1800,22 +1801,13 @@ FindFirstSetBit(T value)
 				}\
 				return nullptr;\
 			}\
-			static Type FromSafeString(char const* enumStr) \
-			{ \
-				for (auto const& pair : nameEnumPairs)\
-				{\
-					if (strcmp(pair.first, enumStr) == 0)\
-						return pair.second;\
-				}\
-				return Type(); /* should never happen!*/ \
-			}\
 			template <typename F>\
 			static void	Enumerate(F&& pEnumerator)\
 			{\
 				for (UnderlyingType i = 0; i < NARGS(__VA_ARGS__); ++i)\
 					pEnumerator((Type)(1 << i));\
 			}\
-			static const char*	GetEnumName()\
+			static const char*	GetTypeName()\
 			{\
 				return STRINGIZE(EnumName);\
 			}\
@@ -1840,7 +1832,7 @@ struct TypedEnumDataHandler : EnumDataHandler
 {
 	TypedEnumDataHandler()
 	{
-		EnumToString = [](const void* pVal) { return T::FromSafeEnum(*(const typename T::Type*)pVal); };
+		EnumToString = [](const void* pVal) { return T::GetStringFromSafeEnum(*(const typename T::Type*)pVal); };
 		SetFromString = &SetEnumFromString;
 		EnumType = &FromEnumToUnderlyingType<T>;
 	}
@@ -1848,7 +1840,7 @@ struct TypedEnumDataHandler : EnumDataHandler
 	static void	SetEnumFromString(const char* pEnumStr, void* pEnumAddr)
 	{
 		T* theEnum = (T*)pEnumAddr;
-		const typename T::Type* enumValue = T::FromString(pEnumStr);
+		const typename T::Type* enumValue = T::GetValueFromString(pEnumStr);
 		if (theEnum && enumValue != nullptr)
 		{
 			*theEnum = *enumValue;
@@ -2200,7 +2192,7 @@ namespace ReflectorConversions
 	{
 		static T Convert(const std::string_view& pChars)
 		{
-			return T::FromSafeString(pChars.data());
+			return *T::GetValueFromString(pChars.data());
 		}
 	};
 
@@ -3431,7 +3423,6 @@ struct FunctionTypeDecomposer<void (Reflector::*)(int)>
 #define REFL_FUNCTION(RetType, Name, Params) \
 	RetType Name Params ; \
 	inline static FunctionTypeInfo<decltype(&Name)> Name##_TYPEINFO{&Name, STRINGIZE(Name)};
-
 
 #define MOE_METHOD(RetType, Name, ...) \
 	RetType Name(GLUE_ARGUMENT_PAIRS(__VA_ARGS__)); \
@@ -4986,9 +4977,6 @@ void testfloat(float atest)
 	atest;
 }
 
-
-PAREN_TEST(int, tata, (bool test, int ffffuuuu))
-
 int main()
 {
 	auto& refl = Test::GetClassReflectableTypeInfo();
@@ -5020,24 +5008,24 @@ int main()
 	assert(FindFirstSetBit(tets) == 1);
 
 	BitEnum be = BitEnum::deux;
-	assert(strcmp("deux", be.FromEnum(be)) == 0);
-	assert(strcmp("huit", be.FromEnum((BitEnum::Type)8)) == 0);
+	assert(strcmp("deux", be.GetString()) == 0);
+	assert(strcmp("huit", be.GetStringFromSafeEnum((BitEnum::Type)8)) == 0);
 
-	assert(!be.IsSet(BitEnum::un));
+	assert(!be.IsBitSet(BitEnum::un));
 
-	be.Set(BitEnum::huit);
-	assert(!be.IsSet(BitEnum::un) && !be.IsSet(BitEnum::deux) && !be.IsSet(BitEnum::quatre) && be.IsSet(BitEnum::huit));
-	be.Clear(BitEnum::huit);
-	be.Set(BitEnum::un);
-	assert(be.IsSet(BitEnum::un) && !be.IsSet(BitEnum::deux) && !be.IsSet(BitEnum::quatre) && !be.IsSet(BitEnum::huit));
+	be.SetBit(BitEnum::huit);
+	assert(!be.IsBitSet(BitEnum::un) && be.IsBitSet(BitEnum::deux) && !be.IsBitSet(BitEnum::quatre) && be.IsBitSet(BitEnum::huit));
+	be.ClearBit(BitEnum::huit);
+	be.SetBit(BitEnum::un);
+	assert(be.IsBitSet(BitEnum::un) && be.IsBitSet(BitEnum::deux) && !be.IsBitSet(BitEnum::quatre) && !be.IsBitSet(BitEnum::huit));
 
 	LinearEnum linear;
 	linear.Value = LinearEnum::deux;
 
-	const char* ename = LinearEnum::FromEnum(linear.Value);
-	assert(strcmp(LinearEnum::FromEnum(linear.Value), ename) == 0);
+	const char* ename = linear.GetString();
+	assert(strcmp(LinearEnum::GetStringFromEnum(linear.Value), ename) == 0);
 
-	LinearEnum::Type fromStr = LinearEnum::FromSafeString("deux");
+	LinearEnum::Type fromStr = *LinearEnum::GetValueFromString("deux");
 	assert(fromStr == LinearEnum::deux);
 
 	c pouet;
@@ -5053,7 +5041,7 @@ int main()
 
 	Subclass<a> aSubClass;
 	aSubClass.SetClass(c::GetClassReflectableTypeInfo().GetID());
-	assert(nullptr != aSubClass.Instantiate());
+	assert(nullptr == aSubClass.Instantiate());
 	c* anotherInstance = aSubClass.Instantiate<c>(42, true); // TODO: try that with noncopyable...
 	aSubClass.SetClass(yolo::GetClassReflectableTypeInfo().GetID());
 	a* aYolo = aSubClass.Instantiate();
@@ -5353,12 +5341,12 @@ int main()
 		// Test enumerations
 		Kings::Enumerate([](Kings pValue)
 		{
-			std::cout << Kings::FromSafeEnum(pValue) << std::endl;
+			std::cout << Kings::GetStringFromSafeEnum(pValue) << std::endl;
 		});
 
 		BitEnum::Enumerate([](auto pValue)
 		{
-			std::cout << BitEnum::FromSafeEnum(pValue) << std::endl;
+			std::cout << BitEnum::GetStringFromSafeEnum(pValue) << std::endl;
 		});
 
 		enumTestType enums;
@@ -5428,8 +5416,6 @@ int main()
 			}
 		}
 
-
-
 		binarized = serializer.Serialize(megaSerialized);
 
 		assert(memcmp(binarized.data(),
@@ -5498,7 +5484,6 @@ int main()
 		enums.allowedQueens = { {Queens::Judith, true}, {Queens::Rachel, false} };
 		enums.pointsPerJack = { {10, Jacks::Ogier}, {20, Jacks::Lahire}, {30, Jacks::Hector}, {40, Jacks::Lancelot} };
 		binarized = serializer.Serialize(enums);
-		writeBinaryString(binarized);
 		assert(memcmp(binarized.data(),
 			"\x0e\x00\x00\x00\x06\x00\x00\x00\x0e\x00\x00\x00\x05\x00\x00\x00\x01\x0c\x00\x00\x00\x08\x00\x00\x00\x01\x00\x00\x00\x0a\x00\x00\x00\x0c\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00\x0a\x00\x00\x00\x18\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x01\x00\x00\x00\x0b\x00\x00\x00\x38\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x01\x00\x01\x02\x00\x00\x0b\x00\x00\x00\x50\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x0a\x00\x00\x00\x01\x00\x14\x00\x00\x00\x02\x00\x1e\x00\x00\x00\x04\x00\x28\x00\x00\x00\x08\x00"
 			, binarized.size()) == 0);
