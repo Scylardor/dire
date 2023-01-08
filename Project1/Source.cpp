@@ -23,14 +23,6 @@ struct ArrayPropertyCRUDHandler;
 
 #define COMMA ,
 
-// Inspired by https://stackoverflow.com/a/62061759/1987466
-//template <typename... Ts>
-//using void_t = void;
-//template <template <class...> class Trait, class AlwaysVoid, class... Args>
-//struct detector : std::false_type {};
-//template <template <class...> class Trait, class... Args>
-//struct detector<Trait, void_t<Trait<Args...>>, Args...> : std::true_type {};
-
 
 // Inspired by https://stackoverflow.com/a/71574097/1987466
 // Useful for member function names like "operator[]" that would break the build if used as is
@@ -538,7 +530,7 @@ private:
 	[[nodiscard]] unsigned	RegisterTypeInfo(ReflectableTypeInfo* pTypeInfo)
 	{
 		myReflectableTypeInfos.push_back(pTypeInfo);
-		return GetTypeInfoCount() - 1;
+		return (unsigned)GetTypeInfoCount() - 1;
 	}
 
 	std::vector<ReflectableTypeInfo*>	myReflectableTypeInfos;
@@ -730,7 +722,7 @@ struct Transient : IMetadataAttribute
 {
 	static void	Serialize(ISerializer& pSerializer)
 	{
-		pSerializer.SerializeValuesForObject("Transient", [](ISerializer& pSerializer)
+		pSerializer.SerializeValuesForObject("Transient", [](ISerializer& /*pSerializer*/)
 		{
 		}); // nothing to do for "boolean" attribute
 	}
@@ -1250,11 +1242,11 @@ bool Reflector3::ImportTypeInfoSettings(std::string_view pReadSettingsFile)
 		return false; // Let's assume that reflector is not backward compatible for now.
 	}
 
-	unsigned& nbTypeInfos = *reinterpret_cast<unsigned*>(readBuffer.data() + offset);
+	const unsigned& nbTypeInfos = *reinterpret_cast<unsigned*>(readBuffer.data() + offset);
 	offset += sizeof(nbTypeInfos);
 	std::vector<ExportedTypeInfoData> theReadData(nbTypeInfos);
 
-	int iTypeInfo = 0;
+	unsigned iTypeInfo = 0;
 	while (iTypeInfo < nbTypeInfos)
 	{
 		ExportedTypeInfoData& curData = theReadData[iTypeInfo];
@@ -1326,7 +1318,7 @@ bool Reflector3::ImportTypeInfoSettings(std::string_view pReadSettingsFile)
 	}
 
 	// In case of new types - make sure their IDs are correct, otherwise fix them
-	for (int iReg = theReadData.size(); iReg < myReflectableTypeInfos.size(); ++iReg)
+	for (unsigned iReg = (unsigned) theReadData.size(); iReg < myReflectableTypeInfos.size(); ++iReg)
 	{
 		auto& registeredTypeInfo = myReflectableTypeInfos[iReg];
 		if (registeredTypeInfo != nullptr && registeredTypeInfo->GetID() != iReg)
@@ -1526,6 +1518,8 @@ struct FunctionTypeInfo<Ret(Class::*)(Args...)> : FunctionInfo
 #define EVAL_1(...) __VA_ARGS__
 #define CONCAT(a, b) a ## b
 #define CONCAT2(a, b) CONCAT(a, b)
+
+#define PAREN_TEST(Type, Name, b) Type Name ## b ## ;
 
 #define STRINGIZE(a) #a
 
@@ -1868,11 +1862,10 @@ struct TypedEnumDataHandler : EnumDataHandler
 	}
 };
 
-LINEAR_ENUM(LinearEnum33, int, un, deux);
 LINEAR_ENUM(LinearEnum, int, un, deux);
 
 
-BITFLAGS_ENUM(BitEnum, int, un, deux, quatre, seize);
+BITFLAGS_ENUM(BitEnum, int, un, deux, quatre, huit);
 
 LINEAR_ENUM(Kings, int, Philippe, Alexandre, Cesar, Charles);
 BITFLAGS_ENUM(Queens, short, Judith, Rachel, Pallas, Argine);
@@ -1932,31 +1925,6 @@ public:
 };
 
 
-template <typename T, typename TOwner = int>
-class Property
-{
-public:
-	using Owner = TOwner;
-
-	Property(T&& defaultValue = T()) :
-		myValue(std::forward<T>(defaultValue))
-	{}
-
-	operator T& ()
-	{
-		return myValue;
-	}
-
-	operator T const& () const
-	{
-		return myValue;
-	}
-
-
-
-private:
-	T	myValue;
-};
 
 // inspired by https://stackoverflow.com/a/4298441/1987466
 
@@ -2249,8 +2217,10 @@ namespace ReflectorConversions
 			}
 			else
 			{
-				auto [_, error] { std::from_chars(pChars.data(), pChars.data() + pChars.size(), result) };
+				auto [unusedPtr, error] { std::from_chars(pChars.data(), pChars.data() + pChars.size(), result) };
+				(void)unusedPtr;
 			}
+
 			// TODO: check for errors
 			return result;
 		}
@@ -2278,9 +2248,10 @@ case Type::TypeEnum:\
 	myJsonWriter.JsonFunc(*static_cast<FromEnumTypeToActualType<Type::TypeEnum>::ActualType const*>(pPropPtr));\
 	break;
 
+/* This macro does a cast on the right side of the equal sign to silence warnings about casting char to int for example */
 #define JSON_DESERIALIZE_VALUE_CASE(TypeEnum, JsonFunc) \
 	case Type::TypeEnum:\
-	*static_cast<FromEnumTypeToActualType<Type::TypeEnum>::ActualType *>(pPropPtr) = jsonVal->Get##JsonFunc();\
+	*(FromEnumTypeToActualType<Type::TypeEnum>::ActualType *)(pPropPtr) = (FromEnumTypeToActualType<Type::TypeEnum>::ActualType) jsonVal->Get##JsonFunc();\
 	break;
 
 class RapidJsonReflectorSerializer : public ISerializer
@@ -2355,7 +2326,7 @@ class RapidJsonReflectorSerializer : public ISerializer
 
 void RapidJsonReflectorSerializer::SerializeString(std::string_view pSerializedString)
 {
-	myJsonWriter.String(pSerializedString.data(), pSerializedString.size());
+	myJsonWriter.String(pSerializedString.data(), (rapidjson::SizeType) pSerializedString.size());
 }
 
 void RapidJsonReflectorSerializer::SerializeInt(int32_t pSerializedInt)
@@ -2375,7 +2346,7 @@ void RapidJsonReflectorSerializer::SerializeBool(bool pSerializedBool)
 
 void RapidJsonReflectorSerializer::SerializeValuesForObject(std::string_view pObjectName, SerializedValueFiller pFillerFunction)
 {
-	myJsonWriter.String(pObjectName.data(), pObjectName.size());
+	myJsonWriter.String(pObjectName.data(), (rapidjson::SizeType) pObjectName.size());
 
 	myJsonWriter.StartObject();
 
@@ -3456,6 +3427,11 @@ struct FunctionTypeDecomposer<void (Reflector::*)(int)>
 #define MOE_METHOD_NAMED_PARAMS(RetType, Name, ...) \
 	RetType Name(GLUE_ARGUMENT_PAIRS(__VA_ARGS__)); \
 	inline static FunctionTypeInfo<decltype(&Name)> Name##_TYPEINFO{&Name, STRINGIZE(Name)}
+
+#define REFL_FUNCTION(RetType, Name, Params) \
+	RetType Name Params ; \
+	inline static FunctionTypeInfo<decltype(&Name)> Name##_TYPEINFO{&Name, STRINGIZE(Name)};
+
 
 #define MOE_METHOD(RetType, Name, ...) \
 	RetType Name(GLUE_ARGUMENT_PAIRS(__VA_ARGS__)); \
@@ -4714,7 +4690,7 @@ reflectable_struct(Test)
 	DECLARE_PROPERTY(int, bobo, 1234);
 	DECLARE_PROPERTY(float, arrrr, 42.f);
 
-	MOE_METHOD_NAMED_PARAMS(int, tititest, int, tata);
+	REFL_FUNCTION(int, tititest, (int tata))
 	MOE_METHOD(int, grostoto, bool);
 	void zdzdzdz(float bibi);
 	MOE_METHOD_TYPEINFO(zdzdzdz);
@@ -4740,7 +4716,7 @@ ISerializer::Result BinaryReflectorSerializer::Serialize(Reflectable2 const& ser
 		std::byte const* propertyAddr = reflectableAddr + pProperty.offset;
 
 		// Uniquely identify props by their offset. Not "change proof", will need a reconcile method it case something changed location (TODO)
-		WriteAsBytes<BinarySerializationHeaders::Property>(pProperty.type, pProperty.offset);
+		WriteAsBytes<BinarySerializationHeaders::Property>(pProperty.type, (uint32_t) pProperty.offset);
 		this->SerializeValue(pProperty.type, propertyAddr, &pProperty.GetDataStructureHandler());
 
 		// Dont forget to count properties
@@ -4854,7 +4830,7 @@ void BinaryReflectorSerializer::SerializeCompoundValue(void const* pPropPtr)
 			std::byte const* propertyAddr = reflectableAddr + pProperty.offset;
 
 			// Uniquely identify props by their offset. TODO: Not "change proof", will need a reconcile method it case something changed location
-			WriteAsBytes<BinarySerializationHeaders::Property>(pProperty.type, pProperty.offset);
+			WriteAsBytes<BinarySerializationHeaders::Property>(pProperty.type, (uint32_t) pProperty.offset);
 			this->SerializeValue(pProperty.type, propertyAddr, &pProperty.GetDataStructureHandler());
 
 			// Dont forget to count properties
@@ -4995,11 +4971,6 @@ void Test::passbyref_tricky(noncopyable& test)
 }
 
 
-int test333(int a, float b, char c)
-{
-	return 0;
-}
-
 int ia = __COUNTER__;
 #if __COUNTER__ == 0
 int i = __COUNTER__;
@@ -5016,47 +4987,24 @@ void testfloat(float atest)
 }
 
 
+PAREN_TEST(int, tata, (bool test, int ffffuuuu))
 
 int main()
 {
-	auto& info = a::GetClassReflectableTypeInfo();
-	auto& info2 = yolo::GetClassReflectableTypeInfo();
-	auto& info3 = c::GetClassReflectableTypeInfo();
-	Property<int> test = 0;
-	test = 42;
-	Test tata;
-	int titi = test;
-	if (test == 0)
-	{
-		printf("yes\n");
-	}
 	auto& refl = Test::GetClassReflectableTypeInfo();
 	for (auto const& t : refl.GetPropertyList())
 	{
 		printf("t : %s\n", t.name.c_str());
 	}
-	auto sz = sizeof(Reflectable2);
-	auto const& myTiti = tata.GetSafeProperty<int>("titi");
-	auto const& myTiti2 = tata.GetSafeProperty<int>("titi");
+
+	Test tata;
 	tata.SetProperty<int>("titi", 42);
 	tata.SetProperty<int>("titi", 1337);
 
-	int nbArgs = NARGS(1, 2, 3, 4, 5, 6, 7, 8, 9);
-	int nbArgs2 = NARGS(1, 2);
-	int nbArgs3 = NARGS();
-	// NARGS
-	printf("%d\n", NARGS());          // Prints 0
-	printf("%d\n", NARGS(1));         // Prints 1
-	printf("%d\n", NARGS(1, 2));      // Prints 2
-	fflush(stdout);
+	assert(9 == NARGS(1, 2, 3, 4, 5, 6, 7, 8, 9));
+	assert(2 == NARGS(1, 2));
+	assert(0 == NARGS());
 
-#ifdef _MSC_VER
-	// NARGS minus 1
-	printf("\n");
-	printf("%d\n", NARGS_1(1));       // Prints 0
-	printf("%d\n", NARGS_1(1, 2));    // Prints 1
-	printf("%d\n", NARGS_1(1, 2, 3)); // Prints 2
-#endif
 
 	tata.TypedInvokeFunction<void, float>("zdzdzdz", 3.f);
 
@@ -5069,76 +5017,59 @@ int main()
 	tata.TypedInvokeFunction<void>("passbyref_tricky", nocopy);
 
 
-	int ffs = FindFirstSetBit(tets);
+	assert(FindFirstSetBit(tets) == 1);
 
-	BitEnum be = BitEnum::seize;
+	BitEnum be = BitEnum::deux;
+	assert(strcmp("deux", be.FromEnum(be)) == 0);
+	assert(strcmp("huit", be.FromEnum((BitEnum::Type)8)) == 0);
 
-	const char* seize = be.FromEnum((BitEnum::Type)2);
-	auto isset = be.IsSet(BitEnum::un);
-	be.Set(BitEnum::seize);
-	isset = be.IsSet(BitEnum::un) && be.IsSet(BitEnum::seize) && !be.IsSet(BitEnum::deux);
-	be.Clear(BitEnum::seize);
-	isset = be.IsSet(BitEnum::un) && !be.IsSet(BitEnum::seize) && !be.IsSet(BitEnum::deux);
-	test333(1, 2, 3);
+	assert(!be.IsSet(BitEnum::un));
 
-	LinearEnum33 linear2 = LinearEnum33::deux;
+	be.Set(BitEnum::huit);
+	assert(!be.IsSet(BitEnum::un) && !be.IsSet(BitEnum::deux) && !be.IsSet(BitEnum::quatre) && be.IsSet(BitEnum::huit));
+	be.Clear(BitEnum::huit);
+	be.Set(BitEnum::un);
+	assert(be.IsSet(BitEnum::un) && !be.IsSet(BitEnum::deux) && !be.IsSet(BitEnum::quatre) && !be.IsSet(BitEnum::huit));
+
 	LinearEnum linear;
 	linear.Value = LinearEnum::deux;
+
 	const char* ename = LinearEnum::FromEnum(linear.Value);
+	assert(strcmp(LinearEnum::FromEnum(linear.Value), ename) == 0);
+
 	LinearEnum::Type fromStr = LinearEnum::FromSafeString("deux");
-
-	ename = LinearEnum33::FromEnum(linear2.Value);
-	linear2 = LinearEnum33::un;
-	ename = LinearEnum33::FromEnum(linear2.Value);
-
-	Reflector3& aaaaaaaaaa = Reflector3::EditSingleton();
+	assert(fromStr == LinearEnum::deux);
 
 	c pouet;
 	Reflectable2* aRefl = &pouet;
 	for (auto it = c::GetClassReflectableTypeInfo().GetPropertyList().begin(); it; ++it)
 	{
-		printf("name: %s, type: %d, offset: %lu\n", (*it).name.c_str(), (*it).type, (*it).offset);
+		printf("name: %s, type: %d, offset: %td\n", (*it).name.c_str(), (*it).type, (*it).offset);
 	}
 	for (auto it = aRefl->GetProperties().begin(); it; ++it)
 	{
-		printf("name: %s, type: %d, offset: %lu\n", (*it).name.c_str(), (*it).type, (*it).offset);
+		printf("name: %s, type: %d, offset: %td\n", (*it).name.c_str(), (*it).type, (*it).offset);
 	}
 
 	Subclass<a> aSubClass;
 	aSubClass.SetClass(c::GetClassReflectableTypeInfo().GetID());
-	a* instance = aSubClass.Instantiate();
+	assert(nullptr != aSubClass.Instantiate());
 	c* anotherInstance = aSubClass.Instantiate<c>(42, true); // TODO: try that with noncopyable...
 	aSubClass.SetClass(yolo::GetClassReflectableTypeInfo().GetID());
 	a* aYolo = aSubClass.Instantiate();
-	bool isAYolo = anotherInstance->IsA<yolo>();
+	assert(anotherInstance->IsA<yolo>());
 
-	a* myA = static_cast<a*>(anotherInstance);
-	yolo* myB = static_cast<yolo*>(anotherInstance);
-	FatOfTheLand* myF = static_cast<FatOfTheLand*>(anotherInstance);
+	a* myA = anotherInstance;
+	yolo* myB = anotherInstance;
+	FatOfTheLand* myF = anotherInstance;
 	printf("a: %p b: %p f: %p c: %p\n", myA, myB, myF, anotherInstance);
 
-	auto ap1 = anotherInstance->GetClassReflectableTypeInfo().FindPropertyInHierarchy("atiti");
-	auto bp1 = anotherInstance->GetClassReflectableTypeInfo().FindPropertyInHierarchy("bdouble");
-	auto cp1 = anotherInstance->GetClassReflectableTypeInfo().FindPropertyInHierarchy("ctoto");
-
-	class Interface {};
-	class Parent : public Interface { int a; };
-	class Child { int b; };
-	struct GrandChild : public Parent, public Child { int a, b, c; };
-
-	GrandChild GC;
-	std::cout << "GrandChild's address is at : " << &GC << std::endl;
-	std::cout << "Child's address is at : " << static_cast<Child*>(&GC) << std::endl;
-	std::cout << "Parent's address is at : " << static_cast<Parent*>(&GC) << std::endl;
-	std::cout << "Child's Interface address is at : " << reinterpret_cast<Interface*>(static_cast<Child*>(&GC)) << std::endl;
+	assert(anotherInstance->GetClassReflectableTypeInfo().FindPropertyInHierarchy("atiti"));
+	assert(anotherInstance->GetClassReflectableTypeInfo().FindPropertyInHierarchy("bdouble"));
+	assert(anotherInstance->GetClassReflectableTypeInfo().FindPropertyInHierarchy("ctoto"));
 
 	aYolo->InvokeFunction("test");
-	constexpr size_t szcomp = sizeof(testcompound);
-	auto offcomp = offsetof(testcompound, compint);
-	auto compoff = offsetof(c, compvar);
-	testcompound const* monComp = (testcompound const*) (reinterpret_cast<std::byte const*>(anotherInstance) + 80);
 
-	int const* monCompint = (int const*)(reinterpret_cast<std::byte const*>(anotherInstance) + 88);
 	int const* compint = anotherInstance->GetProperty<int>("compvar.compint");
 	assert(*compint == 0x2a2a);
 
@@ -5159,25 +5090,25 @@ int main()
 	edited = anotherInstance->SetProperty<int>("compvar.compleet.leet", 0x2a2a);
 	assert(edited && anotherInstance->compvar.compleet.leet == 0x2a2a);
 
-	constexpr bool hasBrackets1 = has_ArrayBrackets_v< std::string>;
-	constexpr bool hasBrackets2 = has_ArrayBrackets_v< std::vector<int>>;
-	constexpr bool hasBrackets3 = has_ArrayBrackets_v<int[]>;
+	static_assert(has_ArrayBrackets_v<std::string>);
+	static_assert(has_ArrayBrackets_v<std::vector<int>>);
+	static_assert(!has_ArrayBrackets_v<int[]>);
 
-	constexpr bool hasINsert4 = has_insert_v< std::string>;
-	constexpr bool hasINsert5 = has_insert_v< std::vector<int>>;
-	constexpr bool hasINsert6 = has_insert_v<int[]>;
+	static_assert(has_insert_v<std::string>);
+	static_assert(has_insert_v<std::vector<int>>);
+	static_assert(!has_insert_v<int[]>);
 
-	constexpr bool hasErase1 = has_erase_v< std::string>;
-	constexpr bool hasErase2 = has_erase_v< std::vector<int>>;
-	constexpr bool hasErase3 = has_erase_v<int[]>;
+	static_assert(has_erase_v<std::string>);
+	static_assert(has_erase_v<std::vector<int>>);
+	static_assert(!has_erase_v<int[]>);
 
-	constexpr bool hasClear1 = has_clear_v< std::string>;
-	constexpr bool hasClear2 = has_clear_v< std::vector<int>>;
-	constexpr bool hasClear3 = has_clear_v<int[]>;
+	static_assert(has_clear_v<std::string>);
+	static_assert(has_clear_v<std::vector<int>>);
+	static_assert(!has_clear_v<int[]>);
 
-	constexpr bool hasSize1 = has_size_v< std::string>;
-	constexpr bool hasSize2 = has_size_v< std::vector<int>>;
-	constexpr bool hasSize3 = has_size_v<int[]>;
+	static_assert(has_size_v<std::string>);
+	static_assert(has_size_v<std::vector<int>>);
+	static_assert(!has_size_v<int[]>);
 
 	std::vector<int> testvec{ 1,2,3 };
 	TypedArrayPropertyCRUDHandler2<std::vector<int>> vechandler;
@@ -5190,9 +5121,9 @@ int main()
 
 	vechandler.ArrayErase(&testvec, 1);
 
-	auto szvec = vechandler.ArraySize(&testvec);
+	assert(vechandler.ArraySize(&testvec) == 3);
 	vechandler.ArrayClear(&testvec);
-	szvec = vechandler.ArraySize(&testvec);
+	assert(vechandler.ArraySize(&testvec) == 0);
 
 	int testarray[]{ 1, 2, 3 };
 	TypedArrayPropertyCRUDHandler2<decltype(testarray)> arrayHandler;
@@ -5209,14 +5140,13 @@ int main()
 
 	arrayHandler.ArrayClear(&testarray);
 
-	auto szarr = arrayHandler.ArraySize(&testarray);
+	assert(arrayHandler.ArraySize(&testarray) == 3);
 
-	constexpr bool testpb = has_size_v<std::vector<int>>;
-	constexpr bool teste =  has_erase_v<std::vector<int>>;
-	constexpr bool testi =  has_insert_v<std::vector<int>>;
+	static_assert(has_size_v<std::vector<int>>);
+	static_assert(has_erase_v<std::vector<int>>);
+	static_assert(has_insert_v<std::vector<int>>);
 
-
-	int const* vec0 = anotherInstance->GetProperty<int>("aVector[0]");
+	assert(anotherInstance->GetProperty<int>("aVector[0]") != nullptr);
 
 	anotherInstance->anArray[5] = 42;
 	int const* arr0 = anotherInstance->GetProperty<int>("anArray[5]");
@@ -5240,7 +5170,7 @@ int main()
 	modified = anotherInstance->SetProperty<int>("ultra.mega.toto[0].titi[2]", 0xabcd);
 	assert(modified && *arr3 == 0xabcd);
 
-	vec0 = anotherInstance->GetProperty<int>("aVector[4]");
+	assert(anotherInstance->GetProperty<int>("aVector[4]"));
 	bool erased = anotherInstance->EraseProperty("aVector[4]");
 	assert(erased);
 
@@ -5498,6 +5428,8 @@ int main()
 			}
 		}
 
+
+
 		binarized = serializer.Serialize(megaSerialized);
 
 		assert(memcmp(binarized.data(),
@@ -5601,13 +5533,13 @@ ISerializer::Result RapidJsonReflectorSerializer::Serialize(Reflectable2 const& 
 		if (serializableState.IsSerializable == true)
 		{
 			void const* propPtr = serializedObject.GetProperty(pProperty.name);
-			myJsonWriter.String(pProperty.name.data(), pProperty.name.size());
+			myJsonWriter.String(pProperty.name.data(), (rapidjson::SizeType) pProperty.name.size());
 			this->SerializeValue(pProperty.type, propPtr, &pProperty.GetDataStructureHandler());
 
 			if (SerializesMetadata() && serializableState.HasAttributesToSerialize)
 			{
 				const std::string metadataName = pProperty.name + "_metadata";
-				myJsonWriter.String(metadataName.data(), metadataName.size());
+				myJsonWriter.String(metadataName.data(), (rapidjson::SizeType) metadataName.size());
 
 				myJsonWriter.StartObject();
 
@@ -5660,7 +5592,7 @@ void RapidJsonReflectorSerializer::SerializeMapValue(void const* pPropPtr, MapPr
 			auto* myself = static_cast<RapidJsonReflectorSerializer*>(pSerializer);
 
 			const std::string keyStr = pMapHandler.KeyToString(pKey);
-			myself->myJsonWriter.String(keyStr.data(), keyStr.length());
+			myself->myJsonWriter.String(keyStr.data(), (rapidjson::SizeType) keyStr.length());
 
 			Type valueType = pMapHandler.GetValueType();
 			myself->SerializeValue(valueType, pVal, &pValueHandler);
@@ -5686,14 +5618,14 @@ void RapidJsonReflectorSerializer::SerializeCompoundValue(void const* pPropPtr)
 			if (serializableState.IsSerializable == true)
 			{
 				void const* compProp = reflectableProp->GetProperty(pProperty.name);
-				myJsonWriter.String(pProperty.name.data(), pProperty.name.size());
+				myJsonWriter.String(pProperty.name.data(), (rapidjson::SizeType) pProperty.name.size());
 				Type propType = pProperty.type;
 				SerializeValue(propType, compProp, &pProperty.DataStructurePropertyHandler);
 
 				if (SerializesMetadata() && serializableState.HasAttributesToSerialize)
 				{
 					const std::string metadataName = pProperty.name + "_metadata";
-					myJsonWriter.String(metadataName.data(), metadataName.size());
+					myJsonWriter.String(metadataName.data(), (rapidjson::SizeType) metadataName.size());
 
 					myJsonWriter.StartObject();
 
@@ -5738,7 +5670,7 @@ void RapidJsonReflectorDeserializer::DeserializeArrayValue(const rapidjson::Valu
 		Type elemType = pArrayHandler->ElementType();
 		if (elemType != Type::Unknown)
 		{
-			for (auto iElem = 0; iElem < pVal.Size(); ++iElem)
+			for (auto iElem = 0u; iElem < pVal.Size(); ++iElem)
 			{
 				void* elemVal = const_cast<void*>(pArrayHandler->Read(pPropPtr, iElem));
 				DeserializeValue(&pVal[iElem], elemType, elemVal, &elemHandler);
@@ -5787,7 +5719,7 @@ void RapidJsonReflectorDeserializer::DeserializeCompoundValue(const rapidjson::V
  * \param tata
  * \return
  */
-int Test::tititest(int tata)
+int Test::tititest(int /*tata*/)
 {
 	return 0;
 }
