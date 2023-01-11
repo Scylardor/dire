@@ -5,7 +5,7 @@ set(PROJECT_NAME Dire)
 project(${PROJECT_NAME}
   VERSION 1.0.0
   LANGUAGES CXX
-  # TODO: HOMEPAGE_URL "DIRE URL" 
+  # TODO: HOMEPAGE_URL "DIRE URL"
   DESCRIPTION "A library for Dynamically Interpreted Reflection Expressions (DIRE)."
 )
 
@@ -20,6 +20,7 @@ set(${PROJECT_NAME}_SERIALIZATION_JSON_SERIALIZER_VERSION "master" CACHE STRING 
 option(${PROJECT_NAME}_SERIALIZATION_BINARY_SERIALIZER_ENABLED "Enables the binary serialization feature of the DIRE library." ON)
 
 set(${PROJECT_NAME}_NAMESPACE "dire" CACHE STRING "Namespace the DIRE library will use (in case of a naming conflict)")
+set(${PROJECT_NAME}_STRING "std::string" CACHE STRING "Type the DIRE library should use for standard dynamic string manipulation.")
 
 option(${PROJECT_NAME}_BUILD_UNIT_TESTS "Builds the unit tests of the DIRE library (for library developers)." OFF)
 set(${PROJECT_NAME}_TESTS_CATCH_VERSION "v3.2.1" CACHE STRING "Version of Catch2 library downloaded from Github (for library developers).")
@@ -30,8 +31,30 @@ set(DIRE_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/${PROJECT_NAME})
 
 # Main target creation
 add_library(${PROJECT_NAME} INTERFACE # Dire is header-only: make it an interface
-	${DIRE_SOURCE_DIR}/DireMacros.h
 	${DIRE_SOURCE_DIR}/Dire.h
+	${DIRE_SOURCE_DIR}/DireMacros.h
+	${DIRE_SOURCE_DIR}/DireTypes.h
+	${DIRE_SOURCE_DIR}/DireTypeTraits.h
+	${DIRE_SOURCE_DIR}/DireIntrusiveList.h
+	${DIRE_SOURCE_DIR}/DireIntrusiveList.inl
+	${DIRE_SOURCE_DIR}/DireTypeInfo.h
+	${DIRE_SOURCE_DIR}/DireTypeInfo.inl
+	${DIRE_SOURCE_DIR}/DireTypeHandlers.h
+	${DIRE_SOURCE_DIR}/DireTypeHandlers.inl
+	${DIRE_SOURCE_DIR}/DireArrayDataStructureHandler.h
+	${DIRE_SOURCE_DIR}/DireArrayDataStructureHandler.inl
+	${DIRE_SOURCE_DIR}/DireMapDataStructureHandler.h
+	${DIRE_SOURCE_DIR}/DireMapDataStructureHandler.inl
+	${DIRE_SOURCE_DIR}/DireEnumDataStructureHandler.h
+	${DIRE_SOURCE_DIR}/DireEnums.h
+	${DIRE_SOURCE_DIR}/DireEnums.inl
+	${DIRE_SOURCE_DIR}/DireCRTP.h
+	${DIRE_SOURCE_DIR}/DireReflectable.h
+	${DIRE_SOURCE_DIR}/DireString.h
+	${DIRE_SOURCE_DIR}/DireString.inl
+	${DIRE_SOURCE_DIR}/DireTypeInfoDatabase.h
+	${DIRE_SOURCE_DIR}/DireSingleton.h
+	${DIRE_SOURCE_DIR}/DireStaticTypeCounter.h
 )
 
 target_include_directories(${PROJECT_NAME}
@@ -40,6 +63,7 @@ target_include_directories(${PROJECT_NAME}
         $<BUILD_INTERFACE:${DIRE_INCLUDE_DIR}>
 )
 
+# Conditional Sources
 if(${PROJECT_NAME}_SERIALIZATION_ENABLED)
 	target_sources(${PROJECT_NAME} INTERFACE
 		${DIRE_SOURCE_DIR}/DireSerialization.h
@@ -49,7 +73,7 @@ endif()
 if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_JSON_SERIALIZER_ENABLED)
 	target_sources(${PROJECT_NAME} INTERFACE
 		${DIRE_SOURCE_DIR}/DireJSONSerializer.h
-		${DIRE_SOURCE_DIR}/DireJSONDeserializer.h	
+		${DIRE_SOURCE_DIR}/DireJSONDeserializer.h
 	)
 endif()
 
@@ -67,21 +91,39 @@ if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_USE_JSON_SERIALIZER
 	add_rapidjson_dependency(rapidjson master ${PROJECT_NAME} INTERFACE)
 endif()
 
-# Catch2 dependency setup
+
+# Defines
+target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_NS=${${PROJECT_NAME}_NAMESPACE})
+target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_USE_STD_STRING=1)
+if(${${PROJECT_NAME}_STRING} STREQUAL "std::string")
+	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_USE_STD_STRING=1)
+else()
+	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_STRING=${${PROJECT_NAME}_STRING})
+endif()
+if(${PROJECT_NAME}_SERIALIZATION_ENABLED)
+	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_USE_SERIALIZATION=1)
+endif()
+if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_JSON_SERIALIZER_ENABLED)
+	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_USE_JSON_SERIALIZATION=1)
+endif()
+
+if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_BINARY_SERIALIZER_ENABLED)
+	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_USE_BINARY_SERIALIZATION=1)
+endif()
+
+# Unit tests
 if(${PROJECT_NAME}_BUILD_UNIT_TESTS)
 	add_executable(${PROJECT_NAME}_UnitTests
 		tests/BasicTests.cpp
 		tests/MacroTests.cpp
 	)
-	
+
+	# Catch2 dependency setup
 	include(CMake/Catch2.cmake)
 	add_catch2_dependency(catch2 ${${PROJECT_NAME}_TESTS_CATCH_VERSION} ${PROJECT_NAME}_UnitTests PRIVATE TRUE)
-	
+
 	target_link_libraries(${PROJECT_NAME}_UnitTests PRIVATE ${PROJECT_NAME})
 endif()
-
-
-
 
 
 
