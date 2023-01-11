@@ -18,6 +18,7 @@ option(${PROJECT_NAME}_SERIALIZATION_ENABLED "Enables the Serialization features
 option(${PROJECT_NAME}_SERIALIZATION_JSON_SERIALIZER_ENABLED "Enables the JSON serialization feature of the DIRE library, using RapidJSON." ON)
 set(${PROJECT_NAME}_SERIALIZATION_JSON_SERIALIZER_VERSION "master" CACHE STRING "RapidJSON version that DIRE will try to use if not found on the system.")
 option(${PROJECT_NAME}_SERIALIZATION_BINARY_SERIALIZER_ENABLED "Enables the binary serialization feature of the DIRE library." ON)
+option(${PROJECT_NAME}_SERIALIZABLE_PROPERTIES_BY_DEFAULT "If true, Dire properties are serializable by default, unless tagged with the NotSerializable attribute. If false, Dire properties are not serializable by default, unless tagged with the Serializable attribute." ON)
 
 set(${PROJECT_NAME}_NAMESPACE "dire" CACHE STRING "Namespace the DIRE library will use (in case of a naming conflict)")
 set(${PROJECT_NAME}_STRING "std::string" CACHE STRING "Type the DIRE library should use for standard dynamic string manipulation.")
@@ -55,34 +56,40 @@ add_library(${PROJECT_NAME} INTERFACE # Dire is header-only: make it an interfac
 	${DIRE_SOURCE_DIR}/DireTypeInfoDatabase.h
 	${DIRE_SOURCE_DIR}/DireSingleton.h
 	${DIRE_SOURCE_DIR}/DireStaticTypeCounter.h
+	${DIRE_SOURCE_DIR}/DireProperty.h
+	${DIRE_SOURCE_DIR}/DireProperty.inl
+	${DIRE_SOURCE_DIR}/DirePropertyMetadata.h
+	${DIRE_SOURCE_DIR}/DirePropertyMetadata.inl
 )
+
+# Conditional Sources
+
+# CMake seems to be a bit weird in how they manage sources for INTERFACE libraries.
+# Declaring the target with an INTERFACE list of sources puts them in the lib, but adding more sources with INTERFACE scope propagates those in user targets, not in the lib target.
+# Fortunately, declaring them PRIVATE instead seems to work.
+if(${PROJECT_NAME}_SERIALIZATION_ENABLED)
+	target_sources(${PROJECT_NAME} PRIVATE
+		${DIRE_SOURCE_DIR}/DireSerialization.h
+	)
+endif()
+if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_JSON_SERIALIZER_ENABLED)
+	target_sources(${PROJECT_NAME} PRIVATE
+		${DIRE_SOURCE_DIR}/DireJSONSerializer.h
+		${DIRE_SOURCE_DIR}/DireJSONDeserializer.h
+	)
+endif()
+if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_BINARY_SERIALIZER_ENABLED)
+	target_sources(${PROJECT_NAME} PRIVATE
+		${DIRE_SOURCE_DIR}/DireBinarySerializer.h
+		${DIRE_SOURCE_DIR}/DireBinaryDeserializer.h
+	)
+endif()
 
 target_include_directories(${PROJECT_NAME}
     INTERFACE # Need to use INTERFACE scope for an INTERFACE target.
         $<INSTALL_INTERFACE:${PROJECT_NAME}>
         $<BUILD_INTERFACE:${DIRE_INCLUDE_DIR}>
 )
-
-# Conditional Sources
-if(${PROJECT_NAME}_SERIALIZATION_ENABLED)
-	target_sources(${PROJECT_NAME} INTERFACE
-		${DIRE_SOURCE_DIR}/DireSerialization.h
-	)
-endif()
-
-if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_JSON_SERIALIZER_ENABLED)
-	target_sources(${PROJECT_NAME} INTERFACE
-		${DIRE_SOURCE_DIR}/DireJSONSerializer.h
-		${DIRE_SOURCE_DIR}/DireJSONDeserializer.h
-	)
-endif()
-
-if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_BINARY_SERIALIZER_ENABLED)
-	target_sources(${PROJECT_NAME} INTERFACE
-		${DIRE_SOURCE_DIR}/DireBinarySerializer.h
-		${DIRE_SOURCE_DIR}/DireBinaryDeserializer.h
-	)
-endif()
 
 # RapidJSON dependency setup
 if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_USE_JSON_SERIALIZER)
@@ -106,9 +113,11 @@ endif()
 if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_JSON_SERIALIZER_ENABLED)
 	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_USE_JSON_SERIALIZATION=1)
 endif()
-
 if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_BINARY_SERIALIZER_ENABLED)
 	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_USE_BINARY_SERIALIZATION=1)
+endif()
+if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZABLE_PROPERTIES_BY_DEFAULT)
+	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_SERIALIZABLE_PROPERTIES_BY_DEFAULT=1)
 endif()
 
 # Unit tests
@@ -124,6 +133,4 @@ if(${PROJECT_NAME}_BUILD_UNIT_TESTS)
 
 	target_link_libraries(${PROJECT_NAME}_UnitTests PRIVATE ${PROJECT_NAME})
 endif()
-
-
 

@@ -4,6 +4,8 @@
 struct Test
 {
 	DIRE_DECLARE_TYPEINFO()
+
+	DIRE_PROPERTY(int, aTest, 42)
 };
 
 TEST_CASE("DECLARE_REFLECTABLE_INFO basic test", "[Typeinfo]")

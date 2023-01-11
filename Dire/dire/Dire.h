@@ -7,19 +7,22 @@
 
 namespace DIRE_NS
 {
-	class ReflectableTypeInfo
+	class FunctionInfo;
+	class PropertyInfo;
+
+	class TypeInfo
 	{
 	public:
 
-		ReflectableTypeInfo() = default; // TODO: remove
+		TypeInfo() = default; // TODO: remove
 
-		ReflectableTypeInfo(const char * pTypename) :
+		TypeInfo(const char * pTypename) :
 			TypeName(pTypename)
 		{
 			ReflectableID = Reflector3::EditSingleton().RegisterTypeInfo(this);
 		}
 
-		void	PushTypeInfo(TypeInfo& pNewTypeInfo)
+		void	PushTypeInfo(PropertyTypeInfo& pNewTypeInfo)
 		{
 			Properties.PushBackNewNode(pNewTypeInfo);
 		}
@@ -29,19 +32,19 @@ namespace DIRE_NS
 			MemberFunctions.PushBackNewNode(pNewFunctionInfo);
 		}
 
-		void	AddParentClass(ReflectableTypeInfo* pParent)
+		void	AddParentClass(TypeInfo* pParent)
 		{
 			ParentClasses.push_back(pParent);
 		}
 
-		void	AddChildClass(ReflectableTypeInfo* pChild)
+		void	AddChildClass(TypeInfo* pChild)
 		{
 			ChildrenClasses.push_back(pChild);
 		}
 
 		[[nodiscard]] bool	IsParentOf(const unsigned pChildClassID) const
 		{
-			auto predicate = [pChildClassID](const ReflectableTypeInfo* pChildTypeInfo)
+			auto predicate = [pChildClassID](const TypeInfo* pChildTypeInfo)
 			{
 				return pChildTypeInfo->ReflectableID == pChildClassID;
 			};
@@ -49,12 +52,12 @@ namespace DIRE_NS
 			return std::find_if(ChildrenClasses.begin(), ChildrenClasses.end(), predicate) != ChildrenClasses.end();
 		}
 
-		using ParentPropertyInfo = std::pair< const ReflectableTypeInfo *, const TypeInfo *>;
+		using ParentPropertyInfo = std::pair< const TypeInfo *, const PropertyTypeInfo *>;
 		[[nodiscard]] ParentPropertyInfo	FindParentClassProperty(const DIRE_STRING_VIEW & pName) const
 		{
-			for (const ReflectableTypeInfo* parentClass : ParentClasses)
+			for (const TypeInfo* parentClass : ParentClasses)
 			{
-				const TypeInfo * foundProp = parentClass->FindProperty(pName);
+				const PropertyTypeInfo * foundProp = parentClass->FindProperty(pName);
 				if (foundProp != nullptr)
 				{
 					return { parentClass, foundProp };
@@ -64,11 +67,11 @@ namespace DIRE_NS
 			return { nullptr, nullptr };
 		}
 
-		[[nodiscard]] TypeInfo const* FindProperty(const DIRE_STRING_VIEW& pName) const
+		[[nodiscard]] PropertyTypeInfo const* FindProperty(const DIRE_STRING_VIEW& pName) const
 		{
 			for (const auto & prop : Properties)
 			{
-				if (prop.Name == pName)
+				if (prop.GetName() == pName)
 				{
 					return &prop;
 				}
@@ -77,11 +80,11 @@ namespace DIRE_NS
 			return nullptr;
 		}
 
-		[[nodiscard]] TypeInfo const* FindPropertyInHierarchy(const DIRE_STRING_VIEW& pName) const
+		[[nodiscard]] PropertyTypeInfo const* FindPropertyInHierarchy(const DIRE_STRING_VIEW& pName) const
 		{
 			for (auto const& prop : Properties)
 			{
-				if (prop.Name == pName)
+				if (prop.GetName() == pName)
 				{
 					return &prop;
 				}
@@ -110,10 +113,10 @@ namespace DIRE_NS
 			return nullptr;
 		}
 
-		using ParentFunctionInfo = std::pair<const ReflectableTypeInfo *, const FunctionInfo *>;
+		using ParentFunctionInfo = std::pair<const TypeInfo *, const FunctionInfo *>;
 		[[nodiscard]] ParentFunctionInfo	FindParentFunction(const DIRE_STRING_VIEW& pFuncName) const
 		{
-			for (const ReflectableTypeInfo * parentClass : ParentClasses)
+			for (const TypeInfo * parentClass : ParentClasses)
 			{
 				const FunctionInfo * foundFunc = parentClass->FindFunction(pFuncName);
 				if (foundFunc != nullptr)
@@ -167,7 +170,7 @@ namespace DIRE_NS
 
 		void	ClonePropertiesOf(Reflectable2& pNewClone, const Reflectable2& pCloned) const;
 
-		[[nodiscard]] const IntrusiveLinkedList<TypeInfo>& GetPropertyList() const
+		[[nodiscard]] const IntrusiveLinkedList<PropertyTypeInfo>& GetPropertyList() const
 		{
 			return Properties;
 		}
@@ -177,27 +180,27 @@ namespace DIRE_NS
 			return MemberFunctions;
 		}
 
-		[[nodiscard]] const std::vector<ReflectableTypeInfo*>& GetParentClasses() const
+		[[nodiscard]] const std::vector<TypeInfo*>& GetParentClasses() const
 		{
 			return ParentClasses;
 		}
 
 	protected:
-		unsigned							ReflectableID = (unsigned)-1;
-		int									VirtualOffset{ 0 }; // for polymorphic classes
-		DIRE_STRING_VIEW					TypeName;
-		IntrusiveLinkedList<TypeInfo>		Properties;
-		IntrusiveLinkedList<FunctionInfo>	MemberFunctions;
-		std::vector<ReflectableTypeInfo*>	ParentClasses;
-		std::vector<ReflectableTypeInfo*>	ChildrenClasses;
+		unsigned								ReflectableID = (unsigned)-1;
+		int										VirtualOffset{ 0 }; // for polymorphic classes
+		DIRE_STRING_VIEW						TypeName;
+		IntrusiveLinkedList<PropertyTypeInfo>	Properties;
+		IntrusiveLinkedList<FunctionInfo>		MemberFunctions;
+		std::vector<TypeInfo*>	ParentClasses;
+		std::vector<TypeInfo*>	ChildrenClasses;
 	};
 
 	template <typename T, bool UseDefaultCtorForInstantiate>
-	class TypedReflectableTypeInfo : public ReflectableTypeInfo
+	class TypedTypeInfo : public TypeInfo
 	{
 	public:
-		TypedReflectableTypeInfo(char const* pTypename) :
-			ReflectableTypeInfo(pTypename)
+		TypedTypeInfo(char const* pTypename) :
+			TypeInfo(pTypename)
 		{
 			if constexpr (std::is_base_of_v<Reflectable2, T>)
 			{
@@ -226,7 +229,7 @@ namespace DIRE_NS
 		{
 			if constexpr (!std::is_same_v<TParent, Reflectable2>)
 			{
-				ReflectableTypeInfo& parentTypeInfo = TParent::EditClassReflectableTypeInfo();
+				TypeInfo& parentTypeInfo = TParent::EditClassReflectableTypeInfo();
 				parentTypeInfo.AddChildClass(this);
 				this->AddParentClass(&parentTypeInfo);
 				RecursiveRegisterParentClasses<typename TParent::Super>();
@@ -270,12 +273,12 @@ namespace DIRE_NS
 	struct DIRE_SelfTypeTag {}; \
     constexpr auto DIRE_SelfTypeHelper() -> decltype(DIRE_NS::SelfHelpers::Writer<DIRE_SelfTypeTag, decltype(this)>{}); \
     using Self = DIRE_NS::SelfHelpers::Read<DIRE_SelfTypeTag>;\
-	inline static DIRE_NS::TypedReflectableTypeInfo<Self, false>	DIRE_TypeInfo{nullptr};\
-	static DIRE_NS::ReflectableTypeInfo const&	GetClassReflectableTypeInfo()\
+	inline static DIRE_NS::TypedTypeInfo<Self, false>	DIRE_TypeInfo{nullptr};\
+	static DIRE_NS::TypeInfo const&	GetClassReflectableTypeInfo()\
 	{\
 		return DIRE_TypeInfo;\
 	}\
-	static DIRE_NS::ReflectableTypeInfo&	EditClassReflectableTypeInfo()\
+	static DIRE_NS::TypeInfo&	EditClassReflectableTypeInfo()\
 	{\
 		return DIRE_TypeInfo;\
 	}
@@ -287,14 +290,16 @@ namespace DIRE_NS
     constexpr auto DIRE_SelfTypeHelper() -> decltype(::SelfType::Writer<DIRE_SelfTypeTag, decltype(this)>{}); \
     using Self = ::SelfType::Read<DIRE_SelfTypeTag>;\
 	using Super = TypeInfoHelper<Self>::Super;\
-	inline static TypedReflectableTypeInfo<Self, USE_DEFAULT_CONSTRUCTOR_INSTANTIATE()> DIRE_TypeInfo{TypeInfoHelper<Self>::TypeName};\
-	static ReflectableTypeInfo const&	GetClassReflectableTypeInfo()\
+	inline static TypedTypeInfo<Self, USE_DEFAULT_CONSTRUCTOR_INSTANTIATE()> DIRE_TypeInfo{TypeInfoHelper<Self>::TypeName};\
+	static TypeInfo const&	GetClassReflectableTypeInfo()\
 	{\
 		return DIRE_TypeInfo;\
 	}\
-	static ReflectableTypeInfo&	EditClassReflectableTypeInfo()\
+	static TypeInfo&	EditClassReflectableTypeInfo()\
 	{\
 		return DIRE_TypeInfo;\
 	}\
 	//mutable ReflectableClassIDSetter2<Self> structname##_TYPEINFO_ID_SETTER{this}; // TODO: fix this "structname"
 	// I had to use mutable, otherwise the MapUpdate function breaks compilation because we try to copy assign. Maybe try to find a better way
+
+#include "DireProperty.h"

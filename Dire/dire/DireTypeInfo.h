@@ -9,11 +9,12 @@
 
 namespace DIRE_NS
 {
-	struct TypeInfo : IntrusiveListNode<TypeInfo>
+	class PropertyTypeInfo : public IntrusiveListNode<PropertyTypeInfo>
 	{
 		using CopyConstructorPtr = void (*)(void* pDestAddr, const void * pOther, size_t pOffset);
 
-		TypeInfo(const char * pName, const std::ptrdiff_t pOffset, const size_t pSize, const CopyConstructorPtr pCopyCtor = nullptr) :
+	public:
+		PropertyTypeInfo(const char * pName, const std::ptrdiff_t pOffset, const size_t pSize, const CopyConstructorPtr pCopyCtor = nullptr) :
 			Name(pName), TypeEnum(Type::Unknown), Offset(pOffset), Size(pSize), CopyCtor(pCopyCtor)
 		{}
 
@@ -32,6 +33,8 @@ namespace DIRE_NS
 			return DataStructurePropertyHandler;
 		}
 
+		const DIRE_STRING& GetName() const { return Name; }
+
 #if DIRE_USE_SERIALIZATION
 		virtual void	SerializeAttributes(class ISerializer& pSerializer) const = 0;
 
@@ -44,6 +47,106 @@ namespace DIRE_NS
 		virtual SerializationState	GetSerializableState() const = 0;
 #endif
 
+
+	protected:
+
+		template <typename TProp>
+		void	SelectType()
+		{
+			if constexpr (HasArraySemantics_v<TProp>)
+			{
+				SetType(Type::Array);
+			}
+			else if constexpr (HasMapSemantics_v<TProp>)
+			{
+				SetType(Type::Map);
+			}
+			else if constexpr (std::is_class_v<TProp> && !IsEnum<TProp>)
+			{
+				SetType(Type::Object);
+			}
+			else if constexpr (std::is_enum_v<TProp>)
+			{
+				SetType(FromEnumToUnderlyingType<TProp>());
+			}
+			else if constexpr (std::is_base_of_v<Enum, TProp>)
+			{
+				SetType(Type::Enum);
+			}
+			else // primary type
+			{
+				SetType(FromActualTypeToEnumType<TProp>::EnumType);
+			}
+		}
+
+		template <typename TProp>
+		void	PopulateDataStructureHandler()
+		{
+			if constexpr (HasMapSemantics_v<TProp>)
+			{
+				DataStructurePropertyHandler.MapHandler = &TypedMapDataStructureHandler<TProp>::GetInstance();
+			}
+			else if constexpr (HasArraySemantics_v<TProp>)
+			{
+				DataStructurePropertyHandler.ArrayHandler = &TypedArrayDataStructureHandler<TProp>::GetInstance();
+			}
+			else if constexpr (std::is_base_of_v<Enum, TProp>)
+			{
+				DataStructurePropertyHandler.EnumHandler = &TypedEnumDataStructureHandler<TProp>::GetInstance();
+			}
+		}
+
+		template <typename TProp>
+		void	SetReflectableID()
+		{
+			if constexpr (std::is_base_of_v<Reflectable2, TProp>)
+			{
+				reflectableID = TProp::GetClassReflectableTypeInfo().GetID();
+			}
+			else
+			{
+				reflectableID = (unsigned)-1;
+			}
+		}
+
+		template <typename TProp>
+		void	InitializeReflectionCopyConstructor()
+		{
+			if constexpr (std::is_trivially_copyable_v<TProp>)
+			{
+				CopyCtor = [](void* pDestAddr, void const* pSrc, size_t pOffset)
+				{
+					memcpy((std::byte*)pDestAddr + pOffset, (std::byte const*)pSrc + pOffset, sizeof(TProp));
+				};
+			}
+			else if constexpr (std::is_assignable_v<TProp, TProp> && !std::is_trivially_copy_assignable_v<TProp>)
+			{ // class has an overloaded operator=
+				CopyCtor = [](void* pDestAddr, void const* pSrc, size_t pOffset)
+				{
+					TProp* actualDestination = (TProp*)((std::byte*)pDestAddr + pOffset);
+					TProp const* actualSrc = (TProp const*)((std::byte const*)pSrc + pOffset);
+					(*actualDestination) = *actualSrc;
+				};
+			}
+			else // C-style arrays, for example...
+			{
+				CopyCtor = [](void* pDestAddr, void const* pOther, size_t pOffset)
+				{
+					TProp* actualDestination = (TProp*)((std::byte*)pDestAddr + pOffset);
+					TProp const* actualSrc = (TProp const*)((std::byte const*)pOther + pOffset);
+
+					std::copy(std::begin(*actualSrc), std::end(*actualSrc), std::begin(*actualDestination));
+				};
+			}
+		}
+
+		void	SetType(const Type pType)
+		{
+			TypeEnum = pType;
+		}
+
+	private:
+
 		DIRE_STRING		Name; // TODO: try storing a string view?
 		Type			TypeEnum;
 		std::ptrdiff_t	Offset;
@@ -54,14 +157,8 @@ namespace DIRE_NS
 		// TODO: storing it here is kind of a hack to go quick.
 		// I guess we should have a map of Type->ClassID to be able to easily find the class ID...
 		// without duplicating this information in all the type info structures of every property of the same type.
-		unsigned		reflectableID = (unsigned) -1;
+		unsigned		reflectableID = (unsigned)-1;
 
-	protected:
-
-		void	SetType(const Type pType)
-		{
-			TypeEnum = pType;
-		}
 	};
 
 

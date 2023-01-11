@@ -12,7 +12,7 @@
 namespace DIRE_NS
 {
 	using ReflectableID = unsigned;
-	class ReflectableTypeInfo;
+	class TypeInfo;
 	struct Reflectable2;
 
 	class ReflectableFactory
@@ -62,7 +62,7 @@ namespace DIRE_NS
 			return myReflectableTypeInfos.size();
 		}
 
-		[[nodiscard]] ReflectableTypeInfo const* GetTypeInfo(unsigned classID) const
+		[[nodiscard]] TypeInfo const* GetTypeInfo(unsigned classID) const
 		{
 			if (classID < myReflectableTypeInfos.size())
 			{
@@ -72,7 +72,7 @@ namespace DIRE_NS
 			return nullptr;
 		}
 
-		[[nodiscard]] ReflectableTypeInfo* EditTypeInfo(unsigned classID)
+		[[nodiscard]] TypeInfo* EditTypeInfo(unsigned classID)
 		{
 			if (classID < myReflectableTypeInfos.size())
 			{
@@ -114,15 +114,15 @@ namespace DIRE_NS
 		bool	ImportTypeInfoSettings(DIRE_STRING_VIEW pReadSettingsFile);
 
 	private:
-		friend ReflectableTypeInfo;
+		friend TypeInfo;
 
-		[[nodiscard]] unsigned	RegisterTypeInfo(ReflectableTypeInfo* pTypeInfo)
+		[[nodiscard]] unsigned	RegisterTypeInfo(TypeInfo* pTypeInfo)
 		{
 			myReflectableTypeInfos.push_back(pTypeInfo);
 			return (unsigned)GetTypeInfoCount() - 1;
 		}
 
-		std::vector<ReflectableTypeInfo*>	myReflectableTypeInfos;
+		std::vector<TypeInfo*>	myReflectableTypeInfos;
 		ReflectableFactory	myInstantiateFactory;
 	};
 }
