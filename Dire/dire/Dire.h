@@ -273,7 +273,7 @@ namespace DIRE_NS
 	struct DIRE_SelfTypeTag {}; \
     constexpr auto DIRE_SelfTypeHelper() -> decltype(DIRE_NS::SelfHelpers::Writer<DIRE_SelfTypeTag, decltype(this)>{}); \
     using Self = DIRE_NS::SelfHelpers::Read<DIRE_SelfTypeTag>;\
-	inline static DIRE_NS::TypedTypeInfo<Self, false>	DIRE_TypeInfo{nullptr};\
+	inline static DIRE_NS::TypedTypeInfo<Self, false>	DIRE_TypeInfo{""};\
 	static DIRE_NS::TypeInfo const&	GetClassReflectableTypeInfo()\
 	{\
 		return DIRE_TypeInfo;\

@@ -78,9 +78,6 @@ namespace DIRE_NS
 {
 	class Enum;
 
-	template <typename T>
-	constexpr bool IsEnum = std::is_enum_v<T> || std::is_base_of_v<Enum, T>;
-
 	DECLARE_HAS_TYPE_DETECTOR(HasValueType, value_type)
 	DECLARE_HAS_TYPE_DETECTOR(HasKeyType, key_type)
 	DECLARE_HAS_TYPE_DETECTOR(HasMappedType, mapped_type)

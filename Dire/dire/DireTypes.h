@@ -6,9 +6,6 @@
 
 namespace DIRE_NS
 {
-	class Enum
-	{};
-
 	DIRE_SEQUENTIAL_ENUM(Type, uint8_t,
 		Unknown,
 		Void,

@@ -15,25 +15,32 @@ namespace DIRE_NS
 
 	public:
 		PropertyTypeInfo(const char * pName, const std::ptrdiff_t pOffset, const size_t pSize, const CopyConstructorPtr pCopyCtor = nullptr) :
-			Name(pName), TypeEnum(Type::Unknown), Offset(pOffset), Size(pSize), CopyCtor(pCopyCtor)
+			myName(pName), myMetatype(Type::Unknown), myOffset(pOffset), mySize(pSize), myCopyCtor(pCopyCtor)
 		{}
 
-		const ArrayDataStructureHandler* GetArrayHandler() const
+		[[nodiscard]] const ArrayDataStructureHandler* GetArrayHandler() const
 		{
-			return DataStructurePropertyHandler.GetArrayHandler();
+			return myDataStructurePropertyHandler.GetArrayHandler();
 		}
 
-		const MapDataStructureHandler* GetMapHandler() const
+		[[nodiscard]] const MapDataStructureHandler* GetMapHandler() const
 		{
-			return DataStructurePropertyHandler.GetMapHandler();
+			return myDataStructurePropertyHandler.GetMapHandler();
 		}
 
-		const DataStructureHandler& GetDataStructureHandler() const
+		[[nodiscard]] const DataStructureHandler& GetDataStructureHandler() const
 		{
-			return DataStructurePropertyHandler;
+			return myDataStructurePropertyHandler;
 		}
 
-		const DIRE_STRING& GetName() const { return Name; }
+		[[nodiscard]] const DIRE_STRING& GetName() const { return myName; }
+
+		[[nodiscard]] Type		GetMetatype() const { return myMetatype; }
+
+		[[nodiscard]] size_t	GetOffset() const { return myOffset; }
+
+		[[nodiscard]] size_t	GetSize() const { return mySize; }
+
 
 #if DIRE_USE_SERIALIZATION
 		virtual void	SerializeAttributes(class ISerializer& pSerializer) const = 0;
@@ -84,15 +91,15 @@ namespace DIRE_NS
 		{
 			if constexpr (HasMapSemantics_v<TProp>)
 			{
-				DataStructurePropertyHandler.MapHandler = &TypedMapDataStructureHandler<TProp>::GetInstance();
+				myDataStructurePropertyHandler.MapHandler = &TypedMapDataStructureHandler<TProp>::GetInstance();
 			}
 			else if constexpr (HasArraySemantics_v<TProp>)
 			{
-				DataStructurePropertyHandler.ArrayHandler = &TypedArrayDataStructureHandler<TProp>::GetInstance();
+				myDataStructurePropertyHandler.ArrayHandler = &TypedArrayDataStructureHandler<TProp>::GetInstance();
 			}
 			else if constexpr (std::is_base_of_v<Enum, TProp>)
 			{
-				DataStructurePropertyHandler.EnumHandler = &TypedEnumDataStructureHandler<TProp>::GetInstance();
+				myDataStructurePropertyHandler.EnumHandler = &TypedEnumDataStructureHandler<TProp>::GetInstance();
 			}
 		}
 
@@ -101,11 +108,11 @@ namespace DIRE_NS
 		{
 			if constexpr (std::is_base_of_v<Reflectable2, TProp>)
 			{
-				reflectableID = TProp::GetClassReflectableTypeInfo().GetID();
+				myReflectableID = TProp::GetClassReflectableTypeInfo().GetID();
 			}
 			else
 			{
-				reflectableID = (unsigned)-1;
+				myReflectableID = (unsigned)-1;
 			}
 		}
 
@@ -114,14 +121,14 @@ namespace DIRE_NS
 		{
 			if constexpr (std::is_trivially_copyable_v<TProp>)
 			{
-				CopyCtor = [](void* pDestAddr, void const* pSrc, size_t pOffset)
+				myCopyCtor = [](void* pDestAddr, void const* pSrc, size_t pOffset)
 				{
 					memcpy((std::byte*)pDestAddr + pOffset, (std::byte const*)pSrc + pOffset, sizeof(TProp));
 				};
 			}
 			else if constexpr (std::is_assignable_v<TProp, TProp> && !std::is_trivially_copy_assignable_v<TProp>)
 			{ // class has an overloaded operator=
-				CopyCtor = [](void* pDestAddr, void const* pSrc, size_t pOffset)
+				myCopyCtor = [](void* pDestAddr, void const* pSrc, size_t pOffset)
 				{
 					TProp* actualDestination = (TProp*)((std::byte*)pDestAddr + pOffset);
 					TProp const* actualSrc = (TProp const*)((std::byte const*)pSrc + pOffset);
@@ -130,7 +137,7 @@ namespace DIRE_NS
 			}
 			else // C-style arrays, for example...
 			{
-				CopyCtor = [](void* pDestAddr, void const* pOther, size_t pOffset)
+				myCopyCtor = [](void* pDestAddr, void const* pOther, size_t pOffset)
 				{
 					TProp* actualDestination = (TProp*)((std::byte*)pDestAddr + pOffset);
 					TProp const* actualSrc = (TProp const*)((std::byte const*)pOther + pOffset);
@@ -142,22 +149,22 @@ namespace DIRE_NS
 
 		void	SetType(const Type pType)
 		{
-			TypeEnum = pType;
+			myMetatype = pType;
 		}
 
 	private:
 
-		DIRE_STRING		Name; // TODO: try storing a string view?
-		Type			TypeEnum;
-		std::ptrdiff_t	Offset;
-		std::size_t		Size;
-		DataStructureHandler	DataStructurePropertyHandler; // Useful for array-like or associative data structures, will stay null for other types.
-		CopyConstructorPtr CopyCtor = nullptr; // if null : this type is not copy-constructible
+		DIRE_STRING		myName; // TODO: try storing a string view?
+		Type			myMetatype;
+		std::ptrdiff_t	myOffset;
+		std::size_t		mySize;
+		DataStructureHandler	myDataStructurePropertyHandler; // Useful for array-like or associative data structures, will stay null for other types.
+		CopyConstructorPtr myCopyCtor = nullptr; // if null : this type is not copy-constructible
 
 		// TODO: storing it here is kind of a hack to go quick.
 		// I guess we should have a map of Type->ClassID to be able to easily find the class ID...
 		// without duplicating this information in all the type info structures of every property of the same type.
-		unsigned		reflectableID = (unsigned)-1;
+		unsigned		myReflectableID = (unsigned)-1;
 
 	};
 
