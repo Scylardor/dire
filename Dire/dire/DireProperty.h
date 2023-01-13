@@ -104,16 +104,6 @@ namespace DIRE_NS
 	};
 }
 
-#define DIRE_LPAREN (
-#define DIRE_RPAREN )
-
-// inspired by https://www.mikeash.com/pyblog/friday-qa-2015-03-20-preprocessor-abuse-and-optional-parentheses.html
-#define DIRE_EXTRACT(...) DIRE_EXTRACT __VA_ARGS__
-#define DIRE_NOTHING_DIRE_EXTRACT
-#define DIRE_PASTE(x, ...) x ## __VA_ARGS__
-#define DIRE_EVALUATING_PASTE(x, ...) DIRE_PASTE(x, __VA_ARGS__)
-#define DIRE_UNPAREN(x) DIRE_EVALUATING_PASTE(DIRE_NOTHING_, DIRE_EXTRACT x)
-
 // This offset trick was inspired by https://stackoverflow.com/a/4938266/1987466
 #define DIRE_PROPERTY(type, name, ...) \
 	struct name##_tag\

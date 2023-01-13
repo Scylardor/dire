@@ -60,30 +60,7 @@ namespace DIRE_NS
 		template <typename TProp>
 		void	SelectType()
 		{
-			if constexpr (HasArraySemantics_v<TProp>)
-			{
-				SetType(Type::Array);
-			}
-			else if constexpr (HasMapSemantics_v<TProp>)
-			{
-				SetType(Type::Map);
-			}
-			else if constexpr (std::is_class_v<TProp> && !IsEnum<TProp>)
-			{
-				SetType(Type::Object);
-			}
-			else if constexpr (std::is_enum_v<TProp>)
-			{
-				SetType(FromEnumToUnderlyingType<TProp>());
-			}
-			else if constexpr (std::is_base_of_v<Enum, TProp>)
-			{
-				SetType(Type::Enum);
-			}
-			else // primary type
-			{
-				SetType(FromActualTypeToEnumType<TProp>::EnumType);
-			}
+			SetType(FromActualTypeToEnumType<TProp>::EnumType);
 		}
 
 		template <typename TProp>
@@ -229,4 +206,94 @@ namespace DIRE_NS
 
 	};
 
+	template <typename Ty >
+	struct TypedFunctionInfo; // not defined
+
+	// TODO: figure out the proper constructor/operator rain dance
+	template <typename Class, typename Ret, typename ... Args >
+	struct TypedFunctionInfo<Ret(Class::*)(Args...)> : FunctionInfo
+	{
+		using MemberFunctionSignature = Ret(Class::*)(Args...);
+
+		TypedFunctionInfo(MemberFunctionSignature memberFunc, const char* methodName) :
+			FunctionInfo(methodName, FromActualTypeToEnumType<Ret>::EnumType),
+			myMemberFunctionPtr(memberFunc)
+		{
+			if constexpr (sizeof...(Args) > 0)
+			{
+				(PushBackParameterType(FromActualTypeToEnumType<Args>::EnumType), ...);
+			}
+
+			TypeInfo& theClassReflector = Class::EditClassReflectableTypeInfo();
+			theClassReflector.PushFunctionInfo(*this);
+		}
+
+		// The idea of using std::apply has been stolen from here : https://stackoverflow.com/a/36656413/1987466
+		std::any	Invoke(void* pObject, std::any const& pInvokeParams) const override
+		{
+			using ArgumentsTuple = std::tuple<Args...>;
+			ArgumentsTuple const* argPack = std::any_cast<ArgumentsTuple>(&pInvokeParams);
+			if (argPack == nullptr)
+			{
+				return {}; // what we have been sent is actually not a tuple of the expected argument types...
+			}
+
+			auto f = [this, pObject](Args... pMemFunArgs) -> Ret
+			{
+				Class* theActualObject = static_cast<Class*>(pObject);
+				return (theActualObject->*myMemberFunctionPtr)(pMemFunArgs...);
+			};
+			if constexpr (std::is_void_v<Ret>)
+			{
+				std::apply(f, *argPack);
+				return {};
+			}
+			else
+			{
+				std::any result = std::apply(f, *argPack);
+				return result;
+			}
+		}
+
+		MemberFunctionSignature	myMemberFunctionPtr = nullptr;
+	};
+
+	template <typename Ret = void, typename T, typename... Args>
+	Ret	Invoke(const DIRE_STRING_VIEW& pFuncName, T& pObject, Args&&... pArgs)
+	{
+		const TypeInfo& theClassReflector = T::EditClassReflectableTypeInfo();
+		const FunctionInfo* funcInfo = theClassReflector.FindFunction(pFuncName);
+		if constexpr (std::is_void_v<Ret>)
+		{
+			if (funcInfo != nullptr)
+				funcInfo->InvokeWithArgs(&pObject, std::forward<Args>(pArgs)...);
+
+			return;
+		}
+		else
+		{
+			std::any result = funcInfo->InvokeWithArgs(&pObject, std::forward<Args>(pArgs)...);
+			return std::any_cast<Ret>(result);
+		}
+	}
+
+
 }
+
+#define DIRE_LPAREN (
+#define DIRE_RPAREN )
+
+// inspired by https://www.mikeash.com/pyblog/friday-qa-2015-03-20-preprocessor-abuse-and-optional-parentheses.html
+#define DIRE_EXTRACT(...) DIRE_EXTRACT __VA_ARGS__
+#define DIRE_NOTHING_DIRE_EXTRACT
+#define DIRE_PASTE(x, ...) x ## __VA_ARGS__
+#define DIRE_EVALUATING_PASTE(x, ...) DIRE_PASTE(x, __VA_ARGS__)
+
+#define DIRE_UNPAREN(...) DIRE_EVALUATING_PASTE(DIRE_NOTHING_, DIRE_EXTRACT __VA_ARGS__)
+
+#define DIRE_FUNCTION_TYPEINFO(Name) \
+	inline static DIRE_NS::TypedFunctionInfo<decltype(&Name)> Name##_TYPEINFO{ &Name, DIRE_STRINGIZE(Name)};
+
+#define DIRE_FUNCTION(RetType, Name, ...) \
+	RetType Name DIRE_LPAREN DIRE_UNPAREN(__VA_ARGS__) DIRE_RPAREN ; \
+	DIRE_FUNCTION_TYPEINFO(Name);

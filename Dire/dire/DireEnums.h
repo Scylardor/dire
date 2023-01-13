@@ -103,12 +103,12 @@ namespace DIRE_NS
 		}\
 	private:\
 		inline static std::pair<const char*, Values> nameEnumPairs[]{DIRE_VA_MACRO(DIRE_BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)}; \
-	};\
-	std::ostream& operator<<(std::ostream& pOs, const EnumName& pEnum)\
-	{\
-		pOs << pEnum.GetString();\
-		return pOs;\
-	}
+	};
+	//std::ostream& operator<<(std::ostream& pOs, const EnumName& pEnum)\
+	//{\
+	//	pOs << pEnum.GetString();\
+	//	return pOs;\
+	//}
 
 namespace DIRE_NS
 {
@@ -277,12 +277,12 @@ namespace DIRE_NS
 		}\
 	private:\
 		inline static std::pair<const char*, Values> nameEnumPairs[] {DIRE_VA_MACRO(DIRE_BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)};\
-	};\
-	std::ostream& operator<<(std::ostream& pOs, const EnumName& pEnum)\
-	{\
-		pOs << pEnum.GetString();\
-		return pOs;\
-	}
+	};
+	//std::ostream& operator<<(std::ostream& pOs, const EnumName& pEnum)\
+	//{\
+	//	pOs << pEnum.GetString();\
+	//	return pOs;\
+	//}
 
 
 #define DIRE_ENUM(EnumName, ...) DIRE_SEQUENTIAL_ENUM(EnumName, int, __VA_ARGS__)

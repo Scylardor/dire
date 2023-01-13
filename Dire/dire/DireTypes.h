@@ -23,7 +23,8 @@ namespace DIRE_NS
 		Char,
 		UChar,
 		Short,
-		UShort
+		UShort,
+		Reference
 	);
 
 	template <Type::Values T>
@@ -43,7 +44,14 @@ namespace DIRE_NS
 		using ActualType = TheActualType; \
 	}; \
 	template <typename T>\
-	struct FromActualTypeToEnumType<T, typename std::enable_if_t<std::is_same_v<T, TheActualType>>>\
+	struct FromActualTypeToEnumType<T, typename ::std::enable_if_t<std::is_same_v<T, TheActualType>>>\
+	{\
+		static const Type::Values EnumType = TheEnumType;\
+	};
+
+#define DECLARE_ENABLE_IF_TRANSLATOR(TheEnumType, Condition) \
+	template <typename T>\
+	struct FromActualTypeToEnumType<T, typename ::std::enable_if_t<Condition>>\
 	{\
 		static const Type::Values EnumType = TheEnumType;\
 	};
@@ -60,6 +68,13 @@ namespace DIRE_NS
 	DECLARE_TYPE_TRANSLATOR(Type::UChar, unsigned char)
 	DECLARE_TYPE_TRANSLATOR(Type::Short, short)
 	DECLARE_TYPE_TRANSLATOR(Type::UShort, unsigned short)
+
+	DECLARE_ENABLE_IF_TRANSLATOR(Type::Array, HasArraySemantics_v<T>)
+	DECLARE_ENABLE_IF_TRANSLATOR(Type::Map, HasMapSemantics_v<T>)
+	DECLARE_ENABLE_IF_TRANSLATOR(Type::Object, std::is_class_v<T> && !IsEnum<T> && !HasArraySemantics_v<T> && !HasMapSemantics_v<T>)
+	DECLARE_ENABLE_IF_TRANSLATOR(FromEnumToUnderlyingType<T>(), std::is_enum_v<T>)
+	DECLARE_ENABLE_IF_TRANSLATOR(Type::Enum, (std::is_base_of_v<Enum, T>))
+	DECLARE_ENABLE_IF_TRANSLATOR(Type::Reference, std::is_reference_v<T>)
 
 	template <typename T>
 	constexpr Type	FromEnumToUnderlyingType()
@@ -80,17 +95,4 @@ namespace DIRE_NS
 				return Type::Unknown;
 		}
 	}
-
-	template <typename T>
-	struct FromActualTypeToEnumType<T, typename std::enable_if_t<std::is_enum_v<T>, void>>
-	{
-		static const Type::Values EnumType = FromEnumToUnderlyingType<T>();
-	};
-
-	template <typename T>
-	struct FromActualTypeToEnumType<T, typename std::enable_if_t<std::is_base_of_v<Enum, T>, void>>
-	{
-		static const Type::Values EnumType = Type::Enum;
-	};
-
 }

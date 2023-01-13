@@ -1,4 +1,8 @@
 #pragma once
+#include <cassert>
+#include <cstdlib> // atoi
+#include <cstddef> // std::byte
+#include "DireString.h"
 
 namespace DIRE_NS
 {
@@ -26,7 +30,7 @@ namespace DIRE_NS
 				return true;
 			}
 
-			ReflectableTypeInfo const& parentTypeInfo = TRefl::GetClassReflectableTypeInfo();
+			TypeInfo const& parentTypeInfo = TRefl::GetClassTypeInfo();
 			return (parentTypeInfo.GetID() == myReflectableClassID || parentTypeInfo.IsParentOf(myReflectableClassID));
 		}
 
@@ -35,7 +39,7 @@ namespace DIRE_NS
 		{
 			static_assert(std::is_base_of_v<Reflectable2, T>, "Clone only works with Reflectable-derived class types.");
 
-			ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
+			TypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
 			if (thisTypeInfo == nullptr)
 			{
 				return nullptr;
@@ -52,13 +56,13 @@ namespace DIRE_NS
 			return (T*)clone;
 		}
 
-		void	CloneProperties(Reflectable2 const* pCloned, ReflectableTypeInfo const* pClonedTypeInfo, Reflectable2* pClone)
+		void	CloneProperties(Reflectable2 const* pCloned, TypeInfo const* pClonedTypeInfo, Reflectable2* pClone)
 		{
 			pClonedTypeInfo->CloneHierarchyPropertiesOf(*pClone, *pCloned);
 		}
 
 
-		[[nodiscard]] IntrusiveLinkedList<TypeInfo2> const& GetProperties() const
+		[[nodiscard]] IntrusiveLinkedList<PropertyTypeInfo> const& GetProperties() const
 		{
 			return Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID)->GetPropertyList();
 		}
@@ -81,9 +85,9 @@ namespace DIRE_NS
 		}
 
 		template <typename TProp = void>
-		[[nodiscard]] TProp const* GetProperty(std::string_view pName) const
+		[[nodiscard]] TProp const* GetProperty(DIRE_STRING_VIEW pName) const
 		{
-			ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
+			TypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
 
 			// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
 			std::byte const* propertyAddr = reinterpret_cast<std::byte const*>(this) - thisTypeInfo->GetVptrOffset();
@@ -95,7 +99,7 @@ namespace DIRE_NS
 			size_t const leftBrackPos = pName.find('[');
 			if (dotPos != pName.npos && dotPos < leftBrackPos) // it's a compound
 			{
-				std::string_view compoundPropName = std::string_view(pName.data(), dotPos);
+				DIRE_STRING_VIEW compoundPropName = DIRE_STRING_VIEW(pName.data(), dotPos);
 				return GetCompoundProperty<TProp>(thisTypeInfo, compoundPropName, pName, propertyAddr);
 			}
 			else if (leftBrackPos != pName.npos && leftBrackPos < dotPos) // it's an array or map
@@ -108,9 +112,9 @@ namespace DIRE_NS
 					return nullptr;
 				}
 
-				std::string_view propName = std::string_view(pName.data(), leftBrackPos);
+				DIRE_STRING_VIEW propName = DIRE_STRING_VIEW(pName.data(), leftBrackPos);
 
-				if (TypeInfo2 const* thisProp = thisTypeInfo->FindPropertyInHierarchy(propName))
+				if (PropertyTypeInfo const* thisProp = thisTypeInfo->FindPropertyInHierarchy(propName))
 				{
 					if (thisProp->type == Type::Array)
 					{
@@ -121,7 +125,7 @@ namespace DIRE_NS
 					else if (thisProp->type == Type::Map)
 					{
 						auto const keyStartPos = leftBrackPos + 1;
-						std::string_view key(pName.data() + keyStartPos, rightBrackPos - keyStartPos);
+						DIRE_STRING_VIEW key(pName.data() + keyStartPos, rightBrackPos - keyStartPos);
 						pName.remove_prefix(rightBrackPos + 1);
 						return GetArrayMapProperty<TProp>(thisTypeInfo, propName, pName, key, propertyAddr);
 					}
@@ -130,7 +134,7 @@ namespace DIRE_NS
 			}
 
 			// Otherwise: search for a "normal" property
-			for (TypeInfo2 const& prop : thisTypeInfo->GetPropertyList())
+			for (PropertyTypeInfo const& prop : thisTypeInfo->GetPropertyList())
 			{
 				if (prop.name == pName)
 				{
@@ -148,15 +152,15 @@ namespace DIRE_NS
 			return nullptr;
 		}
 
-		[[nodiscard]] bool EraseProperty(std::string_view pName)
+		[[nodiscard]] bool EraseProperty(DIRE_STRING_VIEW pName)
 		{
-			ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
+			TypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
 
 			return ErasePropertyImpl(thisTypeInfo, pName);
 		}
 
 
-		[[nodiscard]] bool ErasePropertyImpl(ReflectableTypeInfo const* pTypeInfo, std::string_view pName)
+		[[nodiscard]] bool ErasePropertyImpl(TypeInfo const* pTypeInfo, DIRE_STRING_VIEW pName)
 		{
 			// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
 			std::byte* propertyAddr = reinterpret_cast<std::byte*>(this) - pTypeInfo->GetVptrOffset();
@@ -168,7 +172,7 @@ namespace DIRE_NS
 			size_t const leftBrackPos = pName.find('[');
 			if (dotPos != pName.npos && dotPos < leftBrackPos) // it's a compound
 			{
-				std::string_view compoundPropName = std::string_view(pName.data(), dotPos);
+				DIRE_STRING_VIEW compoundPropName = DIRE_STRING_VIEW(pName.data(), dotPos);
 				return EraseInCompoundProperty(pTypeInfo, compoundPropName, pName, propertyAddr);
 			}
 			else if (leftBrackPos != pName.npos && leftBrackPos < dotPos) // it's an array
@@ -181,13 +185,13 @@ namespace DIRE_NS
 					return false;
 				}
 				int propIndex = atoi(pName.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
-				std::string_view propName = std::string_view(pName.data(), leftBrackPos);
+				DIRE_STRING_VIEW propName = DIRE_STRING_VIEW(pName.data(), leftBrackPos);
 				pName.remove_prefix(rightBrackPos + 1);
 				return EraseArrayProperty(pTypeInfo, propName, pName, propIndex, propertyAddr);
 			}
 
 			// Otherwise: maybe in the parent classes?
-			for (ReflectableTypeInfo const* parentClass : pTypeInfo->GetParentClasses())
+			for (TypeInfo const* parentClass : pTypeInfo->GetParentClasses())
 			{
 				if (ErasePropertyImpl(parentClass, pName))
 				{
@@ -198,10 +202,10 @@ namespace DIRE_NS
 			return false;
 		}
 
-		[[nodiscard]] bool EraseArrayProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pRemainingPath, int pArrayIdx, std::byte* pPropPtr)
+		[[nodiscard]] bool EraseArrayProperty(TypeInfo const* pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, std::byte* pPropPtr)
 		{
 			// First, find our array property
-			TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
+			PropertyTypeInfo const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
 			if (thisProp == nullptr)
 			{
 				return false; // There was no property with the given name.
@@ -213,7 +217,7 @@ namespace DIRE_NS
 			return RecurseEraseArrayProperty(arrayHandler, pName, pRemainingPath, pArrayIdx, pPropPtr);
 		}
 
-		[[nodiscard]] bool RecurseEraseArrayProperty(ArrayPropertyCRUDHandler const* pArrayHandler, std::string_view pName, std::string_view pRemainingPath, int pArrayIdx, std::byte* pPropPtr)
+		[[nodiscard]] bool RecurseEraseArrayProperty(ArrayPropertyCRUDHandler const* pArrayHandler, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, std::byte* pPropPtr)
 		{
 			if (pArrayHandler == nullptr || pArrayIdx >= pArrayHandler->Size(pPropPtr))
 			{
@@ -235,7 +239,7 @@ namespace DIRE_NS
 			}
 			if (dotPos != pRemainingPath.npos && dotPos < leftBrackPos) // it's a compound in an array
 			{
-				ReflectableTypeInfo const* arrayElemTypeInfo = Reflector3::GetSingleton().GetTypeInfo(pArrayHandler->ElementReflectableID());
+				TypeInfo const* arrayElemTypeInfo = Reflector3::GetSingleton().GetTypeInfo(pArrayHandler->ElementReflectableID());
 				if (arrayElemTypeInfo == nullptr) // compound type that is not Reflectable...
 				{
 					return false;
@@ -245,7 +249,7 @@ namespace DIRE_NS
 				dotPos = pRemainingPath.find('.');
 				// Use leftBrackPos-1 because it was computed before stripping the leading dot, so it is off by 1
 				auto suffixPos = (dotPos != pRemainingPath.npos || leftBrackPos != pRemainingPath.npos ? std::min(dotPos, leftBrackPos - 1) : 0);
-				pName = std::string_view(pRemainingPath.data() + dotPos + 1, pRemainingPath.length() - (dotPos + 1));
+				pName = DIRE_STRING_VIEW(pRemainingPath.data() + dotPos + 1, pRemainingPath.length() - (dotPos + 1));
 				dotPos = pName.find('.');
 				if (dotPos < leftBrackPos) // next entry is a compound
 					return EraseInCompoundProperty(arrayElemTypeInfo, pName, pRemainingPath, pPropPtr);
@@ -257,7 +261,7 @@ namespace DIRE_NS
 						return false;
 					}
 					int propIndex = atoi(pRemainingPath.data() + leftBrackPos); // TODO: use own atoi to avoid multi-k-LOC dependency!
-					pName = std::string_view(pRemainingPath.data(), pRemainingPath.length() - suffixPos + 1);
+					pName = DIRE_STRING_VIEW(pRemainingPath.data(), pRemainingPath.length() - suffixPos + 1);
 					pRemainingPath.remove_prefix(rightBrackPos + 1);
 					return EraseArrayProperty(arrayElemTypeInfo, pName, pRemainingPath, propIndex, pPropPtr);
 				}
@@ -289,10 +293,10 @@ namespace DIRE_NS
 		}
 
 		template <typename TProp>
-		[[nodiscard]] TProp const* GetArrayProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const
+		[[nodiscard]] TProp const* GetArrayProperty(TypeInfo const* pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const
 		{
 			// First, find our array property
-			TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
+			PropertyTypeInfo const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
 			if (thisProp == nullptr)
 			{
 				return nullptr; // There was no property with the given name.
@@ -306,7 +310,7 @@ namespace DIRE_NS
 
 
 		template <typename TProp>
-		[[nodiscard]] TProp const* RecurseFindArrayProperty(ArrayPropertyCRUDHandler const* pArrayHandler, std::string_view pName, std::string_view pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const
+		[[nodiscard]] TProp const* RecurseFindArrayProperty(ArrayPropertyCRUDHandler const* pArrayHandler, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const
 		{
 			if (pArrayHandler == nullptr)
 			{
@@ -328,7 +332,7 @@ namespace DIRE_NS
 			}
 			if (dotPos != pRemainingPath.npos && dotPos < leftBrackPos) // it's a compound in an array
 			{
-				ReflectableTypeInfo const* arrayElemTypeInfo = Reflector3::GetSingleton().GetTypeInfo(pArrayHandler->ElementReflectableID());
+				TypeInfo const* arrayElemTypeInfo = Reflector3::GetSingleton().GetTypeInfo(pArrayHandler->ElementReflectableID());
 				if (arrayElemTypeInfo == nullptr) // compound type that is not Reflectable...
 				{
 					return nullptr;
@@ -338,7 +342,7 @@ namespace DIRE_NS
 				dotPos = pRemainingPath.find('.');
 				// Use leftBrackPos-1 because it was computed before stripping the leading dot, so it is off by 1
 				auto suffixPos = (dotPos != pRemainingPath.npos || leftBrackPos != pRemainingPath.npos ? std::min(dotPos, leftBrackPos - 1) : 0);
-				pName = std::string_view(pRemainingPath.data() + dotPos + 1, pRemainingPath.length() - (dotPos + 1));
+				pName = DIRE_STRING_VIEW(pRemainingPath.data() + dotPos + 1, pRemainingPath.length() - (dotPos + 1));
 				dotPos = pName.find('.');
 				if (dotPos < leftBrackPos) // next entry is a compound
 					return GetCompoundProperty<TProp>(arrayElemTypeInfo, pName, pRemainingPath, pPropPtr);
@@ -350,7 +354,7 @@ namespace DIRE_NS
 						return nullptr;
 					}
 					int propIndex = atoi(pRemainingPath.data() + leftBrackPos); // TODO: use own atoi to avoid multi-k-LOC dependency!
-					pName = std::string_view(pRemainingPath.data(), pRemainingPath.length() - suffixPos + 1);
+					pName = DIRE_STRING_VIEW(pRemainingPath.data(), pRemainingPath.length() - suffixPos + 1);
 					pRemainingPath.remove_prefix(rightBrackPos + 1);
 					return GetArrayProperty<TProp>(arrayElemTypeInfo, pName, pRemainingPath, propIndex, pPropPtr);
 				}
@@ -382,7 +386,7 @@ namespace DIRE_NS
 		}
 
 		template <typename TProp>
-		[[nodiscard]] TProp const* RecurseArrayMapProperty(AbstractPropertyHandler const& pDataStructureHandler, std::byte const* pPropPtr, std::string_view pRemainingPath, std::string_view pKey) const
+		[[nodiscard]] TProp const* RecurseArrayMapProperty(AbstractPropertyHandler const& pDataStructureHandler, std::byte const* pPropPtr, DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey) const
 		{
 			// Find out the type of handler we are interested in
 			void const* value = nullptr;
@@ -413,9 +417,9 @@ namespace DIRE_NS
 			if (pRemainingPath[0] == '.') // it's a nested structure
 			{
 				unsigned valueID = pDataStructureHandler.ArrayHandler ? pDataStructureHandler.ArrayHandler->ElementReflectableID() : pDataStructureHandler.MapHandler->ValueReflectableID();
-				ReflectableTypeInfo const* valueTypeInfo = Reflector3::GetSingleton().GetTypeInfo(valueID);
+				TypeInfo const* valueTypeInfo = Reflector3::GetSingleton().GetTypeInfo(valueID);
 				auto nextDelimiterPos = pRemainingPath.find_first_of(".[", 1);
-				std::string_view propName = pRemainingPath.substr(1, nextDelimiterPos == pRemainingPath.npos ? nextDelimiterPos : nextDelimiterPos - 1);
+				DIRE_STRING_VIEW propName = pRemainingPath.substr(1, nextDelimiterPos == pRemainingPath.npos ? nextDelimiterPos : nextDelimiterPos - 1);
 				if (nextDelimiterPos == pRemainingPath.npos)
 				{
 					pRemainingPath.remove_prefix(1);
@@ -466,10 +470,10 @@ namespace DIRE_NS
 		}
 
 		template <typename TProp>
-		[[nodiscard]] TProp const* GetArrayMapProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pRemainingPath, std::string_view pKey, std::byte const* pPropPtr) const
+		[[nodiscard]] TProp const* GetArrayMapProperty(TypeInfo const* pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey, std::byte const* pPropPtr) const
 		{
 			// First, find our array property
-			TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
+			PropertyTypeInfo const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
 			if (thisProp == nullptr)
 			{
 				return nullptr; // There was no property with the given name.
@@ -483,10 +487,10 @@ namespace DIRE_NS
 
 		// TODO: I think pTotalOffset can drop the reference
 		template <typename TProp>
-		[[nodiscard]] TProp const* GetCompoundProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pFullPath, std::byte const* propertyAddr) const
+		[[nodiscard]] TProp const* GetCompoundProperty(TypeInfo const* pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pFullPath, std::byte const* propertyAddr) const
 		{
 			// First, find our compound property
-			TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
+			PropertyTypeInfo const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
 			if (thisProp == nullptr)
 			{
 				return nullptr; // There was no property with the given name.
@@ -507,7 +511,7 @@ namespace DIRE_NS
 			}
 
 			// Yes: recurse one more time, this time using this property's type info (needs to be Reflectable)
-			ReflectableTypeInfo const* nestedTypeInfo = Reflector3::GetSingleton().GetTypeInfo(thisProp->reflectableID);
+			TypeInfo const* nestedTypeInfo = Reflector3::GetSingleton().GetTypeInfo(thisProp->reflectableID);
 			if (nestedTypeInfo != nullptr)
 			{
 				pTypeInfoOwner = nestedTypeInfo;
@@ -528,8 +532,8 @@ namespace DIRE_NS
 				{
 					return nullptr;
 				}
-				pName = std::string_view(pFullPath.data(), nextDelimiterPos);
-				std::string_view key = pFullPath.substr(nextDelimiterPos + 1, rightBrackPos - nextDelimiterPos - 1);
+				pName = DIRE_STRING_VIEW(pFullPath.data(), nextDelimiterPos);
+				DIRE_STRING_VIEW key = pFullPath.substr(nextDelimiterPos + 1, rightBrackPos - nextDelimiterPos - 1);
 				pFullPath.remove_prefix(rightBrackPos + 1);
 				return GetArrayMapProperty<TProp>(pTypeInfoOwner, pName, pFullPath, key, propertyAddr);
 			}
@@ -539,10 +543,10 @@ namespace DIRE_NS
 		}
 
 		// TODO: I think pTotalOffset can drop the reference
-		[[nodiscard]] bool EraseInCompoundProperty(ReflectableTypeInfo const* pTypeInfoOwner, std::string_view pName, std::string_view pFullPath, std::byte* propertyAddr)
+		[[nodiscard]] bool EraseInCompoundProperty(TypeInfo const* pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pFullPath, std::byte* propertyAddr)
 		{
 			// First, find our compound property
-			TypeInfo2 const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
+			PropertyTypeInfo const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
 			if (thisProp == nullptr)
 			{
 				return false; // There was no property with the given name.
@@ -573,7 +577,7 @@ namespace DIRE_NS
 			size_t const dotPos = pFullPath.find('.');
 			if (dotPos != pFullPath.npos)
 			{
-				pName = std::string_view(pFullPath.data(), dotPos);
+				pName = DIRE_STRING_VIEW(pFullPath.data(), dotPos);
 			}
 			else
 			{
@@ -592,7 +596,7 @@ namespace DIRE_NS
 					return false;
 				}
 				int propIndex = atoi(pName.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
-				std::string_view propName = std::string_view(pName.data(), leftBrackPos);
+				DIRE_STRING_VIEW propName = DIRE_STRING_VIEW(pName.data(), leftBrackPos);
 				pFullPath.remove_prefix(rightBrackPos + 1);
 				return EraseArrayProperty(pTypeInfoOwner, propName, pFullPath, propIndex, propertyAddr);
 			}
@@ -604,7 +608,7 @@ namespace DIRE_NS
 
 		/* Version that returns a reference for when you are 100% confident this property exists */
 		template <typename TProp>
-		[[nodiscard]] TProp const& GetSafeProperty(std::string_view pName) const
+		[[nodiscard]] TProp const& GetSafeProperty(DIRE_STRING_VIEW pName) const
 		{
 			TProp const* propPtr = GetProperty<TProp>(pName);
 			if (propPtr != nullptr)
@@ -620,7 +624,7 @@ namespace DIRE_NS
 
 
 		template <typename TProp>
-		bool SetProperty(std::string_view pName, TProp&& pSetValue)
+		bool SetProperty(DIRE_STRING_VIEW pName, TProp&& pSetValue)
 		{
 			TProp const* propPtr = GetProperty<TProp>(pName);
 			if (propPtr == nullptr)
@@ -633,9 +637,9 @@ namespace DIRE_NS
 			return true;
 		}
 
-		[[nodiscard]] FunctionInfo const* GetFunction(std::string_view pMemberFuncName) const
+		[[nodiscard]] FunctionInfo const* GetFunction(DIRE_STRING_VIEW pMemberFuncName) const
 		{
-			ReflectableTypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
+			TypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
 			for (FunctionInfo const& aFuncInfo : thisTypeInfo->GetFunctionList())
 			{
 				if (aFuncInfo.name == pMemberFuncName)
@@ -655,7 +659,7 @@ namespace DIRE_NS
 		}
 
 		template <typename... Args>
-		std::any	InvokeFunction(std::string_view pMemberFuncName, Args&&... pFuncArgs)
+		std::any	InvokeFunction(DIRE_STRING_VIEW pMemberFuncName, Args&&... pFuncArgs)
 		{
 			FunctionInfo const* theFunction = GetFunction(pMemberFuncName);
 			if (theFunction == nullptr)
@@ -667,7 +671,7 @@ namespace DIRE_NS
 		}
 
 		template <typename Ret, typename... Args>
-		Ret	TypedInvokeFunction(std::string_view pMemberFuncName, Args&&... pFuncArgs)
+		Ret	TypedInvokeFunction(DIRE_STRING_VIEW pMemberFuncName, Args&&... pFuncArgs)
 		{
 			if constexpr (std::is_void_v<Ret>)
 			{
