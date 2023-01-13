@@ -5,7 +5,6 @@
 
 #include "DireTypeInfo.h"
 #include "DireMacros.h"
-#include "DireTypeTraits.h"
 #include "DireArrayDataStructureHandler.h"
 
 // Note: this macro does not support templates.
@@ -181,8 +180,7 @@ namespace DIRE_NS
 
 		[[nodiscard]] bool ErasePropertyImpl(TypeInfo const* pTypeInfo, DIRE_STRING_VIEW pName)
 		{
-			// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
-			std::byte* propertyAddr = reinterpret_cast<std::byte*>(this) - pTypeInfo->GetVptrOffset();
+			std::byte* propertyAddr = reinterpret_cast<std::byte*>(this);
 
 			// Test for either array or compound access and branch into the one seen first
 			// compound property syntax uses the standard "." accessor

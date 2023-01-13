@@ -252,7 +252,7 @@ namespace DIRE_NS
 			}
 
 			// Check if the element is assignable to make arrays of arrays work
-			if constexpr (std::is_assignable_v<ElementValueType, ElementValueType>)
+			if constexpr (std::is_assignable_v<ElementValueType&, ElementValueType>)
 			{
 				T* thisArray = static_cast<T*>(pArray);
 				(*thisArray)[pAtIndex] = ElementValueType();

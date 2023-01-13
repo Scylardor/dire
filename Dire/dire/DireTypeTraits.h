@@ -117,4 +117,27 @@ namespace DIRE_NS
 	{
 		using Self = CClass;
 	};
+
+
+	// This was inspired by https://stackoverflow.com/a/70701479/1987466 and https://gcc.godbolt.org/z/rrb1jdTrK
+	namespace SelfHelpers
+	{
+		template <typename T>
+		struct Reader
+		{
+			friend auto adl_GetSelfType(Reader<T>);
+		};
+
+		template <typename T, typename U>
+		struct Writer
+		{
+			friend auto adl_GetSelfType(Reader<T>) { return U{}; }
+		};
+
+		inline void adl_GetSelfType() {}
+
+		template <typename T>
+		using Read = std::remove_pointer_t<decltype(adl_GetSelfType(Reader<T>{})) > ;
+	}
+
 }

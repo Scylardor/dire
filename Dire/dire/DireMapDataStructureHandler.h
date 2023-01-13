@@ -11,13 +11,13 @@ namespace DIRE_NS
 
 	struct MapDataStructureHandler
 	{
-		using MapReadFptr = void const* (*)(void const*, DIRE_STRING_VIEW);
-		using MapUpdateFptr = void (*)(void*, DIRE_STRING_VIEW, void const*);
-		using MapCreateFptr = void* (*)(void*, DIRE_STRING_VIEW, void const*);
-		using MapBinaryCreateFptr = void* (*)(void*, void const*, void const*);
+		using MapReadFptr = const void * (*)(const void *, DIRE_STRING_VIEW);
+		using MapUpdateFptr = void (*)(void*, DIRE_STRING_VIEW, const void *);
+		using MapCreateFptr = void* (*)(void*, DIRE_STRING_VIEW, const void *);
+		using MapBinaryCreateFptr = void* (*)(void*, void const*, const void *);
 		using MapEraseFptr = void	(*)(void*, DIRE_STRING_VIEW);
 		using MapClearFptr = void	(*)(void*);
-		using MapSizeFptr = size_t(*)(void const*);
+		using MapSizeFptr = size_t(*)(const void *);
 		using MapValueHandlerFptr = DataStructureHandler(*)();
 		using MapElementReflectableIDFptr = unsigned (*)();
 		using MapKeyTypeFptr = Type(*)();
@@ -43,12 +43,12 @@ namespace DIRE_NS
 
 #if DIRE_USE_SERIALIZATION
 		using OpaqueSerializerType = void*;
-		using OpaqueMapType = void const*;
-		using OpaqueKeyType = void const*;
+		using OpaqueMapType = const void *;
+		using OpaqueKeyType = const void *;
 		using OpaqueValueType = OpaqueKeyType;
-		using KeyValuePairSerializeFptr = void (*)(OpaqueSerializerType, OpaqueKeyType, OpaqueValueType, MapDataStructureHandler const&, DataStructureHandler const&, DataStructureHandler const&);
+		using KeyValuePairSerializeFptr = void (*)(OpaqueSerializerType, OpaqueKeyType, OpaqueValueType, const MapDataStructureHandler &, const DataStructureHandler &, const DataStructureHandler &);
 		using MapSerializeForeachPairFptr = void (*)(OpaqueMapType, OpaqueSerializerType, KeyValuePairSerializeFptr);
-		using MapSerializeKeyToStringFptr = std::string(*)(OpaqueKeyType); // TODO: customize string type
+		using MapSerializeKeyToStringFptr = DIRE_STRING (*)(OpaqueKeyType);
 		MapSerializeForeachPairFptr	SerializeForEachPair = nullptr;
 		MapSerializeKeyToStringFptr	KeyToString = nullptr;
 #endif
@@ -96,15 +96,14 @@ namespace DIRE_NS
 			"In order to use Map-style reflection access, your type has to implement the following members with the same signature-style as std::map:"
 			"a key_type typedef, a mapped_type typedef, operator[], begin, end, find, an std::pair-like iterator type, erase, clear, size.");
 
-		static void const* MapRead(void const* pMap, std::string_view pKey)
+		static const void * MapRead(const void * pMap, DIRE_STRING_VIEW pKey)
 		{
-			T const* thisMap = static_cast<T const*>(pMap);
+			const T * thisMap = static_cast<const T *>(pMap);
 			if (thisMap == nullptr)
 			{
 				return nullptr;
 			}
-
-			KeyType const key = ReflectorConversions::from_chars<KeyType>(pKey);
+			const KeyType key = DIRE_NS::FromCharsConverter<KeyType>::Convert(pKey);
 			auto it = thisMap->find(key);
 			if (it == thisMap->end())
 			{
@@ -113,24 +112,24 @@ namespace DIRE_NS
 			return &it->second;
 		}
 
-		static void	MapUpdate(void* pMap, std::string_view pKey, void const* pNewData)
+		static void	MapUpdate(void* pMap, DIRE_STRING_VIEW pKey, const void * pNewData)
 		{
 			if (pMap == nullptr)
 			{
 				return;
 			}
 
-			ValueType* valuePtr = const_cast<ValueType*>((ValueType const*)MapRead(pMap, pKey));
+			ValueType* valuePtr = const_cast<ValueType*>((const ValueType *)MapRead(pMap, pKey));
 			if (valuePtr == nullptr) // key not found
 			{
 				return;
 			}
 
-			auto* newValue = static_cast<ValueType const*>(pNewData);
+			auto* newValue = static_cast<const ValueType *>(pNewData);
 			(*valuePtr) = *newValue;
 		}
 
-		static void* MapCreate(void* pMap, std::string_view pKey, void const* pInitData)
+		static void* MapCreate(void* pMap, DIRE_STRING_VIEW pKey, const void * pInitData)
 		{
 			if (pMap == nullptr)
 			{
@@ -138,7 +137,7 @@ namespace DIRE_NS
 			}
 
 			T* thisMap = static_cast<T*>(pMap);
-			KeyType const key = ReflectorConversions::from_chars<KeyType>(pKey);
+			const KeyType key = DIRE_NS::FromCharsConverter<KeyType>::Convert(pKey);
 
 			if (pInitData == nullptr)
 			{
@@ -146,12 +145,12 @@ namespace DIRE_NS
 				return &it->second;
 			}
 
-			ValueType const& initValue = *static_cast<ValueType const*>(pInitData);
+			const ValueType & initValue = *static_cast<const ValueType *>(pInitData);
 			auto [it, inserted] = thisMap->insert({ key, initValue });
 			return &it->second;
 		}
 
-		static void* MapBinaryKeyCreate(void* pMap, void const* pKey, void const* pInitData)
+		static void* MapBinaryKeyCreate(void* pMap, const void * pKey, const void * pInitData)
 		{
 			if (pMap == nullptr)
 			{
@@ -172,12 +171,12 @@ namespace DIRE_NS
 			return &it->second;
 		}
 
-		static void	MapErase(void* pMap, std::string_view pKey)
+		static void	MapErase(void* pMap, DIRE_STRING_VIEW pKey)
 		{
 			if (pMap != nullptr)
 			{
 				T* thisMap = static_cast<T*>(pMap);
-				KeyType const key = ReflectorConversions::from_chars<KeyType>(pKey);
+				const KeyType key = DIRE_NS::FromCharsConverter<KeyType>::Convert(pKey);
 
 				thisMap->erase(key);
 			}
@@ -192,11 +191,11 @@ namespace DIRE_NS
 			}
 		}
 
-		static size_t	MapSize(void const* pMap)
+		static size_t	MapSize(const void * pMap)
 		{
 			if (pMap != nullptr)
 			{
-				T const* thisMap = static_cast<T const*>(pMap);
+				const T * thisMap = static_cast<const T *>(pMap);
 				return thisMap->size();
 			}
 
@@ -266,7 +265,7 @@ namespace DIRE_NS
 		{
 			if (pMap != nullptr)
 			{
-				T const* thisMap = static_cast<T const*>(pMap);
+				const T * thisMap = static_cast<const T *>(pMap);
 				DataStructureHandler mapKeyHandler = MapKeyHandler();
 				DataStructureHandler mapValueHandler = MapValueHandler();
 				for (auto it = thisMap->begin(); it != thisMap->end(); ++it)
@@ -279,11 +278,11 @@ namespace DIRE_NS
 		static std::string	MapKeyToString(OpaqueKeyType pKey)
 		{
 			auto& keyRef = *static_cast<const KeyType*>(pKey);
-			return ReflectorConversions::to_string(keyRef);
+			return DIRE_NS::to_string(keyRef);
 		}
 #endif
 
-		static TypedMapDataStructureHandler const& GetInstance()
+		static const TypedMapDataStructureHandler & GetInstance()
 		{
 			static TypedMapDataStructureHandler instance{};
 			return instance;

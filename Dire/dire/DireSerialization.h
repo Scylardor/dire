@@ -4,6 +4,8 @@
 
 namespace DIRE_NS
 {
+	class Reflectable2;
+
 	class ISerializer
 	{
 	public:
