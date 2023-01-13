@@ -32,7 +32,7 @@ set(DIRE_SOURCE_DIR ${PROJECT_SOURCE_DIR}/${PROJECT_NAME}/${PROJECT_NAME})
 set(DIRE_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/${PROJECT_NAME})
 
 # Main target creation
-add_library(${PROJECT_NAME} INTERFACE # Dire is header-only: make it an interface
+add_library(${PROJECT_NAME} STATIC #TODO customize
 	${DIRE_SOURCE_DIR}/Dire.h
 	${DIRE_SOURCE_DIR}/DireMacros.h
 	${DIRE_SOURCE_DIR}/DireTypes.h
@@ -41,6 +41,7 @@ add_library(${PROJECT_NAME} INTERFACE # Dire is header-only: make it an interfac
 	${DIRE_SOURCE_DIR}/DireIntrusiveList.inl
 	${DIRE_SOURCE_DIR}/DireTypeInfo.h
 	${DIRE_SOURCE_DIR}/DireTypeInfo.inl
+	${DIRE_SOURCE_DIR}/DireTypeInfo.cpp
 	${DIRE_SOURCE_DIR}/DireTypeHandlers.h
 	${DIRE_SOURCE_DIR}/DireTypeHandlers.inl
 	${DIRE_SOURCE_DIR}/DireArrayDataStructureHandler.h
@@ -55,19 +56,19 @@ add_library(${PROJECT_NAME} INTERFACE # Dire is header-only: make it an interfac
 	${DIRE_SOURCE_DIR}/DireString.h
 	${DIRE_SOURCE_DIR}/DireString.inl
 	${DIRE_SOURCE_DIR}/DireTypeInfoDatabase.h
+	${DIRE_SOURCE_DIR}/DireTypeInfoDatabase.cpp
 	${DIRE_SOURCE_DIR}/DireSingleton.h
 	${DIRE_SOURCE_DIR}/DireStaticTypeCounter.h
 	${DIRE_SOURCE_DIR}/DireProperty.h
 	${DIRE_SOURCE_DIR}/DireProperty.inl
 	${DIRE_SOURCE_DIR}/DirePropertyMetadata.h
 	${DIRE_SOURCE_DIR}/DirePropertyMetadata.inl
+	${DIRE_SOURCE_DIR}/DireSubclass.h
 )
+set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 
 # Conditional Sources
 
-# CMake seems to be a bit weird in how they manage sources for INTERFACE libraries.
-# Declaring the target with an INTERFACE list of sources puts them in the lib, but adding more sources with INTERFACE scope propagates those in user targets, not in the lib target.
-# Fortunately, declaring them PRIVATE instead seems to work.
 if(${PROJECT_NAME}_SERIALIZATION_ENABLED)
 	target_sources(${PROJECT_NAME} PRIVATE
 		${DIRE_SOURCE_DIR}/DireSerialization.h
@@ -87,7 +88,7 @@ if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_BINAR
 endif()
 
 target_include_directories(${PROJECT_NAME}
-    INTERFACE # Need to use INTERFACE scope for an INTERFACE target.
+    PUBLIC
         $<INSTALL_INTERFACE:${PROJECT_NAME}>
         $<BUILD_INTERFACE:${DIRE_INCLUDE_DIR}>
 )
@@ -95,40 +96,37 @@ target_include_directories(${PROJECT_NAME}
 # RapidJSON dependency setup
 if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_USE_JSON_SERIALIZER)
 	include(CMake/Rapidjson.cmake)
-	# Need to use INTERFACE scope for an INTERFACE target.
-	add_rapidjson_dependency(rapidjson master ${PROJECT_NAME} INTERFACE)
+	add_rapidjson_dependency(rapidjson master ${PROJECT_NAME} PUBLIC)
 endif()
 
 
 # Defines
-target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_NS=${${PROJECT_NAME}_NAMESPACE})
-
-target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_USE_STD_STRING=1)
+target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_NS=${${PROJECT_NAME}_NAMESPACE})
 
 if(${${PROJECT_NAME}_STRING} STREQUAL "std::string")
-	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_USE_STD_STRING=1)
+	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_USE_STD_STRING=1)
 else()
-	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_STRING=${${PROJECT_NAME}_STRING})
+	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_STRING=${${PROJECT_NAME}_STRING})
 endif()
 
 if(${PROJECT_NAME}_REFLECTABLE_INSTANTIATE_WITH_DEFAULT_CONSTRUCTOR)
-	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_DEFAULT_CONSTRUCTOR_INSTANTIATE=1)
+	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_DEFAULT_CONSTRUCTOR_INSTANTIATE=1)
 endif()
 
 if(${PROJECT_NAME}_SERIALIZATION_ENABLED)
-	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_USE_SERIALIZATION=1)
+	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_USE_SERIALIZATION=1)
 endif()
 
 if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_JSON_SERIALIZER_ENABLED)
-	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_USE_JSON_SERIALIZATION=1)
+	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_USE_JSON_SERIALIZATION=1)
 endif()
 
 if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_BINARY_SERIALIZER_ENABLED)
-	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_USE_BINARY_SERIALIZATION=1)
+	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_USE_BINARY_SERIALIZATION=1)
 endif()
 
 if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZABLE_PROPERTIES_BY_DEFAULT)
-	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_SERIALIZABLE_PROPERTIES_BY_DEFAULT=1)
+	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_SERIALIZABLE_PROPERTIES_BY_DEFAULT=1)
 endif()
 
 # Unit tests
@@ -139,8 +137,10 @@ if(${PROJECT_NAME}_BUILD_UNIT_TESTS)
 		tests/EnumTests.cpp
 		tests/FunctionTests.cpp
 		tests/PropertyTests.cpp
-		tests/SubclassTests.cpp
+		tests/ReflectableTests.cpp
 		tests/TypeTraitsTests.cpp
+		tests/TypeInfoDatabaseTests.cpp
+		tests/TestClasses.h
 	)
 
 	# Catch2 dependency setup

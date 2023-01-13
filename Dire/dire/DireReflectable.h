@@ -48,8 +48,8 @@ namespace DIRE_NS
 				return true;
 			}
 
-			TypeInfo const& parentTypeInfo = TRefl::GetClassTypeInfo();
-			return (parentTypeInfo.GetID() == myReflectableClassID || parentTypeInfo.IsParentOf(myReflectableClassID));
+			TypeInfo const& parentTypeInfo = TRefl::GetClassReflectableTypeInfo();
+			return (parentTypeInfo.GetID() == GetReflectableClassID() || parentTypeInfo.IsParentOf(GetReflectableClassID()));
 		}
 
 		template <typename T = Reflectable2>
@@ -57,13 +57,13 @@ namespace DIRE_NS
 		{
 			static_assert(std::is_base_of_v<Reflectable2, T>, "Clone only works with Reflectable-derived class types.");
 
-			TypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
+			TypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(GetReflectableClassID());
 			if (thisTypeInfo == nullptr)
 			{
 				return nullptr;
 			}
 
-			Reflectable2* clone = Reflector3::GetSingleton().TryInstantiate(myReflectableClassID, {});
+			Reflectable2* clone = Reflector3::GetSingleton().TryInstantiate(GetReflectableClassID(), {});
 			if (clone == nullptr)
 			{
 				return nullptr;

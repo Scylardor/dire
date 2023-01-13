@@ -48,6 +48,7 @@ namespace DIRE_NS
 
 		[[nodiscard]] unsigned	GetReflectableID() const { return myReflectableID; } // TODO: ReflectableID
 
+		[[nodiscard]] CopyConstructorPtr	GetCopyConstructorFunction() const { return myCopyCtor; } // TODO: ReflectableID
 
 #if DIRE_USE_SERIALIZATION
 		virtual void	SerializeAttributes(class ISerializer& pSerializer) const = 0;
