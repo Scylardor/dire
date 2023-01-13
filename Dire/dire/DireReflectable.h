@@ -31,14 +31,12 @@ namespace DIRE_NS
 
 	static const ReflectableID INVALID_REFLECTABLE_ID = (ReflectableID)-1;
 
-	struct Reflectable2
+	class Reflectable2
 	{
+	public:
 		using ClassID = unsigned;
 
-		[[nodiscard]] ClassID	GetReflectableClassID() const
-		{
-			return myReflectableClassID;
-		}
+		[[nodiscard]] virtual ClassID	GetReflectableClassID() const = 0;
 
 		template <typename TRefl>
 		[[nodiscard]] bool	IsA() const
@@ -85,12 +83,12 @@ namespace DIRE_NS
 
 		[[nodiscard]] IntrusiveLinkedList<PropertyTypeInfo> const& GetProperties() const
 		{
-			return Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID)->GetPropertyList();
+			return Reflector3::GetSingleton().GetTypeInfo(GetReflectableClassID())->GetPropertyList();
 		}
 
 		[[nodiscard]] IntrusiveLinkedList<FunctionInfo> const& GetMemberFunctions() const
 		{
-			return Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID)->GetFunctionList();
+			return Reflector3::GetSingleton().GetTypeInfo(GetReflectableClassID())->GetFunctionList();
 		}
 
 		template <typename T>
@@ -108,10 +106,10 @@ namespace DIRE_NS
 		template <typename TProp = void>
 		[[nodiscard]] TProp const* GetProperty(DIRE_STRING_VIEW pName) const
 		{
-			TypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
+			TypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(GetReflectableClassID());
 
 			// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
-			std::byte const* propertyAddr = reinterpret_cast<std::byte const*>(this) - thisTypeInfo->GetVptrOffset();
+			std::byte const* propertyAddr = reinterpret_cast<std::byte const*>(this);// TODO: Remove -thisTypeInfo->GetVptrOffset();
 
 			// Test for either array, map or compound access and branch into the one seen first
 			// compound property syntax uses the standard "." accessor
@@ -137,13 +135,13 @@ namespace DIRE_NS
 
 				if (PropertyTypeInfo const* thisProp = thisTypeInfo->FindPropertyInHierarchy(propName))
 				{
-					if (thisProp->type == Type::Array)
+					if (thisProp->GetMetatype() == Type::Array)
 					{
 						int const propIndex = atoi(pName.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
 						pName.remove_prefix(rightBrackPos + 1);
 						return GetArrayProperty<TProp>(thisTypeInfo, propName, pName, propIndex, propertyAddr);
 					}
-					else if (thisProp->type == Type::Map)
+					else if (thisProp->GetMetatype() == Type::Map)
 					{
 						auto const keyStartPos = leftBrackPos + 1;
 						DIRE_STRING_VIEW key(pName.data() + keyStartPos, rightBrackPos - keyStartPos);
@@ -157,9 +155,9 @@ namespace DIRE_NS
 			// Otherwise: search for a "normal" property
 			for (PropertyTypeInfo const& prop : thisTypeInfo->GetPropertyList())
 			{
-				if (prop.name == pName)
+				if (prop.GetName() == pName)
 				{
-					return reinterpret_cast<TProp const*>(propertyAddr + prop.offset);
+					return reinterpret_cast<TProp const*>(propertyAddr + prop.GetOffset());
 				}
 			}
 
@@ -167,7 +165,7 @@ namespace DIRE_NS
 			auto [parentClass, parentProperty] = thisTypeInfo->FindParentClassProperty(pName);
 			if (parentClass != nullptr && parentProperty != nullptr) // A parent property was found
 			{
-				return reinterpret_cast<TProp const*>(propertyAddr + parentProperty->offset);
+				return reinterpret_cast<TProp const*>(propertyAddr + parentProperty->GetOffset());
 			}
 
 			return nullptr;
@@ -175,7 +173,7 @@ namespace DIRE_NS
 
 		[[nodiscard]] bool EraseProperty(DIRE_STRING_VIEW pName)
 		{
-			TypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
+			TypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(GetReflectableClassID());
 
 			return ErasePropertyImpl(thisTypeInfo, pName);
 		}
@@ -323,7 +321,7 @@ namespace DIRE_NS
 				return nullptr; // There was no property with the given name.
 			}
 
-			pPropPtr += thisProp->offset;
+			pPropPtr += thisProp->GetOffset();
 			ArrayDataStructureHandler const* arrayHandler = thisProp->GetArrayHandler();
 
 			return RecurseFindArrayProperty<TProp>(arrayHandler, pName, pRemainingPath, pArrayIdx, pPropPtr);
@@ -390,7 +388,7 @@ namespace DIRE_NS
 					return nullptr;
 				}
 
-				ArrayDataStructureHandler const* elementHandler = pArrayHandler->ElementHandler().ArrayHandler;
+				ArrayDataStructureHandler const* elementHandler = pArrayHandler->ElementHandler().GetArrayHandler();
 
 				if (elementHandler == nullptr)
 				{
@@ -411,15 +409,14 @@ namespace DIRE_NS
 		{
 			// Find out the type of handler we are interested in
 			void const* value = nullptr;
-			if (pDataStructureHandler.ArrayHandler)
+			if (pDataStructureHandler.GetArrayHandler())
 			{
-				size_t index;
-				std::from_chars(pKey.data(), pKey.data() + pKey.size(), index); // TODO: check for errors
-				value = pDataStructureHandler.ArrayHandler->Read(pPropPtr, index);
+				size_t index = FromCharsConverter<size_t>::Convert(pKey); // TODO: check for errors
+				value = pDataStructureHandler.GetArrayHandler()->Read(pPropPtr, index);
 			}
-			else if (pDataStructureHandler.MapHandler)
+			else if (pDataStructureHandler.GetMapHandler())
 			{
-				value = pDataStructureHandler.MapHandler->Read(pPropPtr, pKey);
+				value = pDataStructureHandler.GetMapHandler()->Read(pPropPtr, pKey);
 			}
 
 			if (value == nullptr)
@@ -437,7 +434,7 @@ namespace DIRE_NS
 
 			if (pRemainingPath[0] == '.') // it's a nested structure
 			{
-				unsigned valueID = pDataStructureHandler.ArrayHandler ? pDataStructureHandler.ArrayHandler->ElementReflectableID() : pDataStructureHandler.MapHandler->ValueReflectableID();
+				unsigned valueID = pDataStructureHandler.GetArrayHandler() ? pDataStructureHandler.GetArrayHandler()->ElementReflectableID() : pDataStructureHandler.GetMapHandler()->ValueReflectableID();
 				TypeInfo const* valueTypeInfo = Reflector3::GetSingleton().GetTypeInfo(valueID);
 				auto nextDelimiterPos = pRemainingPath.find_first_of(".[", 1);
 				DIRE_STRING_VIEW propName = pRemainingPath.substr(1, nextDelimiterPos == pRemainingPath.npos ? nextDelimiterPos : nextDelimiterPos - 1);
@@ -477,13 +474,13 @@ namespace DIRE_NS
 				pKey = pRemainingPath.substr(1, rightBracketPos - 1);
 				pRemainingPath.remove_prefix(rightBracketPos + 1);
 
-				if (pDataStructureHandler.ArrayHandler)
+				if (pDataStructureHandler.GetArrayHandler())
 				{
-					return RecurseArrayMapProperty<TProp>(pDataStructureHandler.ArrayHandler->ElementHandler(), valueAsBytes, pRemainingPath, pKey);
+					return RecurseArrayMapProperty<TProp>(pDataStructureHandler.GetArrayHandler()->ElementHandler(), valueAsBytes, pRemainingPath, pKey);
 				}
-				else if (pDataStructureHandler.MapHandler)
+				else if (pDataStructureHandler.GetMapHandler())
 				{
-					return RecurseArrayMapProperty<TProp>(pDataStructureHandler.MapHandler->ValueHandler(), valueAsBytes, pRemainingPath, pKey);
+					return RecurseArrayMapProperty<TProp>(pDataStructureHandler.GetMapHandler()->ValueHandler(), valueAsBytes, pRemainingPath, pKey);
 				}
 			}
 
@@ -500,9 +497,9 @@ namespace DIRE_NS
 				return nullptr; // There was no property with the given name.
 			}
 
-			pPropPtr += thisProp->offset;
+			pPropPtr += thisProp->GetOffset();
 			// Find out the type of handler we are interested in
-			AbstractPropertyHandler const& dataStructureHandler = thisProp->GetDataStructureHandler();
+			DataStructureHandler const& dataStructureHandler = thisProp->GetDataStructureHandler();
 			return RecurseArrayMapProperty<TProp>(dataStructureHandler, pPropPtr, pRemainingPath, pKey);
 		}
 
@@ -522,7 +519,7 @@ namespace DIRE_NS
 			pFullPath.remove_prefix(std::min(pName.size() + 1, pFullPath.size()));
 
 			// Now, add the offset of the compound to the total offset
-			propertyAddr += (int)thisProp->offset;
+			propertyAddr += (int)thisProp->GetOffset();
 
 			// Do we need to go deeper?
 			if (pFullPath.empty())
@@ -532,7 +529,7 @@ namespace DIRE_NS
 			}
 
 			// Yes: recurse one more time, this time using this property's type info (needs to be Reflectable)
-			TypeInfo const* nestedTypeInfo = Reflector3::GetSingleton().GetTypeInfo(thisProp->reflectableID);
+			TypeInfo const* nestedTypeInfo = Reflector3::GetSingleton().GetTypeInfo(thisProp->GetReflectableID());
 			if (nestedTypeInfo != nullptr)
 			{
 				pTypeInfoOwner = nestedTypeInfo;
@@ -660,7 +657,7 @@ namespace DIRE_NS
 
 		[[nodiscard]] FunctionInfo const* GetFunction(DIRE_STRING_VIEW pMemberFuncName) const
 		{
-			TypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
+			TypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(GetReflectableClassID());
 			for (FunctionInfo const& aFuncInfo : thisTypeInfo->GetFunctionList())
 			{
 				if (aFuncInfo.GetName() == pMemberFuncName)
@@ -706,21 +703,6 @@ namespace DIRE_NS
 			}
 		}
 
-		template <typename T>
-		friend struct ReflectableClassIDSetter2;
-
-	protected:
-		void	SetReflectableClassID(ClassID newClassID)
-		{
-			myReflectableClassID = newClassID;
-		}
-
-	public:
-
-		DIRE_ATTORNEY(SetReflectableClassID);
-
-	private:
-		ClassID	myReflectableClassID{ 0x2a2a };
 	};
 
 }
@@ -743,12 +725,16 @@ namespace DIRE_NS
 		constexpr auto DIRE_SelfTypeHelper() -> decltype(DIRE_NS::SelfHelpers::Writer<DIRE_SelfTypeTag, decltype(this)>{}); \
 		using Self = DIRE_NS::SelfHelpers::Read<DIRE_SelfTypeTag>; \
 		using Super = DIRE_NS::TypeInfoHelper<Self>::Super; \
-		inline static DIRE_NS::TypedTypeInfo<Self, false>	DIRE_TypeInfo{ DIRE_NS::TypeInfoHelper<Self>::TypeName }; \
-		static DIRE_NS::TypeInfo const& GetClassReflectableTypeInfo()\
+		inline static DIRE_NS::TypedTypeInfo<Self, DIRE_DEFAULT_CONSTRUCTOR_INSTANTIATE>	DIRE_TypeInfo{ DIRE_NS::TypeInfoHelper<Self>::TypeName }; \
+		static const DIRE_NS::TypeInfo & GetClassReflectableTypeInfo()\
 		{\
 			return DIRE_TypeInfo; \
 		}\
 		static DIRE_NS::TypeInfo& EditClassReflectableTypeInfo()\
 		{\
 			return DIRE_TypeInfo; \
+		}\
+		[[nodiscard]] virtual ClassID	GetReflectableClassID() const override\
+		{\
+			return GetClassReflectableTypeInfo().GetID();\
 		}

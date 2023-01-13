@@ -13,7 +13,7 @@ namespace DIRE_NS
 {
 	using ReflectableID = unsigned;
 	class TypeInfo;
-	struct Reflectable2;
+	class Reflectable2;
 
 	class ReflectableFactory
 	{

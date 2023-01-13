@@ -154,10 +154,64 @@ dire_reflectable(struct c, b)
 };
 
 
-TEST_CASE("GetProperty", "[Property]")
+TEST_CASE("GetProperty Simple", "[Property]")
 {
+	c superC;
+
+	// direct property
+	unsigned const* compint = superC.GetProperty<unsigned>("ctoto");
+	assert(*compint == 0xdeadbeef);
+
+
+	// inherited property
+
+	// in compound
+
+	// in array
+
+	// in multiarray
+
+	// in nested compound
+
+	// nested arrays in compounds
+
+	// non existing
+}
+
+
+TEST_CASE("GetProperty Array", "[Property]")
+{
+	c superC;
+
+	// direct property
+
+	// inherited
+
+	// in multiarray
+
+	// in nested compound
+
+	// nested arrays in compounds
 
 }
+
+
+TEST_CASE("GetProperty Map", "[Property]")
+{
+	c superC;
+
+	// direct property
+
+	// inherited
+
+	// in nested compound
+
+	// nested map in compounds
+
+
+}
+
+
 
 
 TEST_CASE("SetProperty", "[Property]")

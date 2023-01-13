@@ -17,10 +17,9 @@ namespace DIRE_NS
 		TypeInfo() = default; // TODO: remove
 
 		TypeInfo(const char * pTypename) :
+			ReflectableID(Reflector3::EditSingleton().RegisterTypeInfo(this)),
 			TypeName(pTypename)
-		{
-			ReflectableID = Reflector3::EditSingleton().RegisterTypeInfo(this);
-		}
+		{}
 
 		void	PushTypeInfo(PropertyTypeInfo& pNewTypeInfo)
 		{
@@ -281,7 +280,5 @@ namespace DIRE_NS
 	{\
 		return DIRE_TypeInfo;\
 	}
-//	mutable ReflectableClassIDSetter2<Self> structname##_TYPEINFO_ID_SETTER{this}; // TODO: fix this "structname"
-// I had to use mutable, otherwise the MapUpdate function breaks compilation because we try to copy assign. Maybe try to find a better way
 
 #include "DireProperty.h"

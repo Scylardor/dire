@@ -1,6 +1,7 @@
 #pragma once
 
 #include <type_traits> // enable_if
+#include <charconv> // from_chars
 
 /* If user says it's ok to use std::string, include std::string and use it everywhere we need a dynamic string */
 #if DIRE_USE_STD_STRING
@@ -56,7 +57,7 @@ namespace DIRE_NS
 			}
 			else
 			{
-				auto [unusedPtr, error] { std::from_chars(pChars.data(), pChars.data() + pChars.size(), result) };
+				auto [unusedPtr, error] { ::std::from_chars(pChars.data(), pChars.data() + pChars.size(), result) };
 				(void)unusedPtr;
 			}
 

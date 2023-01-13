@@ -22,6 +22,7 @@ option(${PROJECT_NAME}_SERIALIZABLE_PROPERTIES_BY_DEFAULT "If true, Dire propert
 
 set(${PROJECT_NAME}_NAMESPACE "dire" CACHE STRING "Namespace the DIRE library will use (in case of a naming conflict)")
 set(${PROJECT_NAME}_STRING "std::string" CACHE STRING "Type the DIRE library should use for standard dynamic string manipulation.")
+set(${PROJECT_NAME}_REFLECTABLE_INSTANTIATE_WITH_DEFAULT_CONSTRUCTOR "If on, default-constructible types derived from Reflectable will automatically register their default constructor as a Reflectable instantiator function." ON)
 
 option(${PROJECT_NAME}_BUILD_UNIT_TESTS "Builds the unit tests of the DIRE library (for library developers)." OFF)
 set(${PROJECT_NAME}_TESTS_CATCH_VERSION "v3.2.1" CACHE STRING "Version of Catch2 library downloaded from Github (for library developers).")
@@ -101,21 +102,31 @@ endif()
 
 # Defines
 target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_NS=${${PROJECT_NAME}_NAMESPACE})
+
 target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_USE_STD_STRING=1)
+
 if(${${PROJECT_NAME}_STRING} STREQUAL "std::string")
 	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_USE_STD_STRING=1)
 else()
 	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_STRING=${${PROJECT_NAME}_STRING})
 endif()
+
+if(${PROJECT_NAME}_REFLECTABLE_INSTANTIATE_WITH_DEFAULT_CONSTRUCTOR)
+	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_DEFAULT_CONSTRUCTOR_INSTANTIATE=1)
+endif()
+
 if(${PROJECT_NAME}_SERIALIZATION_ENABLED)
 	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_USE_SERIALIZATION=1)
 endif()
+
 if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_JSON_SERIALIZER_ENABLED)
 	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_USE_JSON_SERIALIZATION=1)
 endif()
+
 if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_BINARY_SERIALIZER_ENABLED)
 	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_USE_BINARY_SERIALIZATION=1)
 endif()
+
 if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZABLE_PROPERTIES_BY_DEFAULT)
 	target_compile_definitions(${PROJECT_NAME} INTERFACE DIRE_SERIALIZABLE_PROPERTIES_BY_DEFAULT=1)
 endif()
