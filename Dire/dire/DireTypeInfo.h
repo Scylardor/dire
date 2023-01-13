@@ -41,6 +41,8 @@ namespace DIRE_NS
 
 		[[nodiscard]] size_t	GetSize() const { return mySize; }
 
+		[[nodiscard]] unsigned	GetReflectableID() const { return myReflectableID; } // TODO: ReflectableID
+
 
 #if DIRE_USE_SERIALIZATION
 		virtual void	SerializeAttributes(class ISerializer& pSerializer) const = 0;
@@ -68,15 +70,15 @@ namespace DIRE_NS
 		{
 			if constexpr (HasMapSemantics_v<TProp>)
 			{
-				myDataStructurePropertyHandler.MapHandler = &TypedMapDataStructureHandler<TProp>::GetInstance();
+				myDataStructurePropertyHandler = DataStructureHandler(&TypedMapDataStructureHandler<TProp>::GetInstance());
 			}
 			else if constexpr (HasArraySemantics_v<TProp>)
 			{
-				myDataStructurePropertyHandler.ArrayHandler = &TypedArrayDataStructureHandler<TProp>::GetInstance();
+				myDataStructurePropertyHandler = DataStructureHandler(&TypedArrayDataStructureHandler<TProp>::GetInstance());
 			}
 			else if constexpr (std::is_base_of_v<Enum, TProp>)
 			{
-				myDataStructurePropertyHandler.EnumHandler = &TypedEnumDataStructureHandler<TProp>::GetInstance();
+				myDataStructurePropertyHandler = DataStructureHandler(&TypedEnumDataStructureHandler<TProp>::GetInstance());
 			}
 		}
 
@@ -142,7 +144,6 @@ namespace DIRE_NS
 		// I guess we should have a map of Type->ClassID to be able to easily find the class ID...
 		// without duplicating this information in all the type info structures of every property of the same type.
 		unsigned		myReflectableID = (unsigned)-1;
-
 	};
 
 

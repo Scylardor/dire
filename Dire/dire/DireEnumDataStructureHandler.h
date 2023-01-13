@@ -4,13 +4,12 @@
 
 namespace DIRE_NS
 {
-	class EnumDataStructureHandler
+	struct EnumDataStructureHandler
 	{
 		using EnumToStringFptr = const char* (*)(const void*);
 		using SetFromStringFptr = void (*)(const char*, void*);
 		using EnumTypeFptr = Type(*)();
 
-	protected:
 		EnumToStringFptr	EnumToString = nullptr;
 		SetFromStringFptr	SetFromString = nullptr;
 		EnumTypeFptr		EnumType = nullptr;

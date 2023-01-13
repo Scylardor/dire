@@ -73,7 +73,7 @@ case Type::TypeEnum:\
 			}
 		}
 
-		void	SerializeArrayValue(void const* pPropPtr, ArrayPropertyCRUDHandler const* pArrayHandler);
+		void	SerializeArrayValue(void const* pPropPtr, ArrayDataStructureHandler const* pArrayHandler);
 
 		void	SerializeMapValue(void const* pPropPtr, MapPropertyCRUDHandler const* pMapHandler);
 

@@ -2,10 +2,31 @@
 #include <cassert>
 #include <cstdlib> // atoi
 #include <cstddef> // std::byte
-#include "DireString.h"
+
+#include "DireTypeInfo.h"
+#include "DireMacros.h"
+#include "DireTypeTraits.h"
+#include "DireArrayDataStructureHandler.h"
+
+// Note: this macro does not support templates.
+#define DIRE_ATTORNEY(MemberFunc) \
+	using ClientType = ::DIRE_NS::SelfTypeDetector<decltype(&MemberFunc)>::Self;\
+	struct DIRE_CONCAT(MemberFunc, _Attorney)\
+	{\
+		template <typename... Args>\
+		auto MemberFunc(::DIRE_NS::is_const_method<decltype(&ClientType::MemberFunc)>::ClassType& pClient, Args&&... pArgs)\
+		{\
+			return pClient.MemberFunc(std::forward<Args>(pArgs)...);\
+		}\
+	};\
+	friend DIRE_CONCAT(MemberFunc, _Attorney);
 
 namespace DIRE_NS
 {
+	template <typename T>
+	struct TypeInfoHelper
+	{};
+
 	using ReflectableID = unsigned;
 
 	static const ReflectableID INVALID_REFLECTABLE_ID = (ReflectableID)-1;
@@ -211,13 +232,13 @@ namespace DIRE_NS
 				return false; // There was no property with the given name.
 			}
 
-			pPropPtr += thisProp->offset;
-			ArrayPropertyCRUDHandler const* arrayHandler = thisProp->GetArrayHandler();
+			pPropPtr += thisProp->GetOffset();
+			ArrayDataStructureHandler const* arrayHandler = thisProp->GetArrayHandler();
 
 			return RecurseEraseArrayProperty(arrayHandler, pName, pRemainingPath, pArrayIdx, pPropPtr);
 		}
 
-		[[nodiscard]] bool RecurseEraseArrayProperty(ArrayPropertyCRUDHandler const* pArrayHandler, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, std::byte* pPropPtr)
+		[[nodiscard]] bool RecurseEraseArrayProperty(ArrayDataStructureHandler const* pArrayHandler, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, std::byte* pPropPtr)
 		{
 			if (pArrayHandler == nullptr || pArrayIdx >= pArrayHandler->Size(pPropPtr))
 			{
@@ -276,7 +297,7 @@ namespace DIRE_NS
 					return false;
 				}
 
-				ArrayPropertyCRUDHandler const* elementHandler = pArrayHandler->ElementHandler().ArrayHandler;
+				ArrayDataStructureHandler const* elementHandler = pArrayHandler->ElementHandler().GetArrayHandler();
 
 				if (elementHandler == nullptr)
 				{
@@ -303,14 +324,14 @@ namespace DIRE_NS
 			}
 
 			pPropPtr += thisProp->offset;
-			ArrayPropertyCRUDHandler const* arrayHandler = thisProp->GetArrayHandler();
+			ArrayDataStructureHandler const* arrayHandler = thisProp->GetArrayHandler();
 
 			return RecurseFindArrayProperty<TProp>(arrayHandler, pName, pRemainingPath, pArrayIdx, pPropPtr);
 		}
 
 
 		template <typename TProp>
-		[[nodiscard]] TProp const* RecurseFindArrayProperty(ArrayPropertyCRUDHandler const* pArrayHandler, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const
+		[[nodiscard]] TProp const* RecurseFindArrayProperty(ArrayDataStructureHandler const* pArrayHandler, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const
 		{
 			if (pArrayHandler == nullptr)
 			{
@@ -369,7 +390,7 @@ namespace DIRE_NS
 					return nullptr;
 				}
 
-				ArrayPropertyCRUDHandler const* elementHandler = pArrayHandler->ElementHandler().ArrayHandler;
+				ArrayDataStructureHandler const* elementHandler = pArrayHandler->ElementHandler().ArrayHandler;
 
 				if (elementHandler == nullptr)
 				{
@@ -386,7 +407,7 @@ namespace DIRE_NS
 		}
 
 		template <typename TProp>
-		[[nodiscard]] TProp const* RecurseArrayMapProperty(AbstractPropertyHandler const& pDataStructureHandler, std::byte const* pPropPtr, DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey) const
+		[[nodiscard]] TProp const* RecurseArrayMapProperty(DataStructureHandler const& pDataStructureHandler, std::byte const* pPropPtr, DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey) const
 		{
 			// Find out the type of handler we are interested in
 			void const* value = nullptr;
@@ -557,7 +578,7 @@ namespace DIRE_NS
 			pFullPath.remove_prefix(std::min(pName.size() + 1, pFullPath.size()));
 
 			// Now, add the offset of the compound to the total offset
-			propertyAddr += (int)thisProp->offset;
+			propertyAddr += (int)thisProp->GetOffset();
 
 			// Can we go deeper?
 			if (pFullPath.empty())
@@ -567,7 +588,7 @@ namespace DIRE_NS
 			}
 
 			// Yes: recurse one more time, this time using this property's type info (needs to be Reflectable)
-			pTypeInfoOwner = Reflector3::GetSingleton().GetTypeInfo(thisProp->reflectableID);
+			pTypeInfoOwner = Reflector3::GetSingleton().GetTypeInfo(thisProp->GetReflectableID());
 			if (pTypeInfoOwner == nullptr)
 			{
 				return false; // This type isn't reflectable? Nothing I can do for you...
@@ -642,7 +663,7 @@ namespace DIRE_NS
 			TypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(myReflectableClassID);
 			for (FunctionInfo const& aFuncInfo : thisTypeInfo->GetFunctionList())
 			{
-				if (aFuncInfo.name == pMemberFuncName)
+				if (aFuncInfo.GetName() == pMemberFuncName)
 				{
 					return &aFuncInfo;
 				}
@@ -696,10 +717,38 @@ namespace DIRE_NS
 
 	public:
 
-		DECLARE_ATTORNEY(SetReflectableClassID);
+		DIRE_ATTORNEY(SetReflectableClassID);
 
 	private:
 		ClassID	myReflectableClassID{ 0x2a2a };
 	};
 
 }
+
+
+
+#define dire_reflectable(ObjectType, ...) \
+	ObjectType;\
+	template <>\
+	struct DIRE_NS::TypeInfoHelper<ObjectType>\
+	{\
+		using Super = DIRE_VA_MACRO(DIRE_FIRST_TYPE_OR_REFLECTABLE_, __VA_ARGS__);\
+		inline static char const* TypeName = DIRE_STRINGIZE(ObjectType);\
+	};\
+	ObjectType : DIRE_VA_MACRO(DIRE_INHERITANCE_LIST_OR_REFLECTABLE, __VA_ARGS__)
+
+
+#define DIRE_REFLECTABLE_INFO() \
+	struct DIRE_SelfTypeTag {}; \
+		constexpr auto DIRE_SelfTypeHelper() -> decltype(DIRE_NS::SelfHelpers::Writer<DIRE_SelfTypeTag, decltype(this)>{}); \
+		using Self = DIRE_NS::SelfHelpers::Read<DIRE_SelfTypeTag>; \
+		using Super = DIRE_NS::TypeInfoHelper<Self>::Super; \
+		inline static DIRE_NS::TypedTypeInfo<Self, false>	DIRE_TypeInfo{ DIRE_NS::TypeInfoHelper<Self>::TypeName }; \
+		static DIRE_NS::TypeInfo const& GetClassReflectableTypeInfo()\
+		{\
+			return DIRE_TypeInfo; \
+		}\
+		static DIRE_NS::TypeInfo& EditClassReflectableTypeInfo()\
+		{\
+			return DIRE_TypeInfo; \
+		}

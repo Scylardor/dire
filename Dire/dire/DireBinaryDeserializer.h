@@ -34,7 +34,7 @@ namespace DIRE_NS
 			return dataPtr;
 		}
 
-		void	DeserializeArrayValue(void* pPropPtr, ArrayPropertyCRUDHandler const* pArrayHandler) const;
+		void	DeserializeArrayValue(void* pPropPtr, ArrayDataStructureHandler const* pArrayHandler) const;
 
 		void	DeserializeMapValue(void* pPropPtr, MapPropertyCRUDHandler const* pMapHandler) const;
 

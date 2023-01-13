@@ -2,16 +2,33 @@
 
 namespace DIRE_NS
 {
-	class ArrayDataStructureHandler;
-	class MapDataStructureHandler;
-	class EnumDataStructureHandler;
+	struct ArrayDataStructureHandler;
+	struct MapDataStructureHandler;
+	struct EnumDataStructureHandler;
 
 	class DataStructureHandler
 	{
 	public:
-		const ArrayDataStructureHandler *	GetArrayHandler() const { return ArrayHandler; }
-		const MapDataStructureHandler *		GetMapHandler() const { return MapHandler; }
-		const EnumDataStructureHandler *	GetEnumHandler() const { return EnumHandler; }
+		DataStructureHandler() = default;
+		DataStructureHandler(const ArrayDataStructureHandler* pArrayHandler, const MapDataStructureHandler* pMapHandler, const EnumDataStructureHandler* pEnumHandler) :
+			ArrayHandler(pArrayHandler), MapHandler(pMapHandler), EnumHandler(pEnumHandler)
+		{}
+		DataStructureHandler(const ArrayDataStructureHandler * pArrayHandler) :
+			ArrayHandler(pArrayHandler)
+		{}
+
+		DataStructureHandler(const MapDataStructureHandler* pMapHandler) :
+			MapHandler(pMapHandler)
+		{}
+
+		DataStructureHandler(const EnumDataStructureHandler* pEnumHandler) :
+			EnumHandler(pEnumHandler)
+		{}
+
+
+		[[nodiscard]] const ArrayDataStructureHandler*	GetArrayHandler() const { return ArrayHandler; }
+		[[nodiscard]] const MapDataStructureHandler  *	GetMapHandler() const { return MapHandler; }
+		[[nodiscard]] const EnumDataStructureHandler *	GetEnumHandler() const { return EnumHandler; }
 
 	private:
 		const ArrayDataStructureHandler *	ArrayHandler = nullptr;

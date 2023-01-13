@@ -16,7 +16,7 @@ namespace DIRE_NS
 
 	private:
 
-		void	DeserializeArrayValue(const rapidjson::Value& pVal, void* pPropPtr, ArrayPropertyCRUDHandler const* pArrayHandler) const;
+		void	DeserializeArrayValue(const rapidjson::Value& pVal, void* pPropPtr, ArrayDataStructureHandler const* pArrayHandler) const;
 
 		void	DeserializeMapValue(const rapidjson::Value& pVal, void* pPropPtr, MapPropertyCRUDHandler const* pMapHandler) const;
 

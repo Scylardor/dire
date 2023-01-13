@@ -2,13 +2,14 @@
 
 #include "DireTypeHandlers.h"
 #include "DireEnumDataStructureHandler.h"
+#include "DireMapDataStructureHandler.h"
 #include "DireTypes.h"
 
 namespace DIRE_NS
 {
 	class DataStructureHandler;
 
-	class ArrayDataStructureHandler
+	struct ArrayDataStructureHandler
 	{
 		using ArrayReadFptr = void const* (*)(void const*, size_t);
 		using ArrayUpdateFptr = void (*)(void*, size_t, void const*);
@@ -21,7 +22,6 @@ namespace DIRE_NS
 		using ArrayElementType = Type(*)();
 		using ArrayElementSize = size_t(*)();
 
-	protected:
 		ArrayReadFptr	Read = nullptr;
 		ArrayUpdateFptr Update = nullptr;
 		ArrayCreateFptr	Create = nullptr;
@@ -39,10 +39,9 @@ namespace DIRE_NS
 	struct TypedArrayDataStructureHandler
 	{};
 
-	// Base class for reflecta
 	// Base class for reflectable properties that have brackets operator to be able to make operations on the underlying array
 	template <typename T>
-	class TypedArrayDataStructureHandler<T,
+	struct TypedArrayDataStructureHandler<T,
 		typename std::enable_if_t<HasArraySemantics_v<T> && !std::is_array_v<T>>> : ArrayDataStructureHandler
 	{
 		using RawElementType = decltype(std::declval<T>()[0]);
@@ -59,7 +58,7 @@ namespace DIRE_NS
 			Size = &ArraySize;
 			ElementHandler = &ArrayElementHandler;
 			ElementReflectableID = &ArrayElementReflectableID;
-			ElementType = [] { return FromActualTypeToEnumType<ElementValueType>::EnumType; };
+			ElementType = [] { return Type(FromActualTypeToEnumType<ElementValueType>::EnumType); };
 			ElementSize = [] { return sizeof(ElementValueType); };
 		}
 
@@ -140,21 +139,20 @@ namespace DIRE_NS
 
 		static DataStructureHandler	ArrayElementHandler()
 		{
-			DataStructureHandler handler;
-
 			if constexpr (HasMapSemantics_v<ElementValueType>)
 			{
-				handler.MapHandler = &TypedMapPropertyCRUDHandler2<ElementValueType>::GetInstance();
+				return DataStructureHandler(&TypedMapDataStructureHandler<ElementValueType>::GetInstance());
 			}
 			else if constexpr (HasArraySemantics_v<ElementValueType>)
 			{
-				handler.ArrayHandler = &TypedArrayDataStructureHandler<ElementValueType>::GetInstance();
+				return DataStructureHandler(&TypedArrayDataStructureHandler<ElementValueType>::GetInstance());
 			}
 			else if constexpr (std::is_base_of_v<Enum, ElementValueType>)
 			{
-				handler.EnumHandler = &TypedEnumDataStructureHandler<ElementValueType>::GetInstance();
+				return DataStructureHandler(&TypedEnumDataStructureHandler<ElementValueType>::GetInstance());
 			}
-			return handler;
+
+			return {};
 		}
 
 		static unsigned ArrayElementReflectableID() // TODO: ReflectableID
@@ -179,7 +177,7 @@ namespace DIRE_NS
 	// Base class for reflectable properties that are C-arrays to be able to make operations on the underlying array
 	template <typename T>
 	struct TypedArrayDataStructureHandler<T,
-		typename std::enable_if_t<std::is_array_v<T>>> : ArrayPropertyCRUDHandler
+		typename std::enable_if_t<std::is_array_v<T>>> : ArrayDataStructureHandler
 	{
 		using RawElementType = decltype(std::declval<T>()[0]);
 		// remove_reference_t removes the references and fixes the compile error "pointer to reference is illegal"
@@ -197,7 +195,7 @@ namespace DIRE_NS
 			Size = &ArraySize;
 			ElementHandler = &ArrayElementHandler;
 			ElementReflectableID = &ArrayElementReflectableID;
-			ElementType = [] { return FromActualTypeToEnumType<ElementValueType>::EnumType; };
+			ElementType = [] { return Type(FromActualTypeToEnumType<ElementValueType>::EnumType); };
 			ElementSize = [] { return sizeof(ElementValueType); };
 		}
 
@@ -286,23 +284,22 @@ namespace DIRE_NS
 		}
 
 		// TODO: Refactor because there is code duplication between the two handler types
-		static AbstractPropertyHandler	ArrayElementHandler()
+		static DataStructureHandler	ArrayElementHandler()
 		{
-			AbstractPropertyHandler handler;
-			handler.ArrayHandler = nullptr;
 			if constexpr (HasMapSemantics_v<ElementValueType>)
 			{
-				handler.MapHandler = &TypedMapPropertyCRUDHandler2<ElementValueType>::GetInstance();
+				return DataStructureHandler(&TypedMapDataStructureHandler<ElementValueType>::GetInstance());
 			}
 			else if constexpr (HasArraySemantics_v<ElementValueType>)
 			{
-				handler.ArrayHandler = &TypedArrayDataStructureHandler<ElementValueType>::GetInstance();
+				return DataStructureHandler(&TypedArrayDataStructureHandler<ElementValueType>::GetInstance());
 			}
 			else if constexpr (std::is_base_of_v<Enum, ElementValueType>)
 			{
-				handler.EnumHandler = &TypedEnumDataHandler<ElementValueType>::GetInstance();
+				return DataStructureHandler(&TypedEnumDataStructureHandler<ElementValueType>::GetInstance());
 			}
-			return handler;
+
+			return {};
 		}
 
 		static unsigned ArrayElementReflectableID() // TODO: ReflectableID

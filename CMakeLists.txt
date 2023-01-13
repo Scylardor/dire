@@ -125,6 +125,11 @@ if(${PROJECT_NAME}_BUILD_UNIT_TESTS)
 	add_executable(${PROJECT_NAME}_UnitTests
 		tests/BasicTests.cpp
 		tests/MacroTests.cpp
+		tests/EnumTests.cpp
+		tests/FunctionTests.cpp
+		tests/PropertyTests.cpp
+		tests/SubclassTests.cpp
+		tests/TypeTraitsTests.cpp
 	)
 
 	# Catch2 dependency setup

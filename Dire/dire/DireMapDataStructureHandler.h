@@ -1,13 +1,15 @@
 #pragma once
 
 #include "DireMacros.h"
-#include "DireReflectable.h"
+#include "DireTypes.h"
+#include "DireString.h"
+#include "DireTypeTraits.h"
 
 namespace DIRE_NS
 {
 	class DataStructureHandler;
 
-	class MapDataStructureHandler
+	struct MapDataStructureHandler
 	{
 		using MapReadFptr = void const* (*)(void const*, DIRE_STRING_VIEW);
 		using MapUpdateFptr = void (*)(void*, DIRE_STRING_VIEW, void const*);
@@ -24,7 +26,6 @@ namespace DIRE_NS
 		using MapSizeofValueFptr = MapSizeofKeyFptr;
 		using MapKeyDataHandlerFptr = DataStructureHandler(*)();
 
-	protected:
 		MapReadFptr		Read = nullptr;
 		MapUpdateFptr	Update = nullptr;
 		MapCreateFptr	Create = nullptr;
@@ -204,40 +205,38 @@ namespace DIRE_NS
 
 		static DataStructureHandler MapKeyHandler()
 		{
-			DataStructureHandler handler;
-
 			if constexpr (HasMapSemantics_v<KeyType>)
 			{
-				handler.MapHandler = &TypedMapDataStructureHandler<KeyType>::GetInstance();
+				return DataStructureHandler(&TypedMapDataStructureHandler<KeyType>::GetInstance());
 			}
 			else if constexpr (HasArraySemantics_v<KeyType>)
 			{
-				handler.ArrayHandler = &TypedArrayDataStructureHandler<KeyType>::GetInstance();
+				return DataStructureHandler(&TypedArrayDataStructureHandler<KeyType>::GetInstance());
 			}
 			else if constexpr (std::is_base_of_v<Enum, KeyType>)
 			{
-				handler.EnumHandler = &TypedEnumDataStructureHandler<KeyType>::GetInstance();
+				return DataStructureHandler(&TypedEnumDataStructureHandler<KeyType>::GetInstance());
 			}
-			return handler;
+
+			return {};
 		}
 
 		static DataStructureHandler MapValueHandler()
 		{
-			DataStructureHandler handler;
-
 			if constexpr (HasMapSemantics_v<ValueType>)
 			{
-				handler.MapHandler = &TypedMapDataStructureHandler<ValueType>::GetInstance();
+				return DataStructureHandler(&TypedMapDataStructureHandler<ValueType>::GetInstance());
 			}
 			else if constexpr (HasArraySemantics_v<ValueType>)
 			{
-				handler.ArrayHandler = &TypedArrayDataStructureHandler<ValueType>::GetInstance();
+				return DataStructureHandler(&TypedArrayDataStructureHandler<ValueType>::GetInstance());
 			}
 			else if constexpr (std::is_base_of_v<Enum, ValueType>)
 			{
-				handler.EnumHandler = &TypedEnumDataStructureHandler<ValueType>::GetInstance();
+				return DataStructureHandler(&TypedEnumDataStructureHandler<ValueType>::GetInstance());
 			}
-			return handler;
+
+			return {};
 		}
 
 		static unsigned MapElementReflectableID() // TODO: ReflectableID

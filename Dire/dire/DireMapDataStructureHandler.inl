@@ -4,7 +4,7 @@ namespace DIRE_NS
 {
 	class DataStructureHandler;
 
-	class ArrayPropertyCRUDHandler
+	class ArrayDataStructureHandler
 	{
 		using ArrayReadFptr = void const* (*)(void const*, size_t);
 		using ArrayUpdateFptr = void (*)(void*, size_t, void const*);
@@ -32,7 +32,7 @@ namespace DIRE_NS
 
 	class DataStructureHandler
 	{
-		ArrayPropertyCRUDHandler const* ArrayHandler = nullptr;
+		ArrayDataStructureHandler const* ArrayHandler = nullptr;
 		MapPropertyCRUDHandler const* MapHandler = nullptr;
 		struct EnumDataHandler const* EnumHandler = nullptr;
 	};

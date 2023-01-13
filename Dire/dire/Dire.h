@@ -204,7 +204,7 @@ namespace DIRE_NS
 		{
 			if constexpr (std::is_base_of_v<Reflectable2, T>)
 			{
-				RecursiveRegisterParentClasses <T, UseDefaultCtorForInstantiate, typename T::Super>(*this);
+				RecursiveRegisterParentClasses <typename T::Super>();
 			}
 
 			if constexpr (UseDefaultCtorForInstantiate && std::is_default_constructible_v<T>)
@@ -235,7 +235,6 @@ namespace DIRE_NS
 				RecursiveRegisterParentClasses<typename TParent::Super>();
 			}
 		}
-
 	};
 }
 
@@ -284,22 +283,5 @@ namespace DIRE_NS
 	}
 //	mutable ReflectableClassIDSetter2<Self> structname##_TYPEINFO_ID_SETTER{this}; // TODO: fix this "structname"
 // I had to use mutable, otherwise the MapUpdate function breaks compilation because we try to copy assign. Maybe try to find a better way
-
-#define DIRE_REFLECTABLE_INFO() \
-	struct DIRE_SelfTypeTag {}; \
-    constexpr auto DIRE_SelfTypeHelper() -> decltype(::SelfType::Writer<DIRE_SelfTypeTag, decltype(this)>{}); \
-    using Self = ::SelfType::Read<DIRE_SelfTypeTag>;\
-	using Super = TypeInfoHelper<Self>::Super;\
-	inline static TypedTypeInfo<Self, USE_DEFAULT_CONSTRUCTOR_INSTANTIATE()> DIRE_TypeInfo{TypeInfoHelper<Self>::TypeName};\
-	static TypeInfo const&	GetClassReflectableTypeInfo()\
-	{\
-		return DIRE_TypeInfo;\
-	}\
-	static TypeInfo&	EditClassReflectableTypeInfo()\
-	{\
-		return DIRE_TypeInfo;\
-	}\
-	//mutable ReflectableClassIDSetter2<Self> structname##_TYPEINFO_ID_SETTER{this}; // TODO: fix this "structname"
-	// I had to use mutable, otherwise the MapUpdate function breaks compilation because we try to copy assign. Maybe try to find a better way
 
 #include "DireProperty.h"

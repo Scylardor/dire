@@ -49,17 +49,7 @@
 	template <typename ContainerType>\
 	inline constexpr bool has_##FunctionName##_v = has_##FunctionName<ContainerType>::value;
 
-MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(ArrayBrackets, operator[], 0)
-MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(MapBrackets, operator[], ContainerType::key_type())
-
-MEMBER_FUNCTION_DETECTOR_PARAM2(insert, std::declval<ContainerType>().begin(), std::declval<ContainerType>()[0])
-MEMBER_FUNCTION_DETECTOR_PARAM1(erase, std::declval<ContainerType>().begin())
-MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(MapErase, erase, typename ContainerType::key_type())
-MEMBER_FUNCTION_DETECTOR(clear)
-MEMBER_FUNCTION_DETECTOR(size)
-
 // Inspired by https://stackoverflow.com/a/62203640/1987466
-
 #define DECLARE_HAS_TYPE_DETECTOR(DetectorName, DetectedType) \
 template <class T, class = void>\
 struct DetectorName\
@@ -76,7 +66,14 @@ inline constexpr bool DetectorName##_v = DetectorName<T>::type::value;
 
 namespace DIRE_NS
 {
-	class Enum;
+	MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(ArrayBrackets, operator[], 0)
+	MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(MapBrackets, operator[], ContainerType::key_type())
+
+	MEMBER_FUNCTION_DETECTOR_PARAM2(insert, std::declval<ContainerType>().begin(), std::declval<ContainerType>()[0])
+	MEMBER_FUNCTION_DETECTOR_PARAM1(erase, std::declval<ContainerType>().begin())
+	MEMBER_FUNCTION_ALIAS_DETECTOR_PARAM1(MapErase, erase, typename ContainerType::key_type())
+	MEMBER_FUNCTION_DETECTOR(clear)
+	MEMBER_FUNCTION_DETECTOR(size)
 
 	DECLARE_HAS_TYPE_DETECTOR(HasValueType, value_type)
 	DECLARE_HAS_TYPE_DETECTOR(HasKeyType, key_type)
@@ -94,4 +91,30 @@ namespace DIRE_NS
 	template<typename T>
 	using HasArraySemantics_t = std::enable_if_t<HasArraySemantics_v<T>>;
 
+
+	// Inspired by https://stackoverflow.com/a/59604594/1987466
+	template<typename method_t>
+	struct is_const_method;
+
+	template<typename CClass, typename ReturnType, typename ...ArgType>
+	struct is_const_method< ReturnType(CClass::*)(ArgType...)> {
+		static constexpr bool value = false;
+		using ClassType = CClass;
+
+	};
+
+	template<typename CClass, typename ReturnType, typename ...ArgType>
+	struct is_const_method< ReturnType(CClass::*)(ArgType...) const> {
+		static constexpr bool value = true;
+		using ClassType = std::add_const_t<CClass>;
+	};
+
+	template<typename method_t>
+	struct SelfTypeDetector;
+
+	template<typename CClass, typename ReturnType, typename ...ArgType>
+	struct SelfTypeDetector< ReturnType(CClass::*)(ArgType...)>
+	{
+		using Self = CClass;
+	};
 }

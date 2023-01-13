@@ -117,3 +117,16 @@ namespace DIRE_NS
     }; \
 	DIRE_NS::GetParenthesizedType<void  DIRE_LPAREN DIRE_UNPAREN(type) DIRE_RPAREN>::Type name{ std::make_from_tuple< DIRE_UNPAREN(type) >(name##_tag::ParamExtractor::CtorParameters(std::make_tuple(__VA_ARGS__))) };\
 	inline static DIRE_NS::ReflectProperty3<Self, DIRE_UNPAREN(type), name##_tag::ParamExtractor::MetadataType> name##_TYPEINFO_PROPERTY{DIRE_STRINGIZE(name), name##_tag::Offset() };
+
+#define DIRE_ARRAY_PROPERTY(type, name, size, ...) \
+	struct name##_tag\
+	{ \
+		using ParamsTupleType = decltype(std::make_tuple(__VA_ARGS__));\
+		using ParamExtractor = DIRE_NS::ParameterExtractor<ParamsTupleType>;\
+		static ptrdiff_t Offset()\
+		{ \
+			return offsetof(Self, name); \
+		} \
+	}; \
+	DIRE_NS::GetParenthesizedType<void DIRE_LPAREN DIRE_UNPAREN(type) DIRE_RPAREN>::Type name##size{ std::make_from_tuple< DIRE_UNPAREN(type) >(name##_tag::ParamExtractor::CtorParameters(std::make_tuple(__VA_ARGS__))) }; \
+	inline static DIRE_NS::ReflectProperty3<Self, DIRE_UNPAREN(type) ## size, name##_tag::ParamExtractor::MetadataType> name##_TYPEINFO_PROPERTY{ DIRE_STRINGIZE(name), name##_tag::Offset()};
