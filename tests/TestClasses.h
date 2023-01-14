@@ -6,6 +6,24 @@
 
 // Declare some structs to be able to create a hierarchy of reflectable types...
 
+namespace testNS
+{
+
+	dire_reflectable(struct Nested)
+	{
+		DIRE_REFLECTABLE_INFO()
+	
+		DIRE_PROPERTY(bool, useless, true)
+	};
+
+	dire_reflectable(struct Nested2)
+	{
+		DIRE_REFLECTABLE_INFO()
+
+		DIRE_PROPERTY(bool, useless, true)
+	};
+}
+
 dire_reflectable(struct SuperCompound)
 {
 	DIRE_REFLECTABLE_INFO()

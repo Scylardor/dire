@@ -8,6 +8,7 @@
 #include <iostream>
 #include <fstream>
 
+
 /* Utility function to print the output of binary generators */
 auto writeBinaryString = [](const std::string& binarized)
 {
@@ -65,5 +66,9 @@ TEST_CASE("ExportTypeInfoSettings", "[TypeInfoDatabase]")
 
 TEST_CASE("ImportTypeInfoSettings", "[TypeInfoDatabase]")
 {
+	// For example : types can have changed names, the same type can now have a different reflectable ID,
+	// there can be "twin types" (types with the same names, how to differentiate them?),
+	// "orphaned types" (types that were imported but are not in the executable anymore)...
+	// This function tries to "patch the holes" as best as it can.
 
 }

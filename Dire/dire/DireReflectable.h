@@ -709,21 +709,35 @@ namespace DIRE_NS
 
 #define dire_reflectable(ObjectType, ...) \
 	ObjectType;\
+	template <typename T>\
+	struct DIRE_TypeInfoHelper;\
 	template <>\
-	struct DIRE_NS::TypeInfoHelper<ObjectType>\
+	struct DIRE_TypeInfoHelper<ObjectType>\
 	{\
 		using Super = DIRE_VA_MACRO(DIRE_FIRST_TYPE_OR_REFLECTABLE_, __VA_ARGS__);\
-		inline static char const* TypeName = DIRE_STRINGIZE(ObjectType);\
 	};\
 	ObjectType : DIRE_VA_MACRO(DIRE_INHERITANCE_LIST_OR_REFLECTABLE, __VA_ARGS__)
-
 
 #define DIRE_REFLECTABLE_INFO() \
 	struct DIRE_SelfTypeTag {}; \
 		constexpr auto DIRE_SelfTypeHelper() -> decltype(DIRE_NS::SelfHelpers::Writer<DIRE_SelfTypeTag, decltype(this)>{}); \
 		using Self = DIRE_NS::SelfHelpers::Read<DIRE_SelfTypeTag>; \
-		using Super = DIRE_NS::TypeInfoHelper<Self>::Super; \
-		inline static DIRE_NS::TypedTypeInfo<Self, DIRE_DEFAULT_CONSTRUCTOR_INSTANTIATE>	DIRE_TypeInfo{ DIRE_NS::TypeInfoHelper<Self>::TypeName }; \
+		using Super = DIRE_TypeInfoHelper<Self>::Super; \
+		static const DIRE_STRING&	DIRE_GetFullyQualifiedName()\
+		{\
+			static const DIRE_STRING fullyQualifiedName = []{\
+				DIRE_STRING funcName = DIRE_FUNCTION_FULLNAME;\
+				std::size_t found = funcName.rfind("::");\
+				found = funcName.rfind("::", found-1);\
+				found = funcName.rfind("::", found-1);\
+				if (found != std::string::npos)\
+					funcName = funcName.substr(0, found);\
+				return funcName;\
+			}(); \
+			return fullyQualifiedName;\
+		}\
+		inline static DIRE_NS::TypedTypeInfo<Self, DIRE_DEFAULT_CONSTRUCTOR_INSTANTIATE>	DIRE_TypeInfo{ DIRE_GetFullyQualifiedName().c_str() }; \
+		\
 		static const DIRE_NS::TypeInfo & GetClassReflectableTypeInfo()\
 		{\
 			return DIRE_TypeInfo; \

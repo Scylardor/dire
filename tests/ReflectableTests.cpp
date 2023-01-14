@@ -63,3 +63,14 @@ TEST_CASE("IsA", "[Reflectable]")
 	REQUIRE((aC.IsA<a>() && aC.IsA<b>() && aC.IsA<c>() && !aC.IsA<SuperCompound>()));
 	REQUIRE((!notPartOfTheFamily.IsA<a>() && !notPartOfTheFamily.IsA<b>() && !notPartOfTheFamily.IsA<c>() && notPartOfTheFamily.IsA<SuperCompound>()));
 }
+
+
+TEST_CASE("TypeInfo Name", "[Reflectable]")
+{
+	REQUIRE(a::GetClassReflectableTypeInfo().GetName() == "a");
+	REQUIRE(b::GetClassReflectableTypeInfo().GetName() == "b");
+	REQUIRE(c::GetClassReflectableTypeInfo().GetName() == "c");
+	REQUIRE(SuperCompound::GetClassReflectableTypeInfo().GetName() == "SuperCompound");
+	REQUIRE(testNS::Nested::GetClassReflectableTypeInfo().GetName() == "testNS::Nested");
+	REQUIRE(testNS::Nested2::GetClassReflectableTypeInfo().GetName() == "testNS::Nested2");
+}
