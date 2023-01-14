@@ -4,10 +4,14 @@
 #include "DireStaticTypeCounter.h"
 
 #include <vector>
-#include <any>
 #include <unordered_map>
 
 #include "DireString.h"
+
+namespace std
+{
+	class any;
+}
 
 namespace DIRE_NS
 {
@@ -51,36 +55,16 @@ namespace DIRE_NS
 	// TODO: replace all the unsigned by a unified typedef
 	struct Reflector3 : Singleton<Reflector3>, AutomaticTypeCounter<Reflector3, ReflectableID>
 	{
-		inline static const int REFLECTOR_VERSION = 0;
-
-	public:
-
-		Reflector3() = default;
+		inline static const unsigned DATABASE_VERSION = 0;
 
 		[[nodiscard]] size_t	GetTypeInfoCount() const
 		{
 			return myReflectableTypeInfos.size();
 		}
 
-		[[nodiscard]] TypeInfo const* GetTypeInfo(unsigned classID) const
-		{
-			if (classID < myReflectableTypeInfos.size())
-			{
-				return myReflectableTypeInfos[classID];
-			}
+		[[nodiscard]] TypeInfo const* GetTypeInfo(unsigned classID) const;
 
-			return nullptr;
-		}
-
-		[[nodiscard]] TypeInfo* EditTypeInfo(unsigned classID)
-		{
-			if (classID < myReflectableTypeInfos.size())
-			{
-				return myReflectableTypeInfos[classID];
-			}
-
-			return nullptr;
-		}
+		[[nodiscard]] TypeInfo* EditTypeInfo(unsigned classID);
 
 
 		void	RegisterInstantiateFunction(unsigned pClassID, ReflectableFactory::InstantiateFunction pInstantiateFunction)
@@ -88,17 +72,7 @@ namespace DIRE_NS
 			myInstantiateFactory.RegisterInstantiator(pClassID, pInstantiateFunction);
 		}
 
-		[[nodiscard]] Reflectable2* TryInstantiate(unsigned pClassID, std::any const& pAnyParameterPack) const
-		{
-			ReflectableFactory::InstantiateFunction anInstantiateFunc = myInstantiateFactory.GetInstantiator(pClassID);
-			if (anInstantiateFunc == nullptr)
-			{
-				return nullptr;
-			}
-
-			Reflectable2* newInstance = anInstantiateFunc(pAnyParameterPack);
-			return newInstance;
-		}
+		[[nodiscard]] Reflectable2* TryInstantiate(unsigned pClassID, std::any const& pAnyParameterPack) const;
 
 
 		// This follows a very simple binary serialization process right now. It encodes:
@@ -110,10 +84,20 @@ namespace DIRE_NS
 			std::string	TypeName;
 		};
 
+		DIRE_STRING	BinaryExport() const;
+		bool	ExportToBinaryFile(DIRE_STRING_VIEW pWrittenSettingsFile) const;
+
 		bool	ExportTypeInfoSettings(DIRE_STRING_VIEW pWrittenSettingsFile) const;
 		bool	ImportTypeInfoSettings(DIRE_STRING_VIEW pReadSettingsFile);
 
+	// Allow unit tests to build a database that is not the program's singleton.
+#if !DIRE_UNIT_TESTS
+	protected:
+		Reflector3() = default;
+		friend Singleton<Reflector3>;
+
 	private:
+#endif
 		friend TypeInfo;
 
 		[[nodiscard]] unsigned	RegisterTypeInfo(TypeInfo* pTypeInfo)
@@ -123,6 +107,7 @@ namespace DIRE_NS
 		}
 
 		std::vector<TypeInfo*>	myReflectableTypeInfos;
-		ReflectableFactory	myInstantiateFactory;
+		ReflectableFactory		myInstantiateFactory;
+
 	};
 }

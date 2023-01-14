@@ -148,5 +148,7 @@ if(${PROJECT_NAME}_BUILD_UNIT_TESTS)
 	add_catch2_dependency(catch2 ${${PROJECT_NAME}_TESTS_CATCH_VERSION} ${PROJECT_NAME}_UnitTests PRIVATE TRUE)
 
 	target_link_libraries(${PROJECT_NAME}_UnitTests PRIVATE ${PROJECT_NAME})
+
+	target_compile_definitions(${PROJECT_NAME}_UnitTests PRIVATE DIRE_UNIT_TESTS=1)
 endif()
 

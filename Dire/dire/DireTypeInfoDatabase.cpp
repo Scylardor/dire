@@ -3,64 +3,115 @@
 
 #include <fstream>
 
-bool	DIRE_NS::Reflector3::ExportTypeInfoSettings(DIRE_STRING_VIEW pWrittenSettingsFile) const
+DIRE_NS::TypeInfo const* DIRE_NS::Reflector3::GetTypeInfo(unsigned classID) const
+{
+	if (classID < myReflectableTypeInfos.size())
+	{
+		return myReflectableTypeInfos[classID];
+	}
+
+	return nullptr;
+}
+
+DIRE_NS::TypeInfo* DIRE_NS::Reflector3::EditTypeInfo(unsigned classID)
+{
+	if (classID < myReflectableTypeInfos.size())
+	{
+		return myReflectableTypeInfos[classID];
+	}
+
+	return nullptr;
+}
+
+DIRE_NS::Reflectable2* DIRE_NS::Reflector3::TryInstantiate(unsigned pClassID, std::any const& pAnyParameterPack) const
+{
+	ReflectableFactory::InstantiateFunction anInstantiateFunc = myInstantiateFactory.GetInstantiator(pClassID);
+	if (anInstantiateFunc == nullptr)
+	{
+		return nullptr;
+	}
+
+	Reflectable2* newInstance = anInstantiateFunc(pAnyParameterPack);
+	return newInstance;
+}
+
+size_t	BinaryWriteAtOffset(char* pDest, const void* pSrc, size_t pCount, size_t pWriteOffset)
+{
+	memcpy(pDest + pWriteOffset, pSrc, pCount);
+	return pWriteOffset + pCount;
+}
+
+DIRE_STRING	DIRE_NS::Reflector3::BinaryExport() const
 {
 	// This follows a very simple binary serialization process right now. It encodes:
-// - file version
-// - total number of encoded types
-// - the reflectable type ID
-// - the length of typename string
-// - the typename string
-	std::string writeBuffer;
+	// - file version
+	// - total number of encoded types
+	// - the reflectable type ID
+	// - the typename string
+	DIRE_STRING writeBuffer;
 	auto nbTypeInfos = (unsigned)myReflectableTypeInfos.size();
 	// TODO: unsigned -> ReflectableID
-	writeBuffer.resize(sizeof(REFLECTOR_VERSION) + sizeof(nbTypeInfos) + sizeof(size_t) * myReflectableTypeInfos.size());
+	const int estimatedNamesStorage = (sizeof(unsigned) + 64) * nbTypeInfos; // expect 64 chars or less for a typename (i.e. 63 + 1 \0)
+	writeBuffer.resize(sizeof(DATABASE_VERSION) + sizeof(nbTypeInfos) + estimatedNamesStorage);
 	size_t offset = 0;
-
 	// TODO: it's possible to compress the data even more if we're willing to make the logic more complex:
-	// - use a unsigned int instead of size_t (4 billions reflectable IDs are probably enough)
 	// - adding a size_t to flag each string length allows us to avoid doing Strlen's to figure out the length of each string.
 	//		But it's probably not worth it as it stores 8 bytes for a size_t, and the type names are usually short (less than 32 chars).
 	//		It then would make sense to stop storing the length and store a single '\0' character at the end of each name instead.
 	//		It needs us to perform 1 strlen per typename but since these are supposed to be short it should be ok and allows us to save on memory.
 
-	memcpy(writeBuffer.data() + offset, (const char*)&REFLECTOR_VERSION, sizeof(REFLECTOR_VERSION));
-	offset += sizeof(REFLECTOR_VERSION);
-
-	memcpy(writeBuffer.data() + offset, (const char*)&nbTypeInfos, sizeof(nbTypeInfos));
-	offset += sizeof(nbTypeInfos);
+	offset = BinaryWriteAtOffset(writeBuffer.data(), (const char*)&DATABASE_VERSION, sizeof(DATABASE_VERSION), offset);
+	offset = BinaryWriteAtOffset(writeBuffer.data(), (const char*)&nbTypeInfos, sizeof(nbTypeInfos), offset);
 
 	for (TypeInfo const* typeInfo : myReflectableTypeInfos)
 	{
-		const DIRE_STRING_VIEW& typeName = typeInfo->GetName();
-		auto nameLen = (unsigned)typeName.length();
-		memcpy(writeBuffer.data() + offset, (const char*)&nameLen, sizeof(nameLen));
-		offset += sizeof(nameLen);
+		const unsigned typeID = typeInfo->GetID(); // TODO: reflectableID
 
-		writeBuffer.resize(writeBuffer.size() + typeName.length());
-		memcpy(writeBuffer.data() + offset, typeName.data(), typeName.length());
-		offset += typeName.length();
+		const DIRE_STRING_VIEW& typeName = typeInfo->GetName();
+		const auto nameLen = (unsigned)typeName.length();
+
+		const size_t remainingSpace = writeBuffer.size() - offset;
+		const size_t neededSpace = sizeof(typeID) + nameLen + 1;
+		// Make sure we have enough space
+		if (remainingSpace < neededSpace) // +1 for \0, if true, make it bigger
+			writeBuffer.resize(writeBuffer.size() + neededSpace);
+
+		offset = BinaryWriteAtOffset(writeBuffer.data(), (const char*)&typeID, sizeof(typeID), offset);
+
+		// A bit "unsafe" to copy typeName.length()+1 bytes, but here we know that the string view actually will point to a null-terminated string.
+		offset = BinaryWriteAtOffset(writeBuffer.data(), typeName.data(), typeName.length()+1, offset);
 	}
+
+	// eliminate extraneous allocated memory
+	writeBuffer.resize(offset);
+	writeBuffer.shrink_to_fit();
+
+	return writeBuffer;
+}
+bool	DIRE_NS::Reflector3::ExportToBinaryFile(DIRE_STRING_VIEW pWrittenSettingsFile) const
+{
+	auto binaryBuffer = BinaryExport();
 
 	std::ofstream openFile{ pWrittenSettingsFile.data(), std::ios::binary };
 	if (openFile.bad())
 	{
 		return false;
 	}
-
 	// TODO: check for exception?
-	openFile.write(writeBuffer.data(), writeBuffer.size());
+	openFile.write(binaryBuffer.data(), binaryBuffer.size());
+
 	return true;
 }
 
 bool	DIRE_NS::Reflector3::ImportTypeInfoSettings(DIRE_STRING_VIEW pReadSettingsFile)
 {
 	// Importing settings is trickier than exporting them because all the static initialization
-// is already done at import time. This gives a lot of opportunities to mess up!
-// For example : types can have changed names, the same type can now have a different reflectable ID,
-// there can be "twin types" (types with the same names, how to differentiate them?),
-// "orphaned types" (types that were imported but are not in the executable anymore)...
-// This function tries to "patch the holes" as best as it can.
+	// is already done at import time. This gives a lot of opportunities to mess up!
+	// For example : types can have changed names, the same type can now have a different reflectable ID,
+	// there can be "twin types" (types with the same names, how to differentiate them?),
+	// "orphaned types" (types that were imported but are not in the executable anymore)...
+	// This function tries to "patch the holes" as best as it can.
+
 
 	std::string readBuffer;
 	{
@@ -81,7 +132,7 @@ bool	DIRE_NS::Reflector3::ImportTypeInfoSettings(DIRE_STRING_VIEW pReadSettingsF
 	int& fileVersion = *reinterpret_cast<int*>(readBuffer.data() + offset);
 	offset += sizeof(fileVersion);
 
-	if (fileVersion != REFLECTOR_VERSION)
+	if (fileVersion != DATABASE_VERSION)
 	{
 		return false; // Let's assume that reflector is not backward compatible for now.
 	}
