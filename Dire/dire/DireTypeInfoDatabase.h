@@ -87,8 +87,8 @@ namespace DIRE_NS
 		DIRE_STRING	BinaryExport() const;
 		bool	ExportToBinaryFile(DIRE_STRING_VIEW pWrittenSettingsFile) const;
 
-		bool	ExportTypeInfoSettings(DIRE_STRING_VIEW pWrittenSettingsFile) const;
-		bool	ImportTypeInfoSettings(DIRE_STRING_VIEW pReadSettingsFile);
+		static DIRE_STRING	BinaryImport(DIRE_STRING_VIEW pReadSettingsFile);
+		bool	ImportFromBinaryFile(DIRE_STRING_VIEW pReadSettingsFile);
 
 	// Allow unit tests to build a database that is not the program's singleton.
 #if !DIRE_UNIT_TESTS

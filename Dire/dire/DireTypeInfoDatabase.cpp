@@ -3,11 +3,20 @@
 
 #include <fstream>
 
-DIRE_NS::TypeInfo const* DIRE_NS::Reflector3::GetTypeInfo(unsigned classID) const
+const DIRE_NS::TypeInfo * DIRE_NS::Reflector3::GetTypeInfo(unsigned classID) const
 {
-	if (classID < myReflectableTypeInfos.size())
+	// TypeInfos IDs are supposed to match their position in the vector, but not always because of possible binary import/exports.
+	// if possible, use Reflectable::GetTypeInfo instead.
+	if (classID < myReflectableTypeInfos.size() && myReflectableTypeInfos[classID]->GetID() == classID)
 	{
+		// lucky!
 		return myReflectableTypeInfos[classID];
+	}
+	// not so lucky :( Linear search but for any reasonable workload it should still be OK.
+	auto it = std::find_if(myReflectableTypeInfos.begin(), myReflectableTypeInfos.end(), [classID](const TypeInfo* pTI) { return pTI->GetID() == classID; });
+	if (it != myReflectableTypeInfos.end())
+	{
+		return *it;
 	}
 
 	return nullptr;
@@ -15,12 +24,8 @@ DIRE_NS::TypeInfo const* DIRE_NS::Reflector3::GetTypeInfo(unsigned classID) cons
 
 DIRE_NS::TypeInfo* DIRE_NS::Reflector3::EditTypeInfo(unsigned classID)
 {
-	if (classID < myReflectableTypeInfos.size())
-	{
-		return myReflectableTypeInfos[classID];
-	}
-
-	return nullptr;
+	const TypeInfo* typeInfo = GetTypeInfo(classID);
+	return const_cast<TypeInfo*>(typeInfo);
 }
 
 DIRE_NS::Reflectable2* DIRE_NS::Reflector3::TryInstantiate(unsigned pClassID, std::any const& pAnyParameterPack) const
@@ -54,11 +59,6 @@ DIRE_STRING	DIRE_NS::Reflector3::BinaryExport() const
 	const int estimatedNamesStorage = (sizeof(unsigned) + 64) * nbTypeInfos; // expect 64 chars or less for a typename (i.e. 63 + 1 \0)
 	writeBuffer.resize(sizeof(DATABASE_VERSION) + sizeof(nbTypeInfos) + estimatedNamesStorage);
 	size_t offset = 0;
-	// TODO: it's possible to compress the data even more if we're willing to make the logic more complex:
-	// - adding a size_t to flag each string length allows us to avoid doing Strlen's to figure out the length of each string.
-	//		But it's probably not worth it as it stores 8 bytes for a size_t, and the type names are usually short (less than 32 chars).
-	//		It then would make sense to stop storing the length and store a single '\0' character at the end of each name instead.
-	//		It needs us to perform 1 strlen per typename but since these are supposed to be short it should be ok and allows us to save on memory.
 
 	offset = BinaryWriteAtOffset(writeBuffer.data(), (const char*)&DATABASE_VERSION, sizeof(DATABASE_VERSION), offset);
 	offset = BinaryWriteAtOffset(writeBuffer.data(), (const char*)&nbTypeInfos, sizeof(nbTypeInfos), offset);
@@ -103,7 +103,21 @@ bool	DIRE_NS::Reflector3::ExportToBinaryFile(DIRE_STRING_VIEW pWrittenSettingsFi
 	return true;
 }
 
-bool	DIRE_NS::Reflector3::ImportTypeInfoSettings(DIRE_STRING_VIEW pReadSettingsFile)
+DIRE_STRING	DIRE_NS::Reflector3::BinaryImport(DIRE_STRING_VIEW pReadSettingsFile)
+{
+	using std::ios;
+	std::ifstream file(pReadSettingsFile.data(), ios::binary | ios::ate);
+	if (file.bad())
+		return {};
+	DIRE_STRING fileBuffer;
+	fileBuffer.resize(file.tellg());
+	file.seekg(ios::beg);
+	file.read(fileBuffer.data(), fileBuffer.size());
+
+	return fileBuffer;
+}
+
+bool	DIRE_NS::Reflector3::ImportFromBinaryFile(DIRE_STRING_VIEW pReadSettingsFile)
 {
 	// Importing settings is trickier than exporting them because all the static initialization
 	// is already done at import time. This gives a lot of opportunities to mess up!
@@ -112,20 +126,9 @@ bool	DIRE_NS::Reflector3::ImportTypeInfoSettings(DIRE_STRING_VIEW pReadSettingsF
 	// "orphaned types" (types that were imported but are not in the executable anymore)...
 	// This function tries to "patch the holes" as best as it can.
 
-
-	std::string readBuffer;
-	{
-		std::ifstream openFile(pReadSettingsFile.data(), std::ios::binary);
-		if (openFile.bad())
-		{
-			return false;
-		}
-
-		openFile.seekg(0, std::ios::end);
-		readBuffer.resize(openFile.tellg());
-		openFile.seekg(0, std::ios::beg);
-		openFile.read(readBuffer.data(), readBuffer.size());
-	}
+	std::string readBuffer = BinaryImport(pReadSettingsFile);
+	if (readBuffer.empty())
+		return false;
 
 	size_t offset = 0;
 
@@ -134,7 +137,7 @@ bool	DIRE_NS::Reflector3::ImportTypeInfoSettings(DIRE_STRING_VIEW pReadSettingsF
 
 	if (fileVersion != DATABASE_VERSION)
 	{
-		return false; // Let's assume that reflector is not backward compatible for now.
+		return false; // reflector is not backward compatible for now.
 	}
 
 	const unsigned& nbTypeInfos = *reinterpret_cast<unsigned*>(readBuffer.data() + offset);
@@ -148,12 +151,14 @@ bool	DIRE_NS::Reflector3::ImportTypeInfoSettings(DIRE_STRING_VIEW pReadSettingsF
 
 		curData.ReflectableID = iTypeInfo;
 
-		unsigned& typeNameLen = *reinterpret_cast<unsigned*>(readBuffer.data() + offset);
-		offset += sizeof(typeNameLen);
+		//TODO: probably useless, to remove!
+		unsigned& storedReflectableID = *reinterpret_cast<unsigned*>(readBuffer.data() + offset);
+		curData.ReflectableID = storedReflectableID;
+		offset += sizeof(storedReflectableID);
 
-		curData.TypeName.resize(typeNameLen);
-		memcpy(curData.TypeName.data(), readBuffer.data() + offset, typeNameLen);
-		offset += typeNameLen;
+		const char* typeName = readBuffer.data() + offset;
+		curData.TypeName = typeName;
+		offset += curData.TypeName.length() + 1; // +1 for \0
 
 		iTypeInfo++;
 	}
@@ -163,10 +168,49 @@ bool	DIRE_NS::Reflector3::ImportTypeInfoSettings(DIRE_STRING_VIEW pReadSettingsF
 
 	// Always resize the registry to at least the size of data we read,
 	// because we absolutely have to keep the same ID for imported types.
-	if (myReflectableTypeInfos.size() < theReadData.size())
+	//if (myReflectableTypeInfos.size() < theReadData.size())
+	//{
+	//	myReflectableTypeInfos.resize(theReadData.size());
+	//}
+
+
+	for (int iReg = 0; iReg < myReflectableTypeInfos.size(); ++iReg)
 	{
-		myReflectableTypeInfos.resize(theReadData.size());
+		TypeInfo* registeredTypeInfo = myReflectableTypeInfos[iReg];
+
+		//if (registeredTypeInfo == nullptr) // possible due to the resize
+		//{
+		//	continue;
+		//}
+
+		// Is this type in the read info ?
+		auto it = std::find_if(theReadData.begin(), theReadData.end(),
+			[registeredTypeInfo](const ExportedTypeInfoData& pReadTypeInfo)
+			{
+				return pReadTypeInfo.TypeName == registeredTypeInfo->GetName();
+			});
+
+		if (it != theReadData.end())
+		{
+			// we found it in the read data. Fix its ID if necessary
+			if (it->ReflectableID != registeredTypeInfo->GetID())
+			{
+				registeredTypeInfo->SetID(it->ReflectableID);
+				//// Registered type info should be in sequential order, by ID. If this type info is not at the right place, "switch" it.
+				//if (iReg != registeredTypeInfo->GetID())
+				//{
+				//	std::iter_swap(myReflectableTypeInfos.begin() + iReg, myReflectableTypeInfos.begin() + registeredTypeInfo->GetID());
+				//	iReg--; // loop over the same item, as there was a swap
+				//}
+			}
+		}
 	}
+
+	// erase-remove all the null pointers.
+	auto isNull = [](TypeInfo* pInfo) { return pInfo == nullptr; };
+	myReflectableTypeInfos.erase(std::remove_if(myReflectableTypeInfos.begin(), myReflectableTypeInfos.end(), isNull), myReflectableTypeInfos.end());
+
+	return true;
 
 	for (int iReg = 0; iReg < myReflectableTypeInfos.size(); ++iReg)
 	{

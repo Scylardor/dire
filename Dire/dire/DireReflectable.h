@@ -22,10 +22,6 @@
 
 namespace DIRE_NS
 {
-	template <typename T>
-	struct TypeInfoHelper
-	{};
-
 	using ReflectableID = unsigned;
 
 	static const ReflectableID INVALID_REFLECTABLE_ID = (ReflectableID)-1;
@@ -35,7 +31,8 @@ namespace DIRE_NS
 	public:
 		using ClassID = unsigned;
 
-		[[nodiscard]] virtual ClassID	GetReflectableClassID() const = 0;
+		[[nodiscard]] virtual ClassID			GetReflectableClassID() const = 0;
+		[[nodiscard]] virtual const TypeInfo*	GetTypeInfo() const = 0;
 
 		template <typename TRefl>
 		[[nodiscard]] bool	IsA() const
@@ -57,7 +54,7 @@ namespace DIRE_NS
 		{
 			static_assert(std::is_base_of_v<Reflectable2, T>, "Clone only works with Reflectable-derived class types.");
 
-			TypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(GetReflectableClassID());
+			TypeInfo const* thisTypeInfo = GetTypeInfo();
 			if (thisTypeInfo == nullptr)
 			{
 				return nullptr;
@@ -82,12 +79,12 @@ namespace DIRE_NS
 
 		[[nodiscard]] IntrusiveLinkedList<PropertyTypeInfo> const& GetProperties() const
 		{
-			return Reflector3::GetSingleton().GetTypeInfo(GetReflectableClassID())->GetPropertyList();
+			return GetTypeInfo()->GetPropertyList();
 		}
 
 		[[nodiscard]] IntrusiveLinkedList<FunctionInfo> const& GetMemberFunctions() const
 		{
-			return Reflector3::GetSingleton().GetTypeInfo(GetReflectableClassID())->GetFunctionList();
+			return GetTypeInfo()->GetFunctionList();
 		}
 
 		template <typename T>
@@ -105,7 +102,7 @@ namespace DIRE_NS
 		template <typename TProp = void>
 		[[nodiscard]] TProp const* GetProperty(DIRE_STRING_VIEW pName) const
 		{
-			TypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(GetReflectableClassID());
+			TypeInfo const* thisTypeInfo = GetTypeInfo();
 
 			// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
 			std::byte const* propertyAddr = reinterpret_cast<std::byte const*>(this);// TODO: Remove -thisTypeInfo->GetVptrOffset();
@@ -172,7 +169,7 @@ namespace DIRE_NS
 
 		[[nodiscard]] bool EraseProperty(DIRE_STRING_VIEW pName)
 		{
-			TypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(GetReflectableClassID());
+			TypeInfo const* thisTypeInfo = GetTypeInfo();
 
 			return ErasePropertyImpl(thisTypeInfo, pName);
 		}
@@ -655,7 +652,7 @@ namespace DIRE_NS
 
 		[[nodiscard]] FunctionInfo const* GetFunction(DIRE_STRING_VIEW pMemberFuncName) const
 		{
-			TypeInfo const* thisTypeInfo = Reflector3::GetSingleton().GetTypeInfo(GetReflectableClassID());
+			TypeInfo const* thisTypeInfo = GetTypeInfo();
 			for (FunctionInfo const& aFuncInfo : thisTypeInfo->GetFunctionList())
 			{
 				if (aFuncInfo.GetName() == pMemberFuncName)
@@ -749,4 +746,8 @@ namespace DIRE_NS
 		[[nodiscard]] virtual ClassID	GetReflectableClassID() const override\
 		{\
 			return GetClassReflectableTypeInfo().GetID();\
+		}\
+		[[nodiscard]] virtual const DIRE_NS::TypeInfo* GetTypeInfo() const\
+		{\
+			return &GetClassReflectableTypeInfo();\
 		}
