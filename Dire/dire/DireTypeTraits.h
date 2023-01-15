@@ -100,7 +100,6 @@ namespace DIRE_NS
 	struct is_const_method< ReturnType(CClass::*)(ArgType...)> {
 		static constexpr bool value = false;
 		using ClassType = CClass;
-
 	};
 
 	template<typename CClass, typename ReturnType, typename ...ArgType>

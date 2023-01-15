@@ -316,8 +316,14 @@ namespace DIRE_NS
 			ChildrenClasses.push_back(pChild);
 		}
 
-		[[nodiscard]] bool	IsParentOf(const unsigned pChildClassID) const
+		[[nodiscard]] bool	IsParentOf(const unsigned pChildClassID, bool pIncludingMyself = true) const
 		{
+			// same logic as std::is_base_of: class is parent of itself (unless we strictly want only children)
+			if (pChildClassID == GetID())
+			{
+				return pIncludingMyself;
+			}
+
 			auto predicate = [pChildClassID](const TypeInfo* pChildTypeInfo)
 			{
 				return pChildTypeInfo->ReflectableID == pChildClassID;
@@ -485,8 +491,11 @@ namespace DIRE_NS
 			{
 				static_assert(std::is_base_of_v<Reflectable2, T>, "This class is only supposed to be used as a member variable of a Reflectable-derived class.");
 				Reflector3::EditSingleton().RegisterInstantiateFunction(T::GetClassReflectableTypeInfo().GetID(),
-					[](std::any const&) -> Reflectable2*
+					[](std::any const& pParams) -> Reflectable2*
 					{
+						if (pParams.has_value()) // we've been sent parameters but this is default construction! Error
+							return nullptr;
+
 						return new T();
 					});
 			}

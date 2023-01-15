@@ -12,7 +12,6 @@ namespace testNS
 	dire_reflectable(struct Nested)
 	{
 		DIRE_REFLECTABLE_INFO()
-	
 		DIRE_PROPERTY(bool, useless, true)
 	};
 
@@ -162,13 +161,8 @@ dire_reflectable(struct c, b)
 
 	c(int, bool)
 	{
-		printf("bonjour int bool\n");
 	}
 
-	void print() override
-	{
-		printf("c\n");
-	}
 };
 
 dire_reflectable(struct MapCompound)

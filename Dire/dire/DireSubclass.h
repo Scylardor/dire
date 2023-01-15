@@ -7,7 +7,10 @@ namespace DIRE_NS
 	{
 		static_assert(std::is_base_of_v<Reflectable2, T>, "Subclass only works for Reflectable-derived classes.");
 
-		Subclass() = default;
+		Subclass()
+		{
+			SubClassID = T::GetClassReflectableTypeInfo().GetID();
+		}
 
 		[[nodiscard]] bool	IsValid() const
 		{
@@ -18,6 +21,13 @@ namespace DIRE_NS
 		void	SetClass(unsigned pNewID) //TODO: reflectable ID
 		{
 			SubClassID = pNewID;
+		}
+
+		template <typename T>
+		void	SetClass()
+		{
+			static_assert(std::is_base_of_v<Reflectable2, T>, "Subclass can only store IDs of Reflectable-derived classes.");
+			SubClassID = T::GetClassReflectableTypeInfo().GetID();
 		}
 
 		unsigned	GetClassID() const //TODO: reflectable ID
