@@ -15,7 +15,7 @@ namespace DIRE_NS
 		using MapUpdateFptr = void (*)(void*, DIRE_STRING_VIEW, const void *);
 		using MapCreateFptr = void* (*)(void*, DIRE_STRING_VIEW, const void *);
 		using MapBinaryCreateFptr = void* (*)(void*, void const*, const void *);
-		using MapEraseFptr = void	(*)(void*, DIRE_STRING_VIEW);
+		using MapEraseFptr = bool	(*)(void*, DIRE_STRING_VIEW);
 		using MapClearFptr = void	(*)(void*);
 		using MapSizeFptr = size_t(*)(const void *);
 		using MapValueHandlerFptr = DataStructureHandler(*)();
@@ -171,15 +171,17 @@ namespace DIRE_NS
 			return &it->second;
 		}
 
-		static void	MapErase(void* pMap, DIRE_STRING_VIEW pKey)
+		static bool	MapErase(void* pMap, DIRE_STRING_VIEW pKey)
 		{
 			if (pMap != nullptr)
 			{
 				T* thisMap = static_cast<T*>(pMap);
-				const KeyType key = DIRE_NS::FromCharsConverter<KeyType>::Convert(pKey);
+				const KeyType key = FromCharsConverter<KeyType>::Convert(pKey);
 
-				thisMap->erase(key);
+				return thisMap->erase(key);
 			}
+
+			return false;
 		}
 
 		static void	MapClear(void* pMap)

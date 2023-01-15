@@ -53,6 +53,7 @@ add_library(${PROJECT_NAME} STATIC #TODO customize
 	${DIRE_SOURCE_DIR}/DireEnums.inl
 	${DIRE_SOURCE_DIR}/DireCRTP.h
 	${DIRE_SOURCE_DIR}/DireReflectable.h
+	${DIRE_SOURCE_DIR}/DireReflectable.cpp
 	${DIRE_SOURCE_DIR}/DireString.h
 	${DIRE_SOURCE_DIR}/DireString.inl
 	${DIRE_SOURCE_DIR}/DireTypeInfoDatabase.h

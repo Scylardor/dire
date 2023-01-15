@@ -22,7 +22,7 @@ namespace DIRE_NS
 	class ReflectableFactory
 	{
 	public:
-		using InstantiateFunction = Reflectable2 * (*)(std::any const&);
+		using InstantiateFunction = Reflectable2 * (*)(const std::any &);
 
 		ReflectableFactory() = default;
 

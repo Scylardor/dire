@@ -14,7 +14,7 @@ namespace DIRE_NS
 		using ArrayReadFptr = void const* (*)(void const*, size_t);
 		using ArrayUpdateFptr = void (*)(void*, size_t, void const*);
 		using ArrayCreateFptr = void (*)(void*, size_t, void const*);
-		using ArrayEraseFptr = void	(*)(void*, size_t);
+		using ArrayEraseFptr = bool	(*)(void*, size_t);
 		using ArrayClearFptr = void	(*)(void*);
 		using ArraySizeFptr = size_t(*)(void const*);
 		using ArrayElementHandlerFptr = DataStructureHandler(*)();
@@ -108,13 +108,17 @@ namespace DIRE_NS
 			return ArrayUpdate(pArray, pAtIndex, pInitData);
 		}
 
-		static void	ArrayErase(void* pArray, size_t pAtIndex)
+		static bool	ArrayErase(void* pArray, size_t pAtIndex)
 		{
-			if (pArray != nullptr)
+			T* thisArray = static_cast<T*>(pArray);
+
+			if (thisArray != nullptr && thisArray->size() > pAtIndex)
 			{
-				T* thisArray = static_cast<T*>(pArray);
 				thisArray->erase(thisArray->begin() + pAtIndex);
+				return true;
 			}
+
+			return false;
 		}
 
 		static void	ArrayClear(void* pArray)
@@ -217,7 +221,7 @@ namespace DIRE_NS
 			}
 
 			// Check if the element is assignable to make arrays of arrays work
-			if constexpr (std::is_assignable_v<ElementValueType, ElementValueType>)
+			if constexpr (std::is_assignable_v<ElementValueType&, ElementValueType>)
 			{
 				T* thisArray = static_cast<T*>(pArray);
 				ElementValueType const* actualData = static_cast<ElementValueType const*>(pNewData);
@@ -236,7 +240,7 @@ namespace DIRE_NS
 			assert(pAtIndex < ARRAY_SIZE);
 
 			// Check if the element is assignable to make arrays of arrays work
-			if constexpr (std::is_assignable_v<ElementValueType, ElementValueType>)
+			if constexpr (std::is_assignable_v<ElementValueType&, ElementValueType>)
 			{
 				T* thisArray = static_cast<T*>(pArray);
 				ElementValueType const* actualInitData = (pInitData ? static_cast<ElementValueType const*>(pInitData) : nullptr);
@@ -244,11 +248,11 @@ namespace DIRE_NS
 			}
 		}
 
-		static void	ArrayErase(void* pArray, size_t pAtIndex)
+		static bool	ArrayErase(void* pArray, size_t pAtIndex)
 		{
 			if (pArray == nullptr || pAtIndex >= ARRAY_SIZE)
 			{
-				return;
+				return false;
 			}
 
 			// Check if the element is assignable to make arrays of arrays work
@@ -256,7 +260,10 @@ namespace DIRE_NS
 			{
 				T* thisArray = static_cast<T*>(pArray);
 				(*thisArray)[pAtIndex] = ElementValueType();
+				return true;
 			}
+
+			return false;
 		}
 
 		static void	ArrayClear(void* pArray)
@@ -268,7 +275,7 @@ namespace DIRE_NS
 
 			// I don't know if we can do something smarter in this case...
 			// Check if the element is assignable to make arrays of arrays work
-			if constexpr (std::is_assignable_v<ElementValueType, ElementValueType>)
+			if constexpr (std::is_assignable_v<ElementValueType&, ElementValueType>)
 			{
 				T* thisArray = static_cast<T*>(pArray);
 				for (auto i = 0u; i < ARRAY_SIZE; ++i)

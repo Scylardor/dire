@@ -159,6 +159,7 @@ TEST_CASE("EraseProperty", "[Property]")
 {
 	c anotherC;
 
+	// erase in vector
 	CHECK(anotherC.aVector.size() == 3);
 	REQUIRE(anotherC.GetProperty<int>("aVector[2]"));
 	bool erased = anotherC.EraseProperty("aVector[2]");
@@ -168,6 +169,13 @@ TEST_CASE("EraseProperty", "[Property]")
 	anotherC.anArray[5] = 1337;
 	erased = anotherC.EraseProperty("anArray[5]");
 	REQUIRE((erased && anotherC.anArray[5] == 0));
+
+	// erase in map
+	MapCompound aMapType;
+	aMapType.aBoolMap[0] = false;
+	aMapType.aBoolMap[1] = true;
+	erased = aMapType.EraseProperty("aBoolMap[0]");
+	REQUIRE((erased && aMapType.aBoolMap.size() == 1 && aMapType.aBoolMap.find(0) == aMapType.aBoolMap.end()));
 
 	// cannot erase a normal prop
 	erased = anotherC.EraseProperty("ctoto");
@@ -180,4 +188,25 @@ TEST_CASE("EraseProperty", "[Property]")
 	// cannot erase invalid index
 	erased = anotherC.EraseProperty("aVector[9999]");
 	REQUIRE((!erased && anotherC.aVector.size() == 2));
+
+	// cannot erase invalid key
+	erased = aMapType.EraseProperty("aBoolMap[42]");
+	REQUIRE((!erased && aMapType.aBoolMap.size() == 1 && aMapType.aBoolMap.find(42) == aMapType.aBoolMap.end()));
+
+	// erasing a vector should clear it
+	erased = anotherC.EraseProperty("aVector");
+	REQUIRE((erased && anotherC.aVector.empty()));
+
+	// erasing a map should clear it
+	erased = aMapType.EraseProperty("aBoolMap");
+	REQUIRE((erased && aMapType.aBoolMap.empty()));
+
+	// erasing a static array should fill with default values (e.g. 0 for ints)
+	for (int i = 0; i < 10; ++i)
+		anotherC.anArray[i] = i;
+
+	static const int testArray[10]{ 0 };
+	erased = anotherC.EraseProperty("anArray");
+	REQUIRE((erased && memcmp(testArray, anotherC.anArray, sizeof(testArray)) == 0));
+
 }
