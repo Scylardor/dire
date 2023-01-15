@@ -15,9 +15,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 # Options
 option(${PROJECT_NAME}_SERIALIZATION_ENABLED "Enables the Serialization features of the DIRE library." ON)
-option(${PROJECT_NAME}_SERIALIZATION_JSON_SERIALIZER_ENABLED "Enables the JSON serialization feature of the DIRE library, using RapidJSON." ON)
-set(${PROJECT_NAME}_SERIALIZATION_JSON_SERIALIZER_VERSION "master" CACHE STRING "RapidJSON version that DIRE will try to use if not found on the system.")
-option(${PROJECT_NAME}_SERIALIZATION_BINARY_SERIALIZER_ENABLED "Enables the binary serialization feature of the DIRE library." ON)
+option(${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED "Enables the JSON serialization feature of the DIRE library, using RapidJSON." ON)
+set(${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_VERSION master CACHE STRING "RapidJSON version that DIRE will try to use if not found on the system.")
+option(${PROJECT_NAME}_SERIALIZATION_BINARY_ENABLED "Enables the binary serialization feature of the DIRE library." ON)
 option(${PROJECT_NAME}_SERIALIZABLE_PROPERTIES_BY_DEFAULT "If true, Dire properties are serializable by default, unless tagged with the NotSerializable attribute. If false, Dire properties are not serializable by default, unless tagged with the Serializable attribute." ON)
 
 set(${PROJECT_NAME}_NAMESPACE "dire" CACHE STRING "Namespace the DIRE library will use (in case of a naming conflict)")
@@ -75,16 +75,20 @@ if(${PROJECT_NAME}_SERIALIZATION_ENABLED)
 		${DIRE_SOURCE_DIR}/DireSerialization.h
 	)
 endif()
-if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_JSON_SERIALIZER_ENABLED)
+if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED)
 	target_sources(${PROJECT_NAME} PRIVATE
 		${DIRE_SOURCE_DIR}/DireJSONSerializer.h
 		${DIRE_SOURCE_DIR}/DireJSONDeserializer.h
+		${DIRE_SOURCE_DIR}/DireJSONSerializer.cpp
+		${DIRE_SOURCE_DIR}/DireJSONDeserializer.cpp
 	)
 endif()
 if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_BINARY_SERIALIZER_ENABLED)
 	target_sources(${PROJECT_NAME} PRIVATE
 		${DIRE_SOURCE_DIR}/DireBinarySerializer.h
 		${DIRE_SOURCE_DIR}/DireBinaryDeserializer.h
+		${DIRE_SOURCE_DIR}/DireBinarySerializer.cpp
+		${DIRE_SOURCE_DIR}/DireBinaryDeserializer.cpp
 	)
 endif()
 
@@ -95,9 +99,9 @@ target_include_directories(${PROJECT_NAME}
 )
 
 # RapidJSON dependency setup
-if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_USE_JSON_SERIALIZER)
+if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED)
 	include(CMake/Rapidjson.cmake)
-	add_rapidjson_dependency(rapidjson master ${PROJECT_NAME} PUBLIC)
+	add_rapidjson_dependency(rapidjson ${${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_VERSION} ${PROJECT_NAME} PUBLIC)
 endif()
 
 
@@ -118,7 +122,7 @@ if(${PROJECT_NAME}_SERIALIZATION_ENABLED)
 	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_USE_SERIALIZATION=1)
 endif()
 
-if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_JSON_SERIALIZER_ENABLED)
+if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED)
 	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_USE_JSON_SERIALIZATION=1)
 endif()
 
@@ -132,24 +136,6 @@ endif()
 
 # Unit tests
 if(${PROJECT_NAME}_BUILD_UNIT_TESTS)
-	add_executable(${PROJECT_NAME}_UnitTests
-		tests/BasicTests.cpp
-		tests/MacroTests.cpp
-		tests/EnumTests.cpp
-		tests/FunctionTests.cpp
-		tests/PropertyTests.cpp
-		tests/ReflectableTests.cpp
-		tests/TypeTraitsTests.cpp
-		tests/TypeInfoDatabaseTests.cpp
-		tests/TestClasses.h
-	)
-
-	# Catch2 dependency setup
-	include(CMake/Catch2.cmake)
-	add_catch2_dependency(catch2 ${${PROJECT_NAME}_TESTS_CATCH_VERSION} ${PROJECT_NAME}_UnitTests PRIVATE TRUE)
-
-	target_link_libraries(${PROJECT_NAME}_UnitTests PRIVATE ${PROJECT_NAME})
-
-	target_compile_definitions(${PROJECT_NAME}_UnitTests PRIVATE DIRE_UNIT_TESTS=1)
+	add_subdirectory(tests)
 endif()
 

@@ -2,6 +2,9 @@
 
 #if DIRE_USE_SERIALIZATION
 
+#include <vector>
+#include "DireString.h"
+
 namespace DIRE_NS
 {
 	class Reflectable2;
@@ -25,15 +28,15 @@ namespace DIRE_NS
 				SerializedBuffer(std::move(pMovedVec))
 			{}
 
-			[[nodiscard]] std::string AsString() const // TODO: customize string
+			[[nodiscard]] DIRE_STRING AsString() const // TODO: customize string
 			{
-				std::string serializedString;
+				DIRE_STRING serializedString;
 				serializedString.resize(SerializedBuffer.size());
 				memcpy(serializedString.data(), SerializedBuffer.data(), sizeof(std::byte) * SerializedBuffer.size());
 				return serializedString;
 			}
 
-			operator std::string() const
+			operator DIRE_STRING() const
 			{
 				return AsString();
 			}
@@ -48,13 +51,13 @@ namespace DIRE_NS
 
 		virtual bool	SerializesMetadata() const = 0;
 
-		virtual void	SerializeString(std::string_view pSerializedString) = 0;
+		virtual void	SerializeString(DIRE_STRING_VIEW pSerializedString) = 0;
 		virtual void	SerializeInt(int32_t pSerializedInt) = 0;
 		virtual void	SerializeFloat(float pSerializedFloat) = 0;
 		virtual void	SerializeBool(bool pSerializedBool) = 0;
 
 		using SerializedValueFiller = void (*)(ISerializer& pSerializer);
-		virtual void	SerializeValuesForObject(std::string_view pObjectName, SerializedValueFiller pFillerFunction) = 0;
+		virtual void	SerializeValuesForObject(DIRE_STRING_VIEW pObjectName, SerializedValueFiller pFillerFunction) = 0;
 	};
 
 	class IDeserializer

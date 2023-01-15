@@ -33,6 +33,15 @@ DIRE_BITMASK_ENUM(BitEnum, int, one, two, four, eight);
 TEST_CASE("Bitmask enum values", "[Enums]")
 {
 	REQUIRE((BitEnum::one == 1 && BitEnum::two == 2 && BitEnum::four == 4 && BitEnum::eight == 8));
+
+	BitEnum anEnum{ BitEnum::one };
+	BitEnum another{ anEnum };
+	another = BitEnum::two;
+
+	REQUIRE((anEnum == BitEnum::one && anEnum != another));
+
+	another = anEnum;
+	REQUIRE((anEnum == BitEnum::one && anEnum == another));
 }
 
 TEST_CASE("Bitmask enum bit manipulation", "[Enums]")

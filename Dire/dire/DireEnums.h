@@ -2,6 +2,7 @@
 
 #include "DireMacros.h"
 #include "DireString.h"
+
 #include <string.h> // strcmp
 #include <type_traits> // enable_if
 
@@ -40,19 +41,19 @@ namespace DIRE_NS
 			Value = pVal;\
 			return *this;\
 		}\
-		bool operator!=(EnumName const& pOther)\
+		bool operator!=(EnumName const& pOther) const\
 		{\
 			return (Value != pOther.Value);\
 		}\
-		bool operator!=(Values const pVal)\
+		bool operator!=(Values const pVal) const\
 		{\
 			return (Value == pVal);\
 		}\
-		bool operator==(EnumName const& pOther)\
+		bool operator==(EnumName const& pOther) const\
 		{\
 			return !(*this != pOther);\
 		}\
-		bool operator==(Values const pVal)\
+		bool operator==(Values const pVal) const\
 		{\
 			return (Value == pVal);\
 		}\
@@ -195,19 +196,19 @@ namespace DIRE_NS
 			Value = pVal;\
 			return *this;\
 		}\
-		bool operator!=(EnumName const& pOther)\
+		bool operator!=(EnumName const& pOther) const\
 		{\
 			return (Value != pOther.Value);\
 		}\
-		bool operator!=(Values const pVal)\
+		bool operator!=(Values const pVal) const\
 		{\
 			return (Value == pVal);\
 		}\
-		bool operator==(EnumName const& pOther)\
+		bool operator==(EnumName const& pOther) const\
 		{\
 			return !(*this != pOther);\
 		}\
-		bool operator==(Values const pVal)\
+		bool operator==(Values const pVal) const\
 		{\
 			return (Value == pVal);\
 		}\
