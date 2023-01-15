@@ -74,7 +74,6 @@ TEST_CASE("Binary Export", "[TypeInfoDatabase]")
 TEST_CASE("Binary Import", "[TypeInfoDatabase]")
 {
 	dire::Reflector3 aDatabase;
-
 	dire::TypeInfo tata("tata");
 	tata.SetID(aDatabase.RegisterTypeInfo(&tata));
 
@@ -92,10 +91,6 @@ TEST_CASE("Binary Import", "[TypeInfoDatabase]")
 
 	bool success = aDatabase.ExportToBinaryFile("database.bin");
 	REQUIRE(success);
-	// For example : types can have changed names, the same type can now have a different reflectable ID,
-	// there can be "twin types" (types with the same names, how to differentiate them?),
-	// "orphaned types" (types that were imported but are not in the executable anymore)...
-	// This function tries to "patch the holes" as best as it can.
 
 	SECTION("Ideal scenario: everything is as we saved it")
 	{
@@ -146,7 +141,6 @@ TEST_CASE("Binary Import", "[TypeInfoDatabase]")
 		}
 
 		// Reimport again
-
 		dire::Reflector3 aDatabase3;
 		tete.SetID(aDatabase3.RegisterTypeInfo(&tete));
 		toto.SetID(aDatabase3.RegisterTypeInfo(&toto));
@@ -156,16 +150,64 @@ TEST_CASE("Binary Import", "[TypeInfoDatabase]")
 		success = aDatabase3.ImportFromBinaryFile("database.bin");
 		REQUIRE(success);
 		REQUIRE((tete.GetID() == 1 && toto.GetID() == 3 && tutu.GetID() == 4));
+	}
 
+	SECTION("Case study 3 : New types appeared")
+	{
+		// Insert newcomers at the beginning, middle, and end
+		dire::TypeInfo tyty("tyty");
+		tyty.SetID(0);
+		aDatabase.myReflectableTypeInfos.insert(aDatabase.myReflectableTypeInfos.begin(), &tyty);
+
+		dire::TypeInfo toutou("toutou");
+		toutou.SetID(3);
+		aDatabase.myReflectableTypeInfos.insert(aDatabase.myReflectableTypeInfos.begin() + 3, &toutou);
+
+		dire::TypeInfo teetee("teetee");
+		teetee.SetID(7);
+		aDatabase.myReflectableTypeInfos.insert(aDatabase.myReflectableTypeInfos.begin() + 7, &teetee);
+
+
+		for (int i = 1; i < aDatabase.myReflectableTypeInfos.size(); ++i)
+		{
+			if (aDatabase.myReflectableTypeInfos[i] != &toutou && aDatabase.myReflectableTypeInfos[i] != &teetee)
+				aDatabase.myReflectableTypeInfos[i]->SetID(i);
+		}
+
+		success = aDatabase.ImportFromBinaryFile("database.bin");
+		REQUIRE(success);
+
+		// The database is supposed to be authoritative and reset all old types to their original ID.
+		REQUIRE((tata.GetID() == 0 && tete.GetID() == 1 && titi.GetID() == 2 && toto.GetID() == 3 && tutu.GetID() == 4));
+
+		// newcomers get new IDs
+		REQUIRE((tyty.GetID() == 5 && toutou.GetID() == 6 && teetee.GetID() == 7));
 	}
 
 
-	// Case study 3 : New types appeared
+	SECTION("Case study 4 : the 'mega mix' : existing types moved around, some are missing, and new types appeared")
+	{
+		dire::Reflector3 aDatabase4;
+
+		tutu.SetID(aDatabase4.RegisterTypeInfo(&tutu));
+
+		tete.SetID(aDatabase4.RegisterTypeInfo(&tete));
+
+		dire::TypeInfo tyty("tyty");
+		tyty.SetID(aDatabase4.RegisterTypeInfo(&tyty));
+
+		toto.SetID(aDatabase4.RegisterTypeInfo(&toto));
+
+		dire::TypeInfo toutou("toutou");
+		toutou.SetID(aDatabase4.RegisterTypeInfo(&toutou));
+
+		success = aDatabase4.ImportFromBinaryFile("database.bin");
+		// The database is supposed to be authoritative and reset all old types to their original ID.
+		REQUIRE((tete.GetID() == 1 && toto.GetID() == 3 && tutu.GetID() == 4 && tyty.GetID() == 5 && toutou.GetID() == 6));
+	}
 
 
-	// Case study 4 : the "mega mix" : existing types moved around, some are missing, and new types appeared
-
-	SECTION("Cleanup the test file")
+	SECTION("Cleanup")
 	{
 		success = !std::remove("database.bin");
 		CHECK(success);

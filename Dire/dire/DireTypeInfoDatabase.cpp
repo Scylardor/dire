@@ -145,13 +145,11 @@ bool	DIRE_NS::Reflector3::ImportFromBinaryFile(DIRE_STRING_VIEW pReadSettingsFil
 	std::vector<ExportedTypeInfoData> theReadData(nbTypeInfos);
 
 	unsigned iTypeInfo = 0;
+	unsigned maxTypeInfoID = 0; // will be useful to assign new IDs to new types not in the database
 	while (iTypeInfo < nbTypeInfos)
 	{
 		ExportedTypeInfoData& curData = theReadData[iTypeInfo];
 
-		curData.ReflectableID = iTypeInfo;
-
-		//TODO: probably useless, to remove!
 		unsigned& storedReflectableID = *reinterpret_cast<unsigned*>(readBuffer.data() + offset);
 		curData.ReflectableID = storedReflectableID;
 		offset += sizeof(storedReflectableID);
@@ -160,28 +158,17 @@ bool	DIRE_NS::Reflector3::ImportFromBinaryFile(DIRE_STRING_VIEW pReadSettingsFil
 		curData.TypeName = typeName;
 		offset += curData.TypeName.length() + 1; // +1 for \0
 
+		maxTypeInfoID = std::max(maxTypeInfoID, storedReflectableID);
+
 		iTypeInfo++;
 	}
 
-	// Walk our registry and see if we find the imported types. Patch the reflectable type ID if necessary.
-	std::vector<ExportedTypeInfoData*> orphanedTypes; // Types that were "lost" - cannot find them in the registry. Will have to "guess" if an existing type matches them or not.
-
-	// Always resize the registry to at least the size of data we read,
-	// because we absolutely have to keep the same ID for imported types.
-	//if (myReflectableTypeInfos.size() < theReadData.size())
-	//{
-	//	myReflectableTypeInfos.resize(theReadData.size());
-	//}
-
+	// To assign new IDs to new types not in the database
+	unsigned nextAvailableID = maxTypeInfoID + 1;
 
 	for (int iReg = 0; iReg < myReflectableTypeInfos.size(); ++iReg)
 	{
 		TypeInfo* registeredTypeInfo = myReflectableTypeInfos[iReg];
-
-		//if (registeredTypeInfo == nullptr) // possible due to the resize
-		//{
-		//	continue;
-		//}
 
 		// Is this type in the read info ?
 		auto it = std::find_if(theReadData.begin(), theReadData.end(),
@@ -196,73 +183,14 @@ bool	DIRE_NS::Reflector3::ImportFromBinaryFile(DIRE_STRING_VIEW pReadSettingsFil
 			if (it->ReflectableID != registeredTypeInfo->GetID())
 			{
 				registeredTypeInfo->SetID(it->ReflectableID);
-				//// Registered type info should be in sequential order, by ID. If this type info is not at the right place, "switch" it.
-				//if (iReg != registeredTypeInfo->GetID())
-				//{
-				//	std::iter_swap(myReflectableTypeInfos.begin() + iReg, myReflectableTypeInfos.begin() + registeredTypeInfo->GetID());
-				//	iReg--; // loop over the same item, as there was a swap
-				//}
 			}
 		}
-	}
-
-	// erase-remove all the null pointers.
-	auto isNull = [](TypeInfo* pInfo) { return pInfo == nullptr; };
-	myReflectableTypeInfos.erase(std::remove_if(myReflectableTypeInfos.begin(), myReflectableTypeInfos.end(), isNull), myReflectableTypeInfos.end());
-
-	return true;
-
-	for (int iReg = 0; iReg < myReflectableTypeInfos.size(); ++iReg)
-	{
-		auto& registeredTypeInfo = myReflectableTypeInfos[iReg];
-
-		if (iReg >= theReadData.size())
+		else
 		{
-			// We reached the end of imported types : all the next ones are new types
-			break;
-		}
-
-		auto& readTypeInfo = theReadData[iReg];
-
-		// There can be null type infos due to a previous resize if there are more imported types than registered types.
-		if (registeredTypeInfo == nullptr || readTypeInfo.TypeName != registeredTypeInfo->GetName())
-		{
-			// mismatch: try to find the read typeinfo in the registered data
-			auto it = std::find_if(myReflectableTypeInfos.begin(), myReflectableTypeInfos.end(),
-				[readTypeInfo](TypeInfo const* pTypeInfo)
-				{
-					return pTypeInfo != nullptr && pTypeInfo->GetName() == readTypeInfo.TypeName;
-				});
-			if (it != myReflectableTypeInfos.end())
-			{
-				std::iter_swap(myReflectableTypeInfos.begin() + iReg, it);
-				myReflectableTypeInfos[iReg]->SetID(readTypeInfo.ReflectableID);
-			}
-			else
-			{
-				orphanedTypes.push_back(&readTypeInfo);
-				if (registeredTypeInfo != nullptr)
-				{
-					// If we are here, the registered type is new one (not found in imported types),
-					// so push it back to fix its reflectable ID later. We should let the not found type block "empty".
-					myReflectableTypeInfos.push_back(registeredTypeInfo);
-					registeredTypeInfo = nullptr;
-				}
-			}
-		}
-		else if (readTypeInfo.ReflectableID != registeredTypeInfo->GetID())
-		{
-			registeredTypeInfo->SetID(readTypeInfo.ReflectableID);
-		}
-	}
-
-	// In case of new types - make sure their IDs are correct, otherwise fix them
-	for (unsigned iReg = (unsigned)theReadData.size(); iReg < myReflectableTypeInfos.size(); ++iReg)
-	{
-		auto& registeredTypeInfo = myReflectableTypeInfos[iReg];
-		if (registeredTypeInfo != nullptr && registeredTypeInfo->GetID() != iReg)
-		{
-			registeredTypeInfo->SetID(iReg);
+			// it's a new type that wasn't here when the database was built.
+			// It may have a "valid" ID (an ID that wasnt taken by any type in the database),
+			// but it's more trouble than it's worth to check. Just assign it a new ID.
+			registeredTypeInfo->SetID(nextAvailableID++);
 		}
 	}
 
