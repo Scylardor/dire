@@ -1,19 +1,13 @@
 #pragma once
 #include <any>
 #include <cassert>
-#include <cstdlib> // atoi
 #include <cstddef> // std::byte
-#include <any>
+#include <stdexcept> // TODO should be conditional
 
 #include "DireTypeInfo.h"
 #include "DireMacros.h"
 #include "DireArrayDataStructureHandler.h"
 #include "DireString.h"
-
-namespace std
-{
-	enum class byte : unsigned char;
-}
 
 namespace DIRE_NS
 {

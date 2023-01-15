@@ -20,6 +20,15 @@ namespace testNS
 		DIRE_REFLECTABLE_INFO()
 
 		DIRE_PROPERTY(bool, useless, true)
+
+		DIRE_ARRAY_PROPERTY(char, pouet, [10])
+	};
+
+	dire_reflectable(struct Nested3, Nested2)
+	{
+		DIRE_REFLECTABLE_INFO()
+
+		DIRE_PROPERTY(bool, allo, true)
 	};
 }
 
@@ -53,6 +62,8 @@ dire_reflectable(struct Copyable)
 dire_reflectable(struct testcompound2)
 {
 	DIRE_REFLECTABLE_INFO()
+
+	int pouet = 1;
 
 	DIRE_PROPERTY(int, leet, 1337);
 	DIRE_PROPERTY(Copyable, copyable);
@@ -141,7 +152,6 @@ dire_reflectable(struct b, a, NotAReflectable) // an example of multiple inherit
 
 	DIRE_PROPERTY(testcompound, compvar)
 
-	DIRE_ARRAY_PROPERTY(char, pouet, [10])
 };
 
 dire_reflectable(struct c, b)
@@ -163,6 +173,12 @@ dire_reflectable(struct c, b)
 	{
 	}
 
+};
+
+dire_reflectable(struct mapType)
+{
+	DIRE_REFLECTABLE_INFO()
+	DIRE_PROPERTY((std::map<int, bool>), aEvenOddMap);
 };
 
 dire_reflectable(struct MapCompound)

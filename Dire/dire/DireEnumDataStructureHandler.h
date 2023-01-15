@@ -8,7 +8,7 @@ namespace DIRE_NS
 	{
 		using EnumToStringFptr = const char* (*)(const void*);
 		using SetFromStringFptr = void (*)(const char*, void*);
-		using EnumTypeFptr = Type(*)();
+		using EnumTypeFptr = Type::Values (*)();
 
 		EnumToStringFptr	EnumToString = nullptr;
 		SetFromStringFptr	SetFromString = nullptr;
@@ -20,7 +20,7 @@ namespace DIRE_NS
 	{
 		TypedEnumDataStructureHandler()
 		{
-			EnumToString = [](const void* pVal) { return T::GetStringFromSafeEnum(*(const typename T::Type*)pVal); };
+			EnumToString = [](const void* pVal) { return T::GetStringFromSafeEnum(*(const typename T::Values*)pVal); };
 			SetFromString = &SetEnumFromString;
 			EnumType = &FromEnumToUnderlyingType<T>;
 		}
@@ -28,7 +28,7 @@ namespace DIRE_NS
 		static void	SetEnumFromString(const char* pEnumStr, void* pEnumAddr)
 		{
 			T* theEnum = (T*)pEnumAddr;
-			const typename T::Type* enumValue = T::GetValueFromString(pEnumStr);
+			const typename T::Values* enumValue = T::GetValueFromString(pEnumStr);
 			if (theEnum && enumValue != nullptr)
 			{
 				*theEnum = *enumValue;

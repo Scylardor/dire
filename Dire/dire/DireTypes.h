@@ -77,7 +77,7 @@ namespace DIRE_NS
 	DECLARE_ENABLE_IF_TRANSLATOR(Type::Reference, std::is_reference_v<T>)
 
 	template <typename T>
-	constexpr Type	FromEnumToUnderlyingType()
+	constexpr Type::Values	FromEnumToUnderlyingType()
 	{
 		static_assert(IsEnum<T>);
 

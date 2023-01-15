@@ -15,6 +15,8 @@ namespace DIRE_NS
 {
 	class RapidJsonReflectorSerializer : public ISerializer
 	{
+	public:
+
 		virtual Result Serialize(const Reflectable2 & serializedObject) override;
 
 		virtual bool	SerializesMetadata() const override
@@ -28,14 +30,15 @@ namespace DIRE_NS
 		inline virtual void	SerializeBool(bool pSerializedBool) override;
 		inline virtual void	SerializeValuesForObject(DIRE_STRING_VIEW pObjectName, SerializedValueFiller pFillerFunction) override;
 
-		void	SerializeValue(Type pPropType, const void * pPropPtr, const DataStructureHandler * pHandler = nullptr);
+		inline void	SerializeValue(Type pPropType, const void * pPropPtr, const DataStructureHandler * pHandler = nullptr);
 
-		void	SerializeArrayValue(const void * pPropPtr, const ArrayDataStructureHandler * pArrayHandler);
+		inline void	SerializeArrayValue(const void * pPropPtr, const ArrayDataStructureHandler * pArrayHandler);
 
-		void	SerializeMapValue(const void * pPropPtr, const MapDataStructureHandler * pMapHandler);
+		inline void	SerializeMapValue(const void * pPropPtr, const MapDataStructureHandler * pMapHandler);
 
-		void	SerializeCompoundValue(const void * pPropPtr);
+		inline void	SerializeCompoundValue(const void * pPropPtr);
 
+	private:
 		// TODO: allow to provide a custom allocator for StringBuffer and Writer
 		rapidjson::StringBuffer	myBuffer;
 		rapidjson::Writer<rapidjson::StringBuffer>	myJsonWriter;
@@ -71,7 +74,6 @@ namespace DIRE_NS
 
 		myJsonWriter.EndObject();
 	}
-
 }
 
 #endif

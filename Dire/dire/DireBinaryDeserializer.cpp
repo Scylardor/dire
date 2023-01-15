@@ -118,7 +118,7 @@ namespace DIRE_NS
 		if (!deserializedTypeInfo->IsParentOf(objTypeInfo->GetID()))
 			return;
 
-		char* objectPtr = (char*)pPropPtr + deserializedTypeInfo->GetVptrOffset();
+		char* objectPtr = (char*)pPropPtr;
 
 		const auto* nextPropertyHeader = &ReadFromBytes<BinarySerializationHeaders::Property>();
 		unsigned iProp = 0;

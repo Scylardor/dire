@@ -24,9 +24,6 @@ set(${PROJECT_NAME}_NAMESPACE "dire" CACHE STRING "Namespace the DIRE library wi
 set(${PROJECT_NAME}_STRING "std::string" CACHE STRING "Type the DIRE library should use for standard dynamic string manipulation.")
 set(${PROJECT_NAME}_REFLECTABLE_INSTANTIATE_WITH_DEFAULT_CONSTRUCTOR "If on, default-constructible types derived from Reflectable will automatically register their default constructor as a Reflectable instantiator function." ON)
 
-option(${PROJECT_NAME}_BUILD_UNIT_TESTS "Builds the unit tests of the DIRE library (for library developers)." OFF)
-set(${PROJECT_NAME}_TESTS_CATCH_VERSION "v3.2.1" CACHE STRING "Version of Catch2 library downloaded from Github (for library developers).")
-
 
 set(DIRE_SOURCE_DIR ${PROJECT_SOURCE_DIR}/${PROJECT_NAME}/${PROJECT_NAME})
 set(DIRE_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/${PROJECT_NAME})
@@ -83,7 +80,7 @@ if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_RAPID
 		${DIRE_SOURCE_DIR}/DireJSONDeserializer.cpp
 	)
 endif()
-if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_BINARY_SERIALIZER_ENABLED)
+if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_BINARY_ENABLED)
 	target_sources(${PROJECT_NAME} PRIVATE
 		${DIRE_SOURCE_DIR}/DireBinarySerializer.h
 		${DIRE_SOURCE_DIR}/DireBinaryDeserializer.h
@@ -126,7 +123,7 @@ if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_RAPID
 	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_USE_JSON_SERIALIZATION=1)
 endif()
 
-if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_BINARY_SERIALIZER_ENABLED)
+if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_BINARY_ENABLED)
 	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_USE_BINARY_SERIALIZATION=1)
 endif()
 
@@ -135,7 +132,7 @@ if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZABLE_PROPER
 endif()
 
 # Unit tests
-if(${PROJECT_NAME}_BUILD_UNIT_TESTS)
-	add_subdirectory(tests)
-endif()
+add_subdirectory(tests)
+
+
 

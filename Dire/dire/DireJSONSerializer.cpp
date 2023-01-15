@@ -25,28 +25,27 @@ case Type::TypeEnum:\
 		myJsonWriter.StartObject();
 
 		Reflector3::GetSingleton().GetTypeInfo(serializedObject.GetReflectableClassID())->ForEachPropertyInHierarchy([&serializedObject, this](const PropertyTypeInfo & pProperty)
+		{
+			PropertyTypeInfo::SerializationState serializableState = pProperty.GetSerializableState();
+			if (serializableState.IsSerializable == true)
 			{
-				PropertyTypeInfo::SerializationState serializableState = pProperty.GetSerializableState();
-				if (serializableState.IsSerializable == true)
+				void const* propPtr = serializedObject.GetProperty(pProperty.GetName());
+				myJsonWriter.String(pProperty.GetName().data(), (rapidjson::SizeType)pProperty.GetName().size());
+				this->SerializeValue(pProperty.GetMetatype(), propPtr, &pProperty.GetDataStructureHandler());
+
+				if (SerializesMetadata() && serializableState.HasAttributesToSerialize)
 				{
-					void const* propPtr = serializedObject.GetProperty(pProperty.GetName());
-					myJsonWriter.String(pProperty.GetName().data(), (rapidjson::SizeType)pProperty.GetName().size());
-					this->SerializeValue(pProperty.GetMetatype(), propPtr, &pProperty.GetDataStructureHandler());
+					const std::string metadataName = pProperty.GetName() + "_metadata";
+					myJsonWriter.String(metadataName.data(), (rapidjson::SizeType)metadataName.size());
 
-					if (SerializesMetadata() && serializableState.HasAttributesToSerialize)
-					{
-						const std::string metadataName = pProperty.GetName() + "_metadata";
-						myJsonWriter.String(metadataName.data(), (rapidjson::SizeType)metadataName.size());
+					myJsonWriter.StartObject();
 
-						myJsonWriter.StartObject();
+					pProperty.SerializeAttributes(*this);
 
-						pProperty.SerializeAttributes(*this);
-
-						myJsonWriter.EndObject();
-					}
+					myJsonWriter.EndObject();
 				}
-
-			});
+			}
+		});
 
 		myJsonWriter.EndObject();
 

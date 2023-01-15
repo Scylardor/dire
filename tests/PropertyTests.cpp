@@ -66,10 +66,11 @@ TEST_CASE("GetProperty Array", "[Property]")
 	}
 
 	// inherited
-	superC.pouet[6] = '*';
-	const char* ch = superC.GetProperty<char>("pouet[6]");
+	testNS::Nested3 child;
+	child.pouet[6] = '*';
+	const char* ch = child.GetProperty<char>("pouet[6]");
 	REQUIRE(*ch == '*');
-	char ch2 = superC.GetSafeProperty<char>("pouet[6]");
+	char ch2 = child.GetSafeProperty<char>("pouet[6]");
 	REQUIRE(ch2 == '*');
 
 	// in multiarray

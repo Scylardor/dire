@@ -167,7 +167,7 @@ namespace DIRE_NS
 			}
 			else
 			{
-				return INVALID_REFLECTABLE_ID;
+				return (unsigned)-1; // TODO
 			}
 		}
 
@@ -317,7 +317,7 @@ namespace DIRE_NS
 			}
 			else
 			{
-				return INVALID_REFLECTABLE_ID;
+				return (unsigned)-1; // TODO
 			}
 		}
 

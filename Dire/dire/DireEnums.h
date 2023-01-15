@@ -47,7 +47,7 @@ namespace DIRE_NS
 		}\
 		bool operator!=(Values const pVal) const\
 		{\
-			return (Value == pVal);\
+			return (Value != pVal);\
 		}\
 		bool operator==(EnumName const& pOther) const\
 		{\
@@ -202,7 +202,7 @@ namespace DIRE_NS
 		}\
 		bool operator!=(Values const pVal) const\
 		{\
-			return (Value == pVal);\
+			return (Value != pVal);\
 		}\
 		bool operator==(EnumName const& pOther) const\
 		{\

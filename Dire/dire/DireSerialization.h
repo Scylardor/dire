@@ -4,6 +4,7 @@
 
 #include <vector>
 #include "DireString.h"
+#include "DireTypeInfo.h"
 
 namespace DIRE_NS
 {
@@ -77,7 +78,7 @@ namespace DIRE_NS
 		template <typename... Args>
 		Reflectable2* Deserialize(const char* pSerialized, unsigned pReflectableClassID, Args&&... pArgs)
 		{
-			TypeInfo const* typeInfo = Reflector3::GetSingleton().GetTypeInfo(pReflectableClassID);
+			const TypeInfo * typeInfo = Reflector3::GetSingleton().GetTypeInfo(pReflectableClassID);
 			if (typeInfo == nullptr) // bad ID
 			{
 				return nullptr;
