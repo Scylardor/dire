@@ -18,11 +18,14 @@ option(${PROJECT_NAME}_SERIALIZATION_ENABLED "Enables the Serialization features
 option(${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED "Enables the JSON serialization feature of the DIRE library, using RapidJSON." ON)
 set(${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_VERSION master CACHE STRING "RapidJSON version that DIRE will try to use if not found on the system.")
 option(${PROJECT_NAME}_SERIALIZATION_BINARY_ENABLED "Enables the binary serialization feature of the DIRE library." ON)
-option(${PROJECT_NAME}_SERIALIZABLE_PROPERTIES_BY_DEFAULT "If true, Dire properties are serializable by default, unless tagged with the NotSerializable attribute. If false, Dire properties are not serializable by default, unless tagged with the Serializable attribute." ON)
+option(${PROJECT_NAME}_SERIALIZABLE_PROPERTIES_BY_DEFAULT "If true, Dire properties are serializable by default, unless tagged with the NotSerializable attribute. If false, they are not serializable by default, unless tagged with the Serializable attribute." ON)
+
+set(${PROJECT_NAME}_REFLECTABLE_INSTANTIATE_WITH_DEFAULT_CONSTRUCTOR "If on, default-constructible Reflectable types will automatically register their default constructor as their instantiator function." ON)
 
 set(${PROJECT_NAME}_NAMESPACE "dire" CACHE STRING "Namespace the DIRE library will use (in case of a naming conflict)")
 set(${PROJECT_NAME}_STRING "std::string" CACHE STRING "Type the DIRE library should use for standard dynamic string manipulation.")
-set(${PROJECT_NAME}_REFLECTABLE_INSTANTIATE_WITH_DEFAULT_CONSTRUCTOR "If on, default-constructible types derived from Reflectable will automatically register their default constructor as a Reflectable instantiator function." ON)
+set(${PROJECT_NAME}_ASSERT "assert" CACHE STRING "Assert expression Dire should use in case of error")
+
 
 
 set(DIRE_SOURCE_DIR ${PROJECT_SOURCE_DIR}/${PROJECT_NAME}/${PROJECT_NAME})
@@ -62,8 +65,9 @@ add_library(${PROJECT_NAME} STATIC #TODO customize
 	${DIRE_SOURCE_DIR}/DirePropertyMetadata.h
 	${DIRE_SOURCE_DIR}/DirePropertyMetadata.inl
 	${DIRE_SOURCE_DIR}/DireSubclass.h
+	${DIRE_SOURCE_DIR}/DireAssert.h
+	${DIRE_SOURCE_DIR}/DireReflectableID.h
 )
-set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 
 # Conditional Sources
 
@@ -109,6 +113,12 @@ if(${${PROJECT_NAME}_STRING} STREQUAL "std::string")
 	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_USE_STD_STRING=1)
 else()
 	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_STRING=${${PROJECT_NAME}_STRING})
+endif()
+
+if(${${PROJECT_NAME}_ASSERT} STREQUAL "assert")
+	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_USE_STD_ASSERT=1)
+else()
+	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_ASSERT=${${PROJECT_NAME}_ASSERT})
 endif()
 
 if(${PROJECT_NAME}_REFLECTABLE_INSTANTIATE_WITH_DEFAULT_CONSTRUCTOR)

@@ -64,8 +64,8 @@ TEST_CASE("Subclass Instantiate", "[Reflectable]")
 	delete custom;
 
 	// invalid ID
-	aSubClass.SetClass((unsigned) -1); // TODO: reflectableID
-	REQUIRE(aSubClass.GetClassID() == (unsigned)-1);
+	aSubClass.SetClass(dire::INVALID_REFLECTABLE_ID);
+	REQUIRE(aSubClass.GetClassID() == dire::INVALID_REFLECTABLE_ID);
 	a* null = aSubClass.Instantiate();
 	REQUIRE(null == nullptr);
 

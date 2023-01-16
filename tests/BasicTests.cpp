@@ -36,7 +36,7 @@ TEST_CASE("GetPropertyList with DECLARE_REFLECTABLE_INFO and basic types", "[Bas
 
 	for (dire::PropertyTypeInfo const& prop : refl.GetPropertyList())
 	{
-		output << prop.GetName().c_str() << ' ' << prop.GetSize() << ' ' << prop.GetOffset() << ' ' << prop.GetMetatype().GetString() << '\n';
+		output << prop.GetName().data() << ' ' << prop.GetSize() << ' ' << prop.GetOffset() << ' ' << prop.GetMetatype().GetString() << '\n';
 	}
 	auto result = output.str();
 	REQUIRE(result == "aBool 1 0 Bool\naChar 1 1 Char\naUChar 1 2 UChar\naShort 2 4 Short\naUShort 2 6 UShort\nanInt 4 8 Int\nanInt64 8 16 Int64\nanUInt 4 24 Uint\nanUInt64 8 32 Uint64\naFloat 4 40 Float\naDouble 8 48 Double\n");

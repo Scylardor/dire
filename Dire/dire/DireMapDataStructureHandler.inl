@@ -1,4 +1,5 @@
 #pragma once
+#include "DireReflectableID.h"
 
 namespace DIRE_NS
 {
@@ -13,7 +14,7 @@ namespace DIRE_NS
 		using ArrayClearFptr = void	(*)(void*);
 		using ArraySizeFptr = size_t(*)(void const*);
 		using ArrayElementHandlerFptr = DataStructureHandler(*)();
-		using ArrayElementReflectableIDFptr = unsigned (*)();
+		using ArrayElementReflectableIDFptr = ReflectableID(*)();
 		using ArrayElementType = Type(*)();
 		using ArrayElementSize = size_t(*)();
 

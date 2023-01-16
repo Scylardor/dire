@@ -3,7 +3,7 @@
 
 #include <fstream>
 
-const DIRE_NS::TypeInfo * DIRE_NS::Reflector3::GetTypeInfo(unsigned classID) const
+const DIRE_NS::TypeInfo * DIRE_NS::Reflector3::GetTypeInfo(ReflectableID classID) const
 {
 	// TypeInfos IDs are supposed to match their position in the vector, but not always because of possible binary import/exports.
 	// if possible, use Reflectable::GetTypeInfo instead.
@@ -22,13 +22,13 @@ const DIRE_NS::TypeInfo * DIRE_NS::Reflector3::GetTypeInfo(unsigned classID) con
 	return nullptr;
 }
 
-DIRE_NS::TypeInfo* DIRE_NS::Reflector3::EditTypeInfo(unsigned classID)
+DIRE_NS::TypeInfo* DIRE_NS::Reflector3::EditTypeInfo(ReflectableID classID)
 {
 	const TypeInfo* typeInfo = GetTypeInfo(classID);
 	return const_cast<TypeInfo*>(typeInfo);
 }
 
-DIRE_NS::Reflectable2* DIRE_NS::Reflector3::TryInstantiate(unsigned pClassID, std::any const& pAnyParameterPack) const
+DIRE_NS::Reflectable2* DIRE_NS::Reflector3::TryInstantiate(ReflectableID pClassID, std::any const& pAnyParameterPack) const
 {
 	ReflectableFactory::InstantiateFunction anInstantiateFunc = myInstantiateFactory.GetInstantiator(pClassID);
 	if (anInstantiateFunc == nullptr)
@@ -55,8 +55,8 @@ DIRE_STRING	DIRE_NS::Reflector3::BinaryExport() const
 	// - the typename string
 	DIRE_STRING writeBuffer;
 	auto nbTypeInfos = (unsigned)myReflectableTypeInfos.size();
-	// TODO: unsigned -> ReflectableID
-	const int estimatedNamesStorage = (sizeof(unsigned) + 64) * nbTypeInfos; // expect 64 chars or less for a typename (i.e. 63 + 1 \0)
+
+	const int estimatedNamesStorage = (sizeof(ReflectableID) + 64) * nbTypeInfos; // expect 64 chars or less for a typename (i.e. 63 + 1 \0)
 	writeBuffer.resize(sizeof(DATABASE_VERSION) + sizeof(nbTypeInfos) + estimatedNamesStorage);
 	size_t offset = 0;
 
@@ -65,7 +65,7 @@ DIRE_STRING	DIRE_NS::Reflector3::BinaryExport() const
 
 	for (TypeInfo const* typeInfo : myReflectableTypeInfos)
 	{
-		const unsigned typeID = typeInfo->GetID(); // TODO: reflectableID
+		const ReflectableID typeID = typeInfo->GetID();
 
 		const DIRE_STRING_VIEW& typeName = typeInfo->GetName();
 		const auto nameLen = (unsigned)typeName.length();
@@ -145,12 +145,12 @@ bool	DIRE_NS::Reflector3::ImportFromBinaryFile(DIRE_STRING_VIEW pReadSettingsFil
 	std::vector<ExportedTypeInfoData> theReadData(nbTypeInfos);
 
 	unsigned iTypeInfo = 0;
-	unsigned maxTypeInfoID = 0; // will be useful to assign new IDs to new types not in the database
+	ReflectableID maxTypeInfoID = 0; // will be useful to assign new IDs to new types not in the database
 	while (iTypeInfo < nbTypeInfos)
 	{
 		ExportedTypeInfoData& curData = theReadData[iTypeInfo];
 
-		unsigned& storedReflectableID = *reinterpret_cast<unsigned*>(readBuffer.data() + offset);
+		ReflectableID& storedReflectableID = *reinterpret_cast<ReflectableID*>(readBuffer.data() + offset);
 		curData.ReflectableID = storedReflectableID;
 		offset += sizeof(storedReflectableID);
 
@@ -164,7 +164,7 @@ bool	DIRE_NS::Reflector3::ImportFromBinaryFile(DIRE_STRING_VIEW pReadSettingsFil
 	}
 
 	// To assign new IDs to new types not in the database
-	unsigned nextAvailableID = maxTypeInfoID + 1;
+	ReflectableID nextAvailableID = maxTypeInfoID + 1;
 
 	for (int iReg = 0; iReg < myReflectableTypeInfos.size(); ++iReg)
 	{

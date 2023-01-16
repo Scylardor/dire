@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include "DireString.h"
+#include "DireReflectableID.h"
 
 namespace std
 {
@@ -15,7 +16,6 @@ namespace std
 
 namespace DIRE_NS
 {
-	using ReflectableID = unsigned;
 	class TypeInfo;
 	class Reflectable2;
 
@@ -26,7 +26,7 @@ namespace DIRE_NS
 
 		ReflectableFactory() = default;
 
-		void	RegisterInstantiator(unsigned pID, InstantiateFunction pFunc)
+		void	RegisterInstantiator(ReflectableID pID, InstantiateFunction pFunc)
 		{
 			// Replace the existing one, if any.
 			auto [it, inserted] = myInstantiators.try_emplace(pID, pFunc);
@@ -36,7 +36,7 @@ namespace DIRE_NS
 			}
 		}
 
-		InstantiateFunction	GetInstantiator(unsigned pID) const
+		InstantiateFunction	GetInstantiator(ReflectableID pID) const
 		{
 			auto it = myInstantiators.find(pID);
 			if (it == myInstantiators.end())
@@ -48,11 +48,10 @@ namespace DIRE_NS
 		}
 
 	private:
-
-		std::unordered_map<unsigned, InstantiateFunction>	myInstantiators;
+		std::unordered_map<ReflectableID, InstantiateFunction>	myInstantiators;
 	};
 
-	// TODO: replace all the unsigned by a unified typedef
+
 	struct Reflector3 : Singleton<Reflector3>, AutomaticTypeCounter<Reflector3, ReflectableID>
 	{
 		inline static const unsigned DATABASE_VERSION = 0;
@@ -62,17 +61,17 @@ namespace DIRE_NS
 			return myReflectableTypeInfos.size();
 		}
 
-		[[nodiscard]] TypeInfo const* GetTypeInfo(unsigned classID) const;
+		[[nodiscard]] TypeInfo const* GetTypeInfo(ReflectableID classID) const;
 
-		[[nodiscard]] TypeInfo* EditTypeInfo(unsigned classID);
+		[[nodiscard]] TypeInfo* EditTypeInfo(ReflectableID classID);
 
 
-		void	RegisterInstantiateFunction(unsigned pClassID, ReflectableFactory::InstantiateFunction pInstantiateFunction)
+		void	RegisterInstantiateFunction(ReflectableID pClassID, ReflectableFactory::InstantiateFunction pInstantiateFunction)
 		{
 			myInstantiateFactory.RegisterInstantiator(pClassID, pInstantiateFunction);
 		}
 
-		[[nodiscard]] Reflectable2* TryInstantiate(unsigned pClassID, std::any const& pAnyParameterPack) const;
+		[[nodiscard]] Reflectable2* TryInstantiate(ReflectableID pClassID, std::any const& pAnyParameterPack) const;
 
 		template <typename T, typename... Args>
 		[[nodiscard]] T* InstantiateClass(Args &&... pArgs) const
@@ -89,8 +88,8 @@ namespace DIRE_NS
 		// - the typename string
 		struct ExportedTypeInfoData
 		{
-			unsigned	ReflectableID;
-			std::string	TypeName;
+			ReflectableID	ReflectableID;
+			DIRE_STRING		TypeName;
 		};
 
 		DIRE_STRING	BinaryExport() const;
@@ -109,10 +108,10 @@ namespace DIRE_NS
 #endif
 		friend TypeInfo;
 
-		[[nodiscard]] unsigned	RegisterTypeInfo(TypeInfo* pTypeInfo)
+		[[nodiscard]] ReflectableID	RegisterTypeInfo(TypeInfo* pTypeInfo)
 		{
 			myReflectableTypeInfos.push_back(pTypeInfo);
-			return (unsigned)GetTypeInfoCount() - 1;
+			return (ReflectableID)GetTypeInfoCount() - 1;
 		}
 
 		std::vector<TypeInfo*>	myReflectableTypeInfos;

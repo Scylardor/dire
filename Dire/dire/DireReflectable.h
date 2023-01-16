@@ -7,6 +7,7 @@
 #include "DireTypeInfo.h"
 #include "DireMacros.h"
 #include "DireArrayDataStructureHandler.h"
+#include "DireAssert.h"
 #include "DireString.h"
 
 namespace DIRE_NS
@@ -42,11 +43,6 @@ namespace DIRE_NS
 #define DECLARE_INSTANTIATOR(...)  \
 	inline static DIRE_NS::ClassInstantiator<Self, __VA_ARGS__> DIRE_INSTANTIATOR;
 
-
-	using ReflectableID = unsigned;
-
-	static const ReflectableID INVALID_REFLECTABLE_ID = (ReflectableID)-1;
-
 	class Reflectable2
 	{
 		struct GetPropertyResult
@@ -61,9 +57,8 @@ namespace DIRE_NS
 		};
 
 	public:
-		using ClassID = unsigned;
 
-		[[nodiscard]] virtual ClassID			GetReflectableClassID() const = 0;
+		[[nodiscard]] virtual ReflectableID		GetReflectableClassID() const = 0;
 		[[nodiscard]] virtual const TypeInfo*	GetTypeInfo() const = 0;
 
 		template <typename TRefl>
@@ -160,8 +155,8 @@ namespace DIRE_NS
 			}
 
 			// throw exception, or assert
-			// TODO: check if exceptions are enabled and allow to customize assert macro
-			assert(false);
+			// TODO: check if exceptions are enabled
+			DIRE_ASSERT(false);
 			throw std::runtime_error("bad");
 		}
 
@@ -181,7 +176,7 @@ namespace DIRE_NS
 
 		[[nodiscard]] bool EraseProperty(DIRE_STRING_VIEW pName);
 
-		[[nodiscard]] const GetPropertyResult GetPropertyImpl(DIRE_STRING_VIEW pName) const;
+		[[nodiscard]] const GetPropertyResult GetPropertyImpl(DIRE_STRING_VIEW pFullPath) const;
 
 		[[nodiscard]] FunctionInfo const* GetFunction(DIRE_STRING_VIEW pMemberFuncName) const;
 
@@ -267,7 +262,7 @@ namespace DIRE_NS
 	{\
 		return DIRE_TypeInfo; \
 	}\
-	[[nodiscard]] virtual ClassID	GetReflectableClassID() const override\
+	[[nodiscard]] virtual DIRE_NS::ReflectableID	GetReflectableClassID() const override\
 	{\
 		return GetClassReflectableTypeInfo().GetID();\
 	}\

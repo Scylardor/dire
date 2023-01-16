@@ -1,6 +1,7 @@
 #if DIRE_USE_SERIALIZATION && DIRE_USE_BINARY_SERIALIZATION
 #include "DireBinarySerializer.h"
 #include "BinaryHeaders.h"
+#include "DireAssert.h"
 
 #define BINARY_SERIALIZE_VALUE_CASE(TypeEnum) \
 case Type::TypeEnum:\
@@ -73,7 +74,7 @@ namespace DIRE_NS
 		break;
 		default:
 			//Unmanaged type in SerializeValue!
-			assert(false); // TODO: for now
+			DIRE_ASSERT(false);
 		}
 	}
 
@@ -87,7 +88,7 @@ namespace DIRE_NS
 		if (elemType != Type::Unknown)
 		{
 			size_t arraySize = pArrayHandler->Size(pPropPtr);
-			size_t elemSize = pArrayHandler->ElementSize(); // TODO: perhaps use a sizeof LUT instead....
+			size_t elemSize = pArrayHandler->ElementSize();
 			WriteAsBytes<BinarySerializationHeaders::Array>(elemType, elemSize, arraySize);
 			DataStructureHandler elemHandler = pArrayHandler->ElementHandler();
 
@@ -126,10 +127,9 @@ namespace DIRE_NS
 
 	void BinaryReflectorSerializer::SerializeCompoundValue(const void * pPropPtr)
 	{
-		// TODO: Casting to Reflectable feels easy here... Shouldn't there be a way to properly reflect structs without making them reflectable ?
 		auto* reflectableProp = static_cast<const Reflectable2 *>(pPropPtr);
 		const TypeInfo * compTypeInfo = Reflector3::GetSingleton().GetTypeInfo(reflectableProp->GetReflectableClassID());
-		assert(compTypeInfo != nullptr); // TODO: customize assert
+		DIRE_ASSERT(compTypeInfo != nullptr);
 
 		const std::byte * reflectableAddr = reinterpret_cast<const std::byte *>(reflectableProp);
 
@@ -171,7 +171,7 @@ namespace DIRE_NS
 
 	void BinaryReflectorSerializer::SerializeValuesForObject(std::string_view /*pObjectName*/, SerializedValueFiller /*pFillerFunction*/)
 	{
-		// TODO: not implemented for now (mostly used for JSON metadata)
+		// not implemented for now (mostly used for JSON metadata)
 	}
 
 }

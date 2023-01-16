@@ -18,8 +18,8 @@ namespace DIRE_NS
 				ReflectableID(pID)
 			{}
 
-			uint32_t	ReflectableID = 0; // TODO: Reflectable typedef
-			uint32_t	PropertiesCount = 0; // TODO: customizable property count
+			ReflectableID	ReflectableID = 0;
+			uint32_t		PropertiesCount = 0;
 		};
 
 		struct Property
@@ -29,17 +29,18 @@ namespace DIRE_NS
 			{}
 
 			Type		PropertyType = Type::Unknown;
-			uint32_t	PropertyOffset = 0; // TODO: customizable offset size
+			uint32_t	PropertyOffset = 0;
 		};
 
 		struct Array
 		{
 			Array(const Type pType, const size_t pSizeofElem, const size_t pArraySize) :
-				ElementType(pType), ElementSize(pSizeofElem), ArraySize(pArraySize)
+				ElementType(pType), SizeofElement(pSizeofElem), ArraySize(pArraySize)
 			{}
 
-			Type		ElementType = Type::Unknown;  // TODO: maybe to remove because we actually have it in the array handler
-			size_t		ElementSize = 0; // TODO: maybe to remove because we actually have it in the array handler
+			// ElementType and SizeofElement are not strictly necessary for now, but let's keep them here for debug purposes
+			Type		ElementType = Type::Unknown;
+			size_t		SizeofElement = 0;
 			size_t		ArraySize = 0;
 		};
 
@@ -49,10 +50,12 @@ namespace DIRE_NS
 				KeyType(pKType), SizeofKeyType(pSizeofKey), ValueType(pVType), SizeofValueType(pSizeofValue), MapSize(pMapSize)
 			{}
 
-			Type		KeyType = Type::Unknown;  // TODO: maybe to remove because we actually have it in the map handler
-			size_t		SizeofKeyType = 0;	// TODO: maybe to remove because we actually have it in the map handler
-			Type		ValueType = Type::Unknown;  // TODO: maybe to remove because we actually have it in the map handler
-			size_t		SizeofValueType = 0;	// TODO: maybe to remove because we actually have it in the map handler
+			// Key/ValueType and Sizeofs are not strictly necessary for now, but let's keep them here for debug purposes
+			// Maybe think of an "optimized" mode that omits them.
+			Type		KeyType = Type::Unknown;
+			size_t		SizeofKeyType = 0;
+			Type		ValueType = Type::Unknown;
+			size_t		SizeofValueType = 0;
 			size_t		MapSize = 0;
 		};
 	};

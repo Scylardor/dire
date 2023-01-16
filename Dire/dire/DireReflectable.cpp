@@ -1,8 +1,10 @@
 #include "DireReflectable.h"
 
+#include "DireAssert.h"
+
 namespace DIRE_NS
 {
-	const Reflectable2::GetPropertyResult Reflectable2::GetPropertyImpl(DIRE_STRING_VIEW pName) const
+	const Reflectable2::GetPropertyResult Reflectable2::GetPropertyImpl(DIRE_STRING_VIEW pFullPath) const
 	{
 		const TypeInfo* thisTypeInfo = GetTypeInfo();
 
@@ -11,39 +13,39 @@ namespace DIRE_NS
 		// Test for either array, map or compound access and branch into the one seen first
 		// compound property syntax uses the standard "." accessor
 		// array and map property syntax uses the standard "[]" array subscript operator
-		const size_t dotPos = pName.find('.');
-		const size_t leftBrackPos = pName.find('[');
-		if (dotPos != pName.npos && dotPos < leftBrackPos) // it's a compound
+		const size_t dotPos = pFullPath.find('.');
+		const size_t leftBrackPos = pFullPath.find('[');
+		if (dotPos != pFullPath.npos && dotPos < leftBrackPos) // it's a compound
 		{
-			DIRE_STRING_VIEW compoundPropName = DIRE_STRING_VIEW(pName.data(), dotPos);
-			return GetCompoundProperty(thisTypeInfo, compoundPropName, pName, propertyAddr);
+			DIRE_STRING_VIEW compoundPropName = DIRE_STRING_VIEW(pFullPath.data(), dotPos);
+			return GetCompoundProperty(thisTypeInfo, compoundPropName, pFullPath, propertyAddr);
 		}
-		else if (leftBrackPos != pName.npos && leftBrackPos < dotPos) // it's an array or map
+		else if (leftBrackPos != pFullPath.npos && leftBrackPos < dotPos) // it's an array or map
 		{
-			const size_t rightBrackPos = pName.find(']');
+			const size_t rightBrackPos = pFullPath.find(']');
 			// If there is a mismatched bracket, or the closing bracket is before the opening one,
 			// or there is nothing between the two brackets, the expression has to be ill-formed!
-			if (rightBrackPos == pName.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 1)
+			if (rightBrackPos == pFullPath.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 1)
 			{
 				return {};
 			}
 
-			DIRE_STRING_VIEW propName = DIRE_STRING_VIEW(pName.data(), leftBrackPos);
+			DIRE_STRING_VIEW propName = DIRE_STRING_VIEW(pFullPath.data(), leftBrackPos);
 
 			if (const PropertyTypeInfo* thisProp = thisTypeInfo->FindPropertyInHierarchy(propName))
 			{
 				if (thisProp->GetMetatype() == Type::Array)
 				{
-					const int propIndex = atoi(pName.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
-					pName.remove_prefix(rightBrackPos + 1);
-					return GetArrayProperty(thisTypeInfo, propName, pName, propIndex, propertyAddr);
+					const int propIndex = atoi(pFullPath.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
+					pFullPath.remove_prefix(rightBrackPos + 1);
+					return GetArrayProperty(thisTypeInfo, propName, pFullPath, propIndex, propertyAddr);
 				}
 				else if (thisProp->GetMetatype() == Type::Map)
 				{
 					const auto keyStartPos = leftBrackPos + 1;
-					DIRE_STRING_VIEW key(pName.data() + keyStartPos, rightBrackPos - keyStartPos);
-					pName.remove_prefix(rightBrackPos + 1);
-					return GetArrayMapProperty(thisTypeInfo, propName, pName, key, propertyAddr);
+					DIRE_STRING_VIEW key(pFullPath.data() + keyStartPos, rightBrackPos - keyStartPos);
+					pFullPath.remove_prefix(rightBrackPos + 1);
+					return GetArrayMapProperty(thisTypeInfo, propName, pFullPath, key, propertyAddr);
 				}
 			}
 			return {}; // Didn't find the property or it's of a type that we don't know how to handle in this context.
@@ -52,14 +54,14 @@ namespace DIRE_NS
 		// Otherwise: search for a "normal" property
 		for (PropertyTypeInfo const& prop : thisTypeInfo->GetPropertyList())
 		{
-			if (prop.GetName() == pName)
+			if (prop.GetName() == pFullPath)
 			{
 				return GetPropertyResult(propertyAddr + prop.GetOffset(), &prop);
 			}
 		}
 
 		// Maybe in the parent classes?
-		auto [parentClass, parentProperty] = thisTypeInfo->FindParentClassProperty(pName);
+		auto [parentClass, parentProperty] = thisTypeInfo->FindParentClassProperty(pFullPath);
 		if (parentClass != nullptr && parentProperty != nullptr) // A parent property was found
 		{
 			return GetPropertyResult(propertyAddr + parentProperty->GetOffset(), parentProperty);
@@ -192,7 +194,7 @@ namespace DIRE_NS
 			return RecurseFindArrayProperty(elementHandler, pName, pRemainingPath, propIndex, pPropPtr);
 		}
 
-		assert(false); // TODO: customize assertion
+		DIRE_ASSERT(false);
 		return {}; // Never supposed to arrive here!
 	}
 
@@ -226,7 +228,7 @@ namespace DIRE_NS
 
 		if (pRemainingPath[0] == '.') // it's a nested structure
 		{
-			unsigned valueID = pDataStructureHandler.GetArrayHandler() ? pDataStructureHandler.GetArrayHandler()->ElementReflectableID() : pDataStructureHandler.GetMapHandler()->ValueReflectableID();
+			ReflectableID valueID = pDataStructureHandler.GetArrayHandler() ? pDataStructureHandler.GetArrayHandler()->ElementReflectableID() : pDataStructureHandler.GetMapHandler()->ValueReflectableID();
 			TypeInfo const* valueTypeInfo = Reflector3::GetSingleton().GetTypeInfo(valueID);
 			auto nextDelimiterPos = pRemainingPath.find_first_of(".[", 1);
 			DIRE_STRING_VIEW propName = pRemainingPath.substr(1, nextDelimiterPos == pRemainingPath.npos ? nextDelimiterPos : nextDelimiterPos - 1);

@@ -6,6 +6,7 @@
 #include "DireTypes.h"
 
 #include "DireTypeInfoDatabase.h"
+#include "DireReflectableID.h"
 
 #include <any>
 #include <vector>
@@ -38,7 +39,7 @@ namespace DIRE_NS
 			return myDataStructurePropertyHandler;
 		}
 
-		[[nodiscard]] const DIRE_STRING& GetName() const { return myName; }
+		[[nodiscard]] const DIRE_STRING_VIEW& GetName() const { return myName; }
 
 		[[nodiscard]] Type		GetMetatype() const { return myMetatype; }
 
@@ -46,9 +47,9 @@ namespace DIRE_NS
 
 		[[nodiscard]] size_t	GetSize() const { return mySize; }
 
-		[[nodiscard]] unsigned	GetReflectableID() const { return myReflectableID; } // TODO: ReflectableID
+		[[nodiscard]] ReflectableID	GetReflectableID() const { return myReflectableID; }
 
-		[[nodiscard]] CopyConstructorPtr	GetCopyConstructorFunction() const { return myCopyCtor; } // TODO: ReflectableID
+		[[nodiscard]] CopyConstructorPtr	GetCopyConstructorFunction() const { return myCopyCtor; }
 
 #if DIRE_USE_SERIALIZATION
 		virtual void	SerializeAttributes(class ISerializer& pSerializer) const = 0;
@@ -61,7 +62,6 @@ namespace DIRE_NS
 
 		virtual SerializationState	GetSerializableState() const = 0;
 #endif
-
 
 	protected:
 
@@ -97,7 +97,7 @@ namespace DIRE_NS
 			}
 			else
 			{
-				myReflectableID = (unsigned)-1;
+				myReflectableID = INVALID_REFLECTABLE_ID;
 			}
 		}
 
@@ -139,7 +139,7 @@ namespace DIRE_NS
 
 	private:
 
-		DIRE_STRING		myName; // TODO: try storing a string view?
+		DIRE_STRING_VIEW myName;
 		Type			myMetatype;
 		std::ptrdiff_t	myOffset;
 		std::size_t		mySize;
@@ -149,7 +149,7 @@ namespace DIRE_NS
 		// TODO: storing it here is kind of a hack to go quick.
 		// I guess we should have a map of Type->ClassID to be able to easily find the class ID...
 		// without duplicating this information in all the type info structures of every property of the same type.
-		unsigned		myReflectableID = (unsigned)-1;
+		ReflectableID		myReflectableID = INVALID_REFLECTABLE_ID;
 	};
 
 
@@ -216,7 +216,6 @@ namespace DIRE_NS
 	template <typename Ty >
 	struct TypedFunctionInfo; // not defined
 
-	// TODO: figure out the proper constructor/operator rain dance
 	template <typename Class, typename Ret, typename ... Args >
 	struct TypedFunctionInfo<Ret(Class::*)(Args...)> : FunctionInfo
 	{
@@ -289,8 +288,6 @@ namespace DIRE_NS
 	{
 	public:
 
-		TypeInfo() = default; // TODO: remove
-
 		TypeInfo(const char* pTypename) :
 			ReflectableID(Reflector3::EditSingleton().RegisterTypeInfo(this)),
 			TypeName(pTypename)
@@ -316,7 +313,7 @@ namespace DIRE_NS
 			ChildrenClasses.push_back(pChild);
 		}
 
-		[[nodiscard]] bool	IsParentOf(const unsigned pChildClassID, bool pIncludingMyself = true) const
+		[[nodiscard]] bool	IsParentOf(const ReflectableID pChildClassID, bool pIncludingMyself = true) const
 		{
 			// same logic as std::is_base_of: class is parent of itself (unless we strictly want only children)
 			if (pChildClassID == GetID())
@@ -431,12 +428,12 @@ namespace DIRE_NS
 			return TypeName;
 		}
 
-		void	SetID(const unsigned pNewID)
+		void	SetID(const ReflectableID pNewID)
 		{
 			ReflectableID = pNewID;
 		}
 
-		[[nodiscard]] unsigned	GetID() const
+		[[nodiscard]] ReflectableID	GetID() const
 		{
 			return ReflectableID;
 		}
@@ -466,7 +463,7 @@ namespace DIRE_NS
 		}
 
 	protected:
-		unsigned								ReflectableID = (unsigned)-1;
+		ReflectableID							ReflectableID = INVALID_REFLECTABLE_ID;
 		int										VirtualOffset{ 0 }; // for polymorphic classes
 		DIRE_STRING_VIEW						TypeName;
 		IntrusiveLinkedList<PropertyTypeInfo>	Properties;

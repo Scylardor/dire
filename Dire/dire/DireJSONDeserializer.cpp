@@ -1,4 +1,3 @@
-
 #if DIRE_USE_SERIALIZATION && DIRE_USE_JSON_SERIALIZATION
 
 #include "DireTypeInfo.h"
@@ -6,6 +5,8 @@
 #include "DireReflectable.h"
 #include "DireJSONDeserializer.h"
 #include "DireTypeHandlers.h"
+
+#include "DireAssert.h"
 
 #include <rapidjson/error/en.h>
 #include <rapidjson/document.h>
@@ -42,7 +43,7 @@ namespace DIRE_NS
 
 	void RapidJsonReflectorDeserializer::DeserializeArrayValue(const rapidjson::Value& pVal, void* pPropPtr, const ArrayDataStructureHandler * pArrayHandler) const
 	{
-		assert(pVal.IsArray()); // TODO: custom assert
+		DIRE_ASSERT(pVal.IsArray());
 
 		if (pArrayHandler != nullptr)
 		{
@@ -66,7 +67,7 @@ namespace DIRE_NS
 		if (pPropPtr == nullptr || pMapHandler == nullptr)
 			return;
 
-		assert(pVal.IsObject()); // TODO: custom assert
+		DIRE_ASSERT(pVal.IsObject());
 
 		const Type valueType = pMapHandler->GetValueType();
 		const DataStructureHandler valueHandler = pMapHandler->ValueHandler();
@@ -80,11 +81,10 @@ namespace DIRE_NS
 
 	void RapidJsonReflectorDeserializer::DeserializeCompoundValue(const rapidjson::Value& pVal, void* pPropPtr) const
 	{
-		assert(pVal.IsObject());
-		// TODO: Casting to Reflectable feels easy here... Shouldn't there be a way to properly reflect structs without making them reflectable ?
+		DIRE_ASSERT(pVal.IsObject());
 		auto* reflectableProp = static_cast<Reflectable2*>(pPropPtr);
 		const TypeInfo * compTypeInfo = Reflector3::GetSingleton().GetTypeInfo(reflectableProp->GetReflectableClassID());
-		assert(compTypeInfo != nullptr); // TODO: customize assert
+		DIRE_ASSERT(compTypeInfo != nullptr);
 
 		compTypeInfo->ForEachPropertyInHierarchy([this, &pVal, reflectableProp](const PropertyTypeInfo & pProperty)
 			{
@@ -132,7 +132,7 @@ namespace DIRE_NS
 			break;
 		default:
 			// Unmanaged type in DeserializeValue!
-			assert(false); // TODO: for now
+			DIRE_ASSERT(false); // for now
 		}
 	}
 }

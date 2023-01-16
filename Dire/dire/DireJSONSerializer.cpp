@@ -1,4 +1,3 @@
-
 #if DIRE_USE_SERIALIZATION && DIRE_USE_JSON_SERIALIZATION
 
 #include "DireJSONSerializer.h"
@@ -7,6 +6,7 @@
 #include "DireEnumDataStructureHandler.h"
 #include "DireTypeInfo.h"
 #include "DireReflectable.h"
+#include "DireAssert.h"
 
 namespace DIRE_NS
 {
@@ -35,7 +35,7 @@ case Type::TypeEnum:\
 
 				if (SerializesMetadata() && serializableState.HasAttributesToSerialize)
 				{
-					const std::string metadataName = pProperty.GetName() + "_metadata";
+					const DIRE_STRING metadataName = DIRE_STRING(pProperty.GetName()) + "_metadata";
 					myJsonWriter.String(metadataName.data(), (rapidjson::SizeType)metadataName.size());
 
 					myJsonWriter.StartObject();
@@ -100,10 +100,9 @@ case Type::TypeEnum:\
 
 	void RapidJsonReflectorSerializer::SerializeCompoundValue(const void * pPropPtr)
 	{
-		// TODO: Casting to Reflectable feels easy here... Shouldn't there be a way to properly reflect structs without making them reflectable ?
 		auto* reflectableProp = static_cast<const Reflectable2 *>(pPropPtr);
 		const TypeInfo * compTypeInfo = Reflector3::GetSingleton().GetTypeInfo(reflectableProp->GetReflectableClassID());
-		assert(compTypeInfo != nullptr); // TODO: customize assert
+		DIRE_ASSERT(compTypeInfo != nullptr);
 
 		myJsonWriter.StartObject();
 
@@ -120,7 +119,7 @@ case Type::TypeEnum:\
 
 					if (SerializesMetadata() && serializableState.HasAttributesToSerialize)
 					{
-						const std::string metadataName = pProperty.GetName() + "_metadata";
+						const DIRE_STRING metadataName = DIRE_STRING( pProperty.GetName() ) + "_metadata";
 						myJsonWriter.String(metadataName.data(), (rapidjson::SizeType)metadataName.size());
 
 						myJsonWriter.StartObject();
@@ -175,7 +174,7 @@ case Type::TypeEnum:\
 		break;
 		default:
 			// Unmanaged type!
-			assert(false); // TODO: for now
+			DIRE_ASSERT(false); // for now
 		}
 	}
 }

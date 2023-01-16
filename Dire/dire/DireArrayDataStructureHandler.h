@@ -4,6 +4,7 @@
 #include "DireEnumDataStructureHandler.h"
 #include "DireMapDataStructureHandler.h"
 #include "DireTypes.h"
+#include "DireReflectableID.h"
 
 namespace DIRE_NS
 {
@@ -18,7 +19,7 @@ namespace DIRE_NS
 		using ArrayClearFptr = void	(*)(void*);
 		using ArraySizeFptr = size_t(*)(void const*);
 		using ArrayElementHandlerFptr = DataStructureHandler(*)();
-		using ArrayElementReflectableIDFptr = unsigned (*)();
+		using ArrayElementReflectableIDFptr = ReflectableID (*)();
 		using ArrayElementType = Type(*)();
 		using ArrayElementSize = size_t(*)();
 
@@ -159,7 +160,7 @@ namespace DIRE_NS
 			return {};
 		}
 
-		static unsigned ArrayElementReflectableID() // TODO: ReflectableID
+		static ReflectableID ArrayElementReflectableID()
 		{
 			if constexpr (std::is_base_of_v<Reflectable2, T>)
 			{
@@ -167,7 +168,7 @@ namespace DIRE_NS
 			}
 			else
 			{
-				return (unsigned)-1; // TODO
+				return DIRE_NS::INVALID_REFLECTABLE_ID;
 			}
 		}
 
@@ -309,7 +310,7 @@ namespace DIRE_NS
 			return {};
 		}
 
-		static unsigned ArrayElementReflectableID() // TODO: ReflectableID
+		static ReflectableID ArrayElementReflectableID()
 		{
 			if constexpr (std::is_base_of_v<Reflectable2, ElementValueType>)
 			{
@@ -317,7 +318,7 @@ namespace DIRE_NS
 			}
 			else
 			{
-				return (unsigned)-1; // TODO
+				return DIRE_NS::INVALID_REFLECTABLE_ID;
 			}
 		}
 

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "DireMacros.h"
 #include "DireTypes.h"
 #include "DireString.h"
 #include "DireTypeTraits.h"
+#include "DireReflectableID.h"
 
 namespace DIRE_NS
 {
@@ -19,7 +19,7 @@ namespace DIRE_NS
 		using MapClearFptr = void	(*)(void*);
 		using MapSizeFptr = size_t(*)(const void *);
 		using MapValueHandlerFptr = DataStructureHandler(*)();
-		using MapElementReflectableIDFptr = unsigned (*)();
+		using MapElementReflectableIDFptr = ReflectableID (*)();
 		using MapKeyTypeFptr = Type(*)();
 		using MapValueTypeFptr = MapKeyTypeFptr;
 		using MapSizeofKeyFptr = size_t(*)();
@@ -240,7 +240,7 @@ namespace DIRE_NS
 			return {};
 		}
 
-		static unsigned MapElementReflectableID() // TODO: ReflectableID
+		static ReflectableID MapElementReflectableID()
 		{
 			if constexpr (std::is_base_of_v<Reflectable2, ValueType>)
 			{
@@ -248,7 +248,7 @@ namespace DIRE_NS
 			}
 			else
 			{
-				return (unsigned)-1; // TODO
+				return DIRE_NS::INVALID_REFLECTABLE_ID;
 			}
 		}
 

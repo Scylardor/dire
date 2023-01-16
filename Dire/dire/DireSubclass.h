@@ -18,7 +18,7 @@ namespace DIRE_NS
 			return (parentTypeInfo.IsParentOf(SubClassID));
 		}
 
-		void	SetClass(unsigned pNewID) //TODO: reflectable ID
+		void	SetClass(ReflectableID pNewID)
 		{
 			SubClassID = pNewID;
 		}
@@ -30,7 +30,7 @@ namespace DIRE_NS
 			SubClassID = T::GetClassReflectableTypeInfo().GetID();
 		}
 
-		unsigned	GetClassID() const //TODO: reflectable ID
+		ReflectableID	GetClassID() const
 		{
 			return SubClassID;
 		}
@@ -63,6 +63,6 @@ namespace DIRE_NS
 
 	private:
 
-		unsigned	SubClassID{ T::GetClassReflectableTypeInfo().GetID() };  //TODO: reflectable ID
+		ReflectableID	SubClassID{ T::GetClassReflectableTypeInfo().GetID() };
 	};
 }

@@ -3,6 +3,7 @@
 #include "DireReflectable.h"
 #include "DireTypeInfoDatabase.h"
 #include "BinaryHeaders.h"
+#include "DireAssert.h"
 
 #define BINARY_DESERIALIZE_VALUE_CASE(TypeEnum) \
 case Type::TypeEnum:\
@@ -65,6 +66,8 @@ namespace DIRE_NS
 			DataStructureHandler elemHandler = pArrayHandler->ElementHandler();
 			auto& arrayHeader = ReadFromBytes<BinarySerializationHeaders::Array>();
 
+			DIRE_ASSERT(pArrayHandler->ElementType() == arrayHeader.ElementType
+			&& pArrayHandler->ElementSize() == arrayHeader.SizeofElement);
 			if (arrayHeader.ElementType != Type::Unknown)
 			{
 				for (auto iElem = 0; iElem < arrayHeader.ArraySize; ++iElem)
@@ -86,6 +89,10 @@ namespace DIRE_NS
 		const size_t sizeofKeyType = pMapHandler->SizeofKey();
 
 		auto& mapHeader = ReadFromBytes<BinarySerializationHeaders::Map>();
+
+		DIRE_ASSERT(valueType == mapHeader.ValueType && mapHeader.SizeofValueType == pMapHandler->SizeofValue()
+			&& mapHeader.KeyType == pMapHandler->GetKeyType() && mapHeader.SizeofKeyType == sizeofKeyType);
+
 		for (int i = 0; i < mapHeader.MapSize; ++i)
 		{
 			const char* keyData = ReadBytes(sizeofKeyType);
@@ -178,7 +185,7 @@ namespace DIRE_NS
 		break;
 		default:
 			// Unmanaged type in DeserializeValue!
-			assert(false); // TODO: for now
+			DIRE_ASSERT(false);
 		}
 	}
 }

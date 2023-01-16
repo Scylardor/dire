@@ -29,7 +29,7 @@ namespace DIRE_NS
 				SerializedBuffer(std::move(pMovedVec))
 			{}
 
-			[[nodiscard]] DIRE_STRING AsString() const // TODO: customize string
+			[[nodiscard]] DIRE_STRING AsString() const
 			{
 				DIRE_STRING serializedString;
 				serializedString.resize(SerializedBuffer.size());
@@ -76,7 +76,7 @@ namespace DIRE_NS
 		}
 
 		template <typename... Args>
-		Reflectable2* Deserialize(const char* pSerialized, unsigned pReflectableClassID, Args&&... pArgs)
+		Reflectable2* Deserialize(const char* pSerialized, ReflectableID pReflectableClassID, Args&&... pArgs)
 		{
 			const TypeInfo * typeInfo = Reflector3::GetSingleton().GetTypeInfo(pReflectableClassID);
 			if (typeInfo == nullptr) // bad ID
