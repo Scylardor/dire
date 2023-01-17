@@ -11,6 +11,8 @@
 #include "DireTypes.h"
 #include "DireTypeHandlers.h"
 
+
+
 namespace DIRE_NS
 {
 	class RapidJsonReflectorSerializer : public ISerializer
@@ -39,9 +41,14 @@ namespace DIRE_NS
 		inline void	SerializeCompoundValue(const void * pPropPtr);
 
 	private:
-		// TODO: allow to provide a custom allocator for StringBuffer and Writer
-		rapidjson::StringBuffer	myBuffer;
-		rapidjson::Writer<rapidjson::StringBuffer>	myJsonWriter;
+
+		void	SerializeReflectable(const Reflectable2& pReflectable);
+
+		using StringBuffer = rapidjson::GenericStringBuffer<rapidjson::UTF8<>, DIRE_RAPIDJSON_ALLOCATOR>;
+		using Writer = rapidjson::Writer<StringBuffer>;
+
+		StringBuffer	myBuffer;
+		Writer			myJsonWriter;
 	};
 
 	void RapidJsonReflectorSerializer::SerializeString(DIRE_STRING_VIEW pSerializedString)

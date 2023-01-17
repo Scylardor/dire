@@ -17,10 +17,7 @@ namespace DIRE_NS
 
 		virtual Result	Serialize(Reflectable2 const& serializedObject) override;
 
-		virtual bool	SerializesMetadata() const override
-		{
-			return false;
-		}
+		virtual bool	SerializesMetadata() const override { return false; }
 
 		virtual void	SerializeString(DIRE_STRING_VIEW pSerializedString) override;
 		virtual void	SerializeInt(int32_t pSerializedInt) override;
@@ -38,10 +35,7 @@ namespace DIRE_NS
 				SerializedData(pSerializedBytes), Offset(pOffset)
 			{}
 
-			[[nodiscard]] T& Edit() const
-			{
-				return reinterpret_cast<T&>(SerializedData[Offset]);
-			}
+			[[nodiscard]] T& Edit() const { return reinterpret_cast<T&>(SerializedData[Offset]); }
 
 		private:
 			Result::ByteVector& SerializedData;

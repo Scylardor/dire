@@ -17,6 +17,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 option(${PROJECT_NAME}_SERIALIZATION_ENABLED "Enables the Serialization features of the DIRE library." ON)
 option(${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED "Enables the JSON serialization feature of the DIRE library, using RapidJSON." ON)
 set(${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_VERSION master CACHE STRING "RapidJSON version that DIRE will try to use if not found on the system.")
+set(${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ALLOCATOR "rapidjson::CrtAllocator" CACHE STRING "Allocator passed to RapidJSON for its allocations. Uses RapidJSON's one by default.")
 option(${PROJECT_NAME}_SERIALIZATION_BINARY_ENABLED "Enables the binary serialization feature of the DIRE library." ON)
 option(${PROJECT_NAME}_SERIALIZABLE_PROPERTIES_BY_DEFAULT "If true, Dire properties are serializable by default, unless tagged with the NotSerializable attribute. If false, they are not serializable by default, unless tagged with the Serializable attribute." ON)
 
@@ -83,6 +84,7 @@ if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_RAPID
 		${DIRE_SOURCE_DIR}/DireJSONSerializer.cpp
 		${DIRE_SOURCE_DIR}/DireJSONDeserializer.cpp
 	)
+	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_RAPIDJSON_ALLOCATOR=${${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ALLOCATOR})
 endif()
 if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_BINARY_ENABLED)
 	target_sources(${PROJECT_NAME} PRIVATE

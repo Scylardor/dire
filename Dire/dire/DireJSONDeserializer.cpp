@@ -21,24 +21,27 @@
 
 namespace DIRE_NS
 {
-	void RapidJsonReflectorDeserializer::DeserializeInto(char const* pJson, Reflectable2& pDeserializedObject)
+	IDeserializer::Result RapidJsonReflectorDeserializer::DeserializeInto(char const* pJson, Reflectable2& pDeserializedObject)
 	{
 		rapidjson::Document doc;
 		rapidjson::ParseResult ok = doc.Parse(pJson);
 		if (doc.Parse(pJson).HasParseError())
 		{
-			// TODO: encapsulate in REFLECTION_ERROR customizable macro
-			fprintf(stderr, "JSON parse error: %s (%llu)",
-				rapidjson::GetParseError_En(ok.Code()), ok.Offset());
-			return;
+			auto neededSize = snprintf(nullptr, 0, "JSON parse error: %s (%llu)", GetParseError_En(ok.Code()), ok.Offset());
+			DIRE_STRING error(neededSize+1, '\0');
+			snprintf(error.data(), error.size(), "JSON parse error: %s (%llu)", GetParseError_En(ok.Code()), ok.Offset());
+
+			return { error };
 		}
 
 		Reflector3::GetSingleton().GetTypeInfo(pDeserializedObject.GetReflectableClassID())->ForEachPropertyInHierarchy([&pDeserializedObject, &doc, this](const PropertyTypeInfo& pProperty)
-			{
-				void* propPtr = const_cast<void*>(pDeserializedObject.GetProperty(pProperty.GetName()));
-				rapidjson::Value const& propValue = doc[pProperty.GetName().data()];
-				DeserializeValue(&propValue, pProperty.GetMetatype(), propPtr, &pProperty.GetDataStructureHandler());
-			});
+		{
+			void* propPtr = const_cast<void*>(pDeserializedObject.GetProperty(pProperty.GetName()));
+			rapidjson::Value const& propValue = doc[pProperty.GetName().data()];
+			DeserializeValue(&propValue, pProperty.GetMetatype(), propPtr, &pProperty.GetDataStructureHandler());
+		});
+
+		return { &pDeserializedObject };
 	}
 
 	void RapidJsonReflectorDeserializer::DeserializeArrayValue(const rapidjson::Value& pVal, void* pPropPtr, const ArrayDataStructureHandler * pArrayHandler) const

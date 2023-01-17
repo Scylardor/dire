@@ -13,7 +13,7 @@ namespace DIRE_NS
 	class BinaryReflectorDeserializer : public IDeserializer
 	{
 	public:
-		virtual void	DeserializeInto(char const* pSerialized, Reflectable2& pDeserializedObject) override;
+		virtual Result	DeserializeInto(char const* pSerialized, Reflectable2& pDeserializedObject) override;
 
 	private:
 

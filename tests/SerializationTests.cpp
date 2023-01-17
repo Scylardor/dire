@@ -21,7 +21,7 @@ TEST_CASE("JSON simple object", "[Serialization]")
 	clonedComp.leet = 123456789;
 	clonedComp.copyable.aUselessProp = 42.f;
 
-	serialized = serializer.Serialize(clonedComp);
+	serialized = serializer.Serialize(clonedComp).AsString();
 	REQUIRE(serialized == "{\"leet\":123456789,\"copyable\":{\"aUselessProp\":42.0}}");
 
 	testcompound2 deserializedClonedComp;
@@ -39,7 +39,7 @@ TEST_CASE("JSON array", "[Serialization]")
 
 	for (int i = 0; i < 5; ++i)
 		seriaArray.titi[i] = i;
-	serialized = serializer.Serialize(seriaArray);
+	serialized = serializer.Serialize(seriaArray).AsString();
 	REQUIRE(serialized == "{\"titi\":[0,1,2,3,4]}");
 
 	SuperCompound deserializedseriaArray;
@@ -62,7 +62,7 @@ TEST_CASE("JSON objects, arrays, and array of objects", "[Serialization]")
 		}
 	}
 
-	serialized = serializer.Serialize(megaSerialized);
+	serialized = serializer.Serialize(megaSerialized).AsString();
 	REQUIRE(serialized == "{\"compint\":10794,\"compleet\":{\"leet\":1337,\"copyable\":{\"aUselessProp\":4.0}},\"toto\":[{\"titi\":[0,1,2,3,4]},{\"titi\":[1,2,3,4,5]},{\"titi\":[2,3,4,5,6]}]}");
 
 	MegaCompound megaDeserialized;
@@ -86,7 +86,7 @@ TEST_CASE("JSON std::vector (and other things)", "[Serialization]")
 			serializedC.aMultiArray[i][j] = i + j;
 		}
 	}
-	serialized = serializer.Serialize(serializedC);
+	serialized = serializer.Serialize(serializedC).AsString();
 	REQUIRE(serialized ==
 		"{\"atiti\":false,\"atoto\":0.0,\"bdouble\":0.0,\"compvar\":{\"compint\":10794,\"compleet\":{\"leet\":1337,\"copyable\":{\"aUselessProp\":4.0}}},\"ctoto\":3735928559,\"aVector\":[42,43,44,45,46],\"anArray\":[1,2,3,4,5,6,7,8,9,10],\"aMultiArray\":[[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,5,6,7,8,9,10],[2,3,4,5,6,7,8,9,10,11],[3,4,5,6,7,8,9,10,11,12],[4,5,6,7,8,9,10,11,12,13],[5,6,7,8,9,10,11,12,13,14],[6,7,8,9,10,11,12,13,14,15],[7,8,9,10,11,12,13,14,15,16],[8,9,10,11,12,13,14,15,16,17],[9,10,11,12,13,14,15,16,17,18]],\"mega\":{\"compint\":10794,\"compleet\":{\"leet\":1337,\"copyable\":{\"aUselessProp\":4.0}},\"toto\":[{\"titi\":[0,0,0,0,0]},{\"titi\":[0,0,0,0,0]},{\"titi\":[0,0,0,0,0]}]},\"ultra\":{\"mega\":{\"compint\":10794,\"compleet\":{\"leet\":1337,\"copyable\":{\"aUselessProp\":4.0}},\"toto\":[{\"titi\":[0,0,0,0,0]},{\"titi\":[0,0,0,0,0]},{\"titi\":[0,0,0,0,0]}]}}}");
 
@@ -113,7 +113,7 @@ TEST_CASE("JSON std::map", "[Serialization]")
 	{
 		serializedMap.aEvenOddMap[i] = (i % 2 == 0);
 	}
-	serialized = serializer.Serialize(serializedMap);
+	serialized = serializer.Serialize(serializedMap).AsString();
 	REQUIRE(serialized == "{\"aEvenOddMap\":{\"0\":true,\"1\":false,\"2\":true,\"3\":false,\"4\":true,\"5\":false,\"6\":true,\"7\":false,\"8\":true,\"9\":false}}");
 
 	mapType deSerializedMap;
@@ -130,7 +130,7 @@ TEST_CASE("JSON Serialize compound, map in map, and compound value in map", "[Se
 	d aD;
 	aD.SetProperty<int>("ultra.mega.toto[0].titi[2]", 0x1234);
 
-	serialized = serializer.Serialize(aD);
+	serialized = serializer.Serialize(aD).AsString();
 	REQUIRE(serialized == "{\"atiti\":false,\"atoto\":0.0,\"bdouble\":0.0,\"compvar\":{\"compint\":10794,\"compleet\":{\"leet\":1337,\"copyable\":{\"aUselessProp\":4.0}}},\"ctoto\":3735928559,\"aVector\":[1,2,3],\"anArray\":[0,0,0,0,0,0,0,0,0,0],\"aMultiArray\":[[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]],\"mega\":{\"compint\":10794,\"compleet\":{\"leet\":1337,\"copyable\":{\"aUselessProp\":4.0}},\"toto\":[{\"titi\":[0,0,0,0,0]},{\"titi\":[0,0,0,0,0]},{\"titi\":[0,0,0,0,0]}]},\"ultra\":{\"mega\":{\"compint\":10794,\"compleet\":{\"leet\":1337,\"copyable\":{\"aUselessProp\":4.0}},\"toto\":[{\"titi\":[0,0,4660,0,0]},{\"titi\":[0,0,0,0,0]},{\"titi\":[0,0,0,0,0]}]}},\"aMap\":{},\"xp\":42,\"aBoolMap\":{},\"aFatMap\":{},\"aMapInMap\":{},\"aStruct\":{\"aBoolMap\":{},\"aSuperMap\":{}}}");
 
 	d deserializedD;
@@ -182,7 +182,7 @@ TEST_CASE("JSON Serialize enumerations", "[Serialization]")
 	enums.playableKings = { Kings::Cesar, Kings::Alexandre };
 	enums.allowedQueens = { {Queens::Judith, true}, {Queens::Rachel, false} };
 	enums.pointsPerJack = { {10, Jacks::Ogier}, {20, Jacks::Lahire}, {30, Jacks::Hector}, {40, Jacks::Lancelot} };
-	serialized = serializer.Serialize(enums);
+	serialized = serializer.Serialize(enums).AsString();
 	REQUIRE(serialized ==
 		"{\"aTestFace\":1,\"bestKing\":\"Alexandre\",\"worstKings\":[\"Philippe\",\"Charles\"],\"playableKings\":[\"Cesar\",\"Alexandre\"],\"allowedQueens\":{\"Judith\":true,\"Rachel\":false},\"pointsPerJack\":{\"10\":\"Ogier\",\"20\":\"Lahire\",\"30\":\"Hector\",\"40\":\"Lancelot\"}}"
 	);

@@ -22,34 +22,9 @@ case Type::TypeEnum:\
 		myBuffer.Clear(); // to clean any previously written information
 		myJsonWriter.Reset(myBuffer); // to wipe the root of a previously serialized object
 
-		myJsonWriter.StartObject();
+		SerializeReflectable(serializedObject);
 
-		Reflector3::GetSingleton().GetTypeInfo(serializedObject.GetReflectableClassID())->ForEachPropertyInHierarchy([&serializedObject, this](const PropertyTypeInfo & pProperty)
-		{
-			PropertyTypeInfo::SerializationState serializableState = pProperty.GetSerializableState();
-			if (serializableState.IsSerializable == true)
-			{
-				void const* propPtr = serializedObject.GetProperty(pProperty.GetName());
-				myJsonWriter.String(pProperty.GetName().data(), (rapidjson::SizeType)pProperty.GetName().size());
-				this->SerializeValue(pProperty.GetMetatype(), propPtr, &pProperty.GetDataStructureHandler());
-
-				if (SerializesMetadata() && serializableState.HasAttributesToSerialize)
-				{
-					const DIRE_STRING metadataName = DIRE_STRING(pProperty.GetName()) + "_metadata";
-					myJsonWriter.String(metadataName.data(), (rapidjson::SizeType)metadataName.size());
-
-					myJsonWriter.StartObject();
-
-					pProperty.SerializeAttributes(*this);
-
-					myJsonWriter.EndObject();
-				}
-			}
-		});
-
-		myJsonWriter.EndObject();
-
-		return Result(myBuffer.GetString(), myBuffer.GetSize());
+		return { myBuffer.GetString(), myBuffer.GetSize() };
 	}
 
 
@@ -100,36 +75,41 @@ case Type::TypeEnum:\
 
 	void RapidJsonReflectorSerializer::SerializeCompoundValue(const void * pPropPtr)
 	{
+		DIRE_ASSERT(pPropPtr != nullptr);
 		auto* reflectableProp = static_cast<const Reflectable2 *>(pPropPtr);
-		const TypeInfo * compTypeInfo = Reflector3::GetSingleton().GetTypeInfo(reflectableProp->GetReflectableClassID());
-		DIRE_ASSERT(compTypeInfo != nullptr);
+		SerializeReflectable(*reflectableProp);
+	}
+
+	void RapidJsonReflectorSerializer::SerializeReflectable(const Reflectable2& pReflectable)
+	{
+		const TypeInfo* typeInfo = pReflectable.GetTypeInfo();
+
+		DIRE_ASSERT(typeInfo != nullptr);
 
 		myJsonWriter.StartObject();
 
-		// TODO: Should be refactored with Serialize()
-		compTypeInfo->ForEachPropertyInHierarchy([this, reflectableProp](const PropertyTypeInfo & pProperty)
+		typeInfo->ForEachPropertyInHierarchy([this, &pReflectable](const PropertyTypeInfo& pProperty)
+		{
+			PropertyTypeInfo::SerializationState serializableState = pProperty.GetSerializableState();
+			if (serializableState.IsSerializable == true)
 			{
-				PropertyTypeInfo::SerializationState serializableState = pProperty.GetSerializableState();
-				if (serializableState.IsSerializable == true)
+				void const* propPtr = pReflectable.GetProperty(pProperty.GetName());
+				myJsonWriter.String(pProperty.GetName().data(), (rapidjson::SizeType)pProperty.GetName().size());
+				this->SerializeValue(pProperty.GetMetatype(), propPtr, &pProperty.GetDataStructureHandler());
+
+				if (SerializesMetadata() && serializableState.HasAttributesToSerialize)
 				{
-					void const* compProp = reflectableProp->GetProperty(pProperty.GetName());
-					myJsonWriter.String(pProperty.GetName().data(), (rapidjson::SizeType)pProperty.GetName().size());
-					Type propType = pProperty.GetMetatype();
-					SerializeValue(propType, compProp, &pProperty.GetDataStructureHandler());
+					const DIRE_STRING metadataName = DIRE_STRING(pProperty.GetName()) + "_metadata";
+					myJsonWriter.String(metadataName.data(), (rapidjson::SizeType)metadataName.size());
 
-					if (SerializesMetadata() && serializableState.HasAttributesToSerialize)
-					{
-						const DIRE_STRING metadataName = DIRE_STRING( pProperty.GetName() ) + "_metadata";
-						myJsonWriter.String(metadataName.data(), (rapidjson::SizeType)metadataName.size());
+					myJsonWriter.StartObject();
 
-						myJsonWriter.StartObject();
+					pProperty.SerializeAttributes(*this);
 
-						pProperty.SerializeAttributes(*this);
-
-						myJsonWriter.EndObject();
-					}
+					myJsonWriter.EndObject();
 				}
-			});
+			}
+		});
 
 		myJsonWriter.EndObject();
 	}

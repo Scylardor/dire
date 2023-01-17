@@ -15,7 +15,7 @@ namespace DIRE_NS
 	class RapidJsonReflectorDeserializer : public IDeserializer
 	{
 	public:
-		virtual void	DeserializeInto(char const* pJson, Reflectable2& pDeserializedObject) override;
+		virtual Result	DeserializeInto(char const* pJson, Reflectable2& pDeserializedObject) override;
 
 	private:
 

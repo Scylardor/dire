@@ -15,11 +15,10 @@ case Type::TypeEnum:\
 
 namespace DIRE_NS
 {
-
-	void BinaryReflectorDeserializer::DeserializeInto(const char * pSerialized, Reflectable2& pDeserializedObject)
+	IDeserializer::Result BinaryReflectorDeserializer::DeserializeInto(const char * pSerialized, Reflectable2& pDeserializedObject)
 	{
 		if (pSerialized == nullptr)
-			return;
+			return {"The binary string is nullptr."};
 
 		mySerializedBytes = pSerialized;
 		myReadingOffset = 0;
@@ -27,14 +26,14 @@ namespace DIRE_NS
 		// should start with a header...
 		auto& header = ReadFromBytes<BinarySerializationHeaders::Object>();
 		if (header.PropertiesCount == 0)
-			return;
+			return &pDeserializedObject; // just an empty object. Doesn't count like an error I guess?
 
 		const TypeInfo* deserializedTypeInfo = Reflector3::GetSingleton().GetTypeInfo(header.ReflectableID);
 		const TypeInfo* objTypeInfo = Reflector3::GetSingleton().GetTypeInfo(pDeserializedObject.GetReflectableClassID());
 
 		// cannot dump properties into incompatible reflectable type
 		if (!deserializedTypeInfo->IsParentOf(objTypeInfo->GetID()))
-			return;
+			return { "The serialized data is incompatible with the reflectable to be deserialized into." };
 
 		const auto* nextPropertyHeader = &ReadFromBytes<BinarySerializationHeaders::Property>();
 
@@ -42,21 +41,23 @@ namespace DIRE_NS
 		unsigned iProp = 0;
 
 		objTypeInfo->ForEachPropertyInHierarchy([&](const PropertyTypeInfo& pProperty)
+		{
+			// In theory, property will come in ascending order of offset so we should not be missing any.
+			if (pProperty.GetOffset() == nextPropertyHeader->PropertyOffset)
 			{
-				// In theory, property will come in ascending order of offset so we should not be missing any.
-				if (pProperty.GetOffset() == nextPropertyHeader->PropertyOffset)
-				{
-					void* propPtr = objectPtr + pProperty.GetOffset();
-					DeserializeValue(nextPropertyHeader->PropertyType, propPtr, &pProperty.GetDataStructureHandler());
+				void* propPtr = objectPtr + pProperty.GetOffset();
+				DeserializeValue(nextPropertyHeader->PropertyType, propPtr, &pProperty.GetDataStructureHandler());
 
-					iProp++;
-					if (iProp < header.PropertiesCount)
-					{
-						// Only read a following property header if we're sure there are more properties coming
-						nextPropertyHeader = &ReadFromBytes<BinarySerializationHeaders::Property>();
-					}
+				iProp++;
+				if (iProp < header.PropertiesCount)
+				{
+					// Only read a following property header if we're sure there are more properties coming
+					nextPropertyHeader = &ReadFromBytes<BinarySerializationHeaders::Property>();
 				}
-			});
+			}
+		});
+
+		return &pDeserializedObject;
 	}
 
 	void BinaryReflectorDeserializer::DeserializeArrayValue(void* pPropPtr, const ArrayDataStructureHandler * pArrayHandler) const

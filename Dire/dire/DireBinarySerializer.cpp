@@ -22,16 +22,16 @@ namespace DIRE_NS
 		const std::byte * reflectableAddr = reinterpret_cast<const std::byte *>(&serializedObject);
 
 		Reflector3::GetSingleton().GetTypeInfo(serializedObject.GetReflectableClassID())->ForEachPropertyInHierarchy([this, &objectHandle, reflectableAddr](const PropertyTypeInfo & pProperty)
-			{
-				const std::byte * propertyAddr = reflectableAddr + pProperty.GetOffset();
+		{
+			const std::byte * propertyAddr = reflectableAddr + pProperty.GetOffset();
 
-				// Uniquely identify props by their offset. Not "change proof", will need a reconcile method it case something changed location (TODO)
-				WriteAsBytes<BinarySerializationHeaders::Property>(pProperty.GetMetatype(), (uint32_t)pProperty.GetOffset());
-				this->SerializeValue(pProperty.GetMetatype(), propertyAddr, &pProperty.GetDataStructureHandler());
+			// Uniquely identify props by their offset. Not "change proof", will need a reconcile method it case something changed location (TODO)
+			WriteAsBytes<BinarySerializationHeaders::Property>(pProperty.GetMetatype(), (uint32_t)pProperty.GetOffset());
+			this->SerializeValue(pProperty.GetMetatype(), propertyAddr, &pProperty.GetDataStructureHandler());
 
-				// Dont forget to count properties
-				objectHandle.Edit().PropertiesCount++;
-			});
+			// Dont forget to count properties
+			objectHandle.Edit().PropertiesCount++;
+		});
 
 		return Result(std::move(mySerializedBuffer));
 	}
