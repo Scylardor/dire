@@ -109,6 +109,10 @@ endif()
 
 
 # Defines
+
+# Disable MSVC "unsafe" functions warnings
+target_compile_definitions(${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS)
+
 target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_NS=${${PROJECT_NAME}_NAMESPACE})
 
 if(${${PROJECT_NAME}_STRING} STREQUAL "std::string")

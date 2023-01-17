@@ -103,8 +103,11 @@ namespace DIRE_NS
 			{
 				return nullptr;
 			}
-			const KeyType key = DIRE_NS::FromCharsConverter<KeyType>::Convert(pKey);
-			auto it = thisMap->find(key);
+			const ConvertResult<KeyType> key = DIRE_NS::FromCharsConverter<KeyType>::Convert(pKey);
+			if (key.HasError())
+				return nullptr;
+
+			auto it = thisMap->find(key.GetValue());
 			if (it == thisMap->end())
 			{
 				return nullptr;
@@ -137,16 +140,18 @@ namespace DIRE_NS
 			}
 
 			T* thisMap = static_cast<T*>(pMap);
-			const KeyType key = DIRE_NS::FromCharsConverter<KeyType>::Convert(pKey);
+			const ConvertResult<KeyType> key = DIRE_NS::FromCharsConverter<KeyType>::Convert(pKey);
+			if (key.HasError())
+				return nullptr;
 
 			if (pInitData == nullptr)
 			{
-				auto [it, inserted] = thisMap->insert({ key, ValueType() });
+				auto [it, inserted] = thisMap->insert({ key.GetValue(), ValueType() });
 				return &it->second;
 			}
 
 			const ValueType & initValue = *static_cast<const ValueType *>(pInitData);
-			auto [it, inserted] = thisMap->insert({ key, initValue });
+			auto [it, inserted] = thisMap->insert({ key.GetValue(), initValue });
 			return &it->second;
 		}
 
@@ -176,9 +181,11 @@ namespace DIRE_NS
 			if (pMap != nullptr)
 			{
 				T* thisMap = static_cast<T*>(pMap);
-				const KeyType key = FromCharsConverter<KeyType>::Convert(pKey);
+				const ConvertResult<KeyType> key = FromCharsConverter<KeyType>::Convert(pKey);
+				if (key.HasError())
+					return false;
 
-				return thisMap->erase(key);
+				return thisMap->erase(key.GetValue());
 			}
 
 			return false;

@@ -27,7 +27,7 @@ namespace DIRE_NS
 			// or there is nothing between the two brackets, the expression has to be ill-formed!
 			if (rightBrackPos == pFullPath.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 1)
 			{
-				return {};
+				return {"Syntax error: Mismatched bracket or empty brackets."};
 			}
 
 			DIRE_STRING_VIEW propName = DIRE_STRING_VIEW(pFullPath.data(), leftBrackPos);
@@ -36,9 +36,12 @@ namespace DIRE_NS
 			{
 				if (thisProp->GetMetatype() == Type::Array)
 				{
-					const int propIndex = atoi(pFullPath.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
+					const ConvertResult<int> propIndex = FromCharsConverter<int>::Convert((pFullPath.data() + leftBrackPos + 1));
+					if (propIndex.HasError())
+						return { propIndex.GetError() };
+
 					pFullPath.remove_prefix(rightBrackPos + 1);
-					return GetArrayProperty(thisTypeInfo, propName, pFullPath, propIndex, propertyAddr);
+					return GetArrayProperty(thisTypeInfo, propName, pFullPath, propIndex.GetValue(), propertyAddr);
 				}
 				else if (thisProp->GetMetatype() == Type::Map)
 				{
@@ -88,8 +91,11 @@ namespace DIRE_NS
 				if (result.TypeInfo->GetArrayHandler() != nullptr)
 				{
 					void* array = const_cast<void*>(result.Address);
-					size_t index = FromCharsConverter<size_t>::Convert(key);
-					return result.TypeInfo->GetArrayHandler()->Erase(array, index);
+					ConvertResult<size_t> index = FromCharsConverter<size_t>::Convert(key);
+					if (index.HasError())
+						return false;
+
+					return result.TypeInfo->GetArrayHandler()->Erase(array, index.GetValue());
 				}
 				if (result.TypeInfo->GetMapHandler() != nullptr)
 				{
@@ -166,10 +172,13 @@ namespace DIRE_NS
 				{
 					return {};
 				}
-				int propIndex = atoi(pRemainingPath.data() + leftBrackPos); // TODO: use own atoi to avoid multi-k-LOC dependency!
+				ConvertResult<int> propIndex = FromCharsConverter<int>::Convert(pRemainingPath.data() + leftBrackPos);
+				if (propIndex.HasError())
+					return { propIndex.GetError() };
+
 				pName = DIRE_STRING_VIEW(pRemainingPath.data(), pRemainingPath.length() - suffixPos + 1);
 				pRemainingPath.remove_prefix(rightBrackPos + 1);
-				return GetArrayProperty(arrayElemTypeInfo, pName, pRemainingPath, propIndex, pPropPtr);
+				return GetArrayProperty(arrayElemTypeInfo, pName, pRemainingPath, propIndex.GetValue(), pPropPtr);
 			}
 		}
 		else if (leftBrackPos != pRemainingPath.npos && leftBrackPos < dotPos) // it's an array in an array
@@ -189,9 +198,12 @@ namespace DIRE_NS
 				return {}; // Tried to access a property type that is not an array or not a Reflectable
 			}
 
-			int propIndex = atoi(pRemainingPath.data() + leftBrackPos + 1); // TODO: use own atoi to avoid multi-k-LOC dependency!
+			ConvertResult<int> propIndex = FromCharsConverter<int>::Convert(pRemainingPath.data() + leftBrackPos + 1);
+			if (propIndex.HasError())
+				return { propIndex.GetError() };
+
 			pRemainingPath.remove_prefix(rightBrackPos + 1);
-			return RecurseFindArrayProperty(elementHandler, pName, pRemainingPath, propIndex, pPropPtr);
+			return RecurseFindArrayProperty(elementHandler, pName, pRemainingPath, propIndex.GetValue(), pPropPtr);
 		}
 
 		DIRE_ASSERT(false);
@@ -205,8 +217,11 @@ namespace DIRE_NS
 		void const* value = nullptr;
 		if (pDataStructureHandler.GetArrayHandler())
 		{
-			size_t index = FromCharsConverter<size_t>::Convert(pKey); // TODO: check for errors
-			value = pDataStructureHandler.GetArrayHandler()->Read(pPropPtr, index);
+			ConvertResult<size_t> index = FromCharsConverter<size_t>::Convert(pKey);
+			if (index.HasError())
+				return { index.GetError() };
+
+			value = pDataStructureHandler.GetArrayHandler()->Read(pPropPtr, index.GetValue());
 		}
 		else if (pDataStructureHandler.GetMapHandler())
 		{

@@ -1,6 +1,5 @@
 #pragma once
 #include <any>
-#include <cassert>
 #include <cstddef> // std::byte
 #include <stdexcept> // TODO should be conditional
 
@@ -45,15 +44,22 @@ namespace DIRE_NS
 
 	class Reflectable2
 	{
+		using ParseError = DIRE_STRING;
+
 		struct GetPropertyResult
 		{
 			GetPropertyResult() = default;
-			GetPropertyResult(const void* pAddr, const PropertyTypeInfo* pInfo) :
-				Address(pAddr), TypeInfo(pInfo)
+			GetPropertyResult(const void* pAddr, const PropertyTypeInfo* pInfo, const ParseError& pError = "") :
+				Address(pAddr), TypeInfo(pInfo), Error(pError)
+			{}
+
+			GetPropertyResult(const ParseError& pError) :
+				Error(pError)
 			{}
 
 			const void* Address = nullptr;
 			const PropertyTypeInfo* TypeInfo = nullptr;
+			ParseError Error;
 		};
 
 	public:

@@ -2,6 +2,7 @@
 
 #include <type_traits> // enable_if
 #include <charconv> // from_chars
+#include <variant>
 
 /* If user says it's ok to use std::string, include std::string and use it everywhere we need a dynamic string */
 #if DIRE_USE_STD_STRING
@@ -30,6 +31,40 @@ namespace DIRE_NS
 		return ADL::AsString(std::forward<T>(t));
 	}
 
+	using ConvertError = DIRE_STRING;
+
+	template <typename T>
+	class ConvertResult
+	{
+	public:
+
+		ConvertResult(T pVal) :
+			Value(pVal)
+		{}
+
+		ConvertResult(const DIRE_STRING_VIEW& pToken, std::errc pErrorCode)
+		{
+			auto neededSize = snprintf(nullptr, 0, "Converting '%s' failed: '%s'.", pToken.data(), std::strerror((int)pErrorCode));
+			ConvertError& error = Value.template emplace<ConvertError>(neededSize + 1, '\0');
+			snprintf(error.data(), error.size(), "Converting '%s' failed: '%s'.", pToken.data(), std::strerror((int)pErrorCode));
+		}
+
+		[[nodiscard]] T	GetValue() const { return std::get<T>(Value); }
+
+		[[nodiscard]] bool			HasError() const { return std::get_if<ConvertError>(&Value) != nullptr; }
+		[[nodiscard]] ConvertError	GetError() const
+		{
+			const ConvertError* error = std::get_if<ConvertError>(&Value);
+			if (error != nullptr)
+				return *error;
+
+			return "";
+		}
+
+	private:
+		std::variant<T, ConvertError>	Value;
+	};
+
 	class Enum;
 
 	template<typename T, typename = void>
@@ -47,29 +82,38 @@ namespace DIRE_NS
 	template <typename T>
 	struct FromCharsConverter<T, typename std::enable_if_t<std::is_arithmetic_v<T>, void>>
 	{
-		static T Convert(const std::string_view& pChars)
+		static ConvertResult<T> Convert(const std::string_view& pChars)
 		{
-			T result;
+			T value;
 			if constexpr (std::is_same_v<T, bool>)
 			{
 				// bool is an arithmetic type but from_chars doesn't support it so we need a special case to handle it
-				result = (pChars == "true" || pChars == "1");
+				if (pChars != "true" && pChars != "false" && pChars != "1" && pChars != "0")
+				{
+					return ConvertResult<T>(pChars, std::errc::invalid_argument);
+				}
+
+				value = (pChars == "true" || pChars == "1");
 			}
 			else
 			{
-				auto [unusedPtr, error] { ::std::from_chars(pChars.data(), pChars.data() + pChars.size(), result) };
+				auto [unusedPtr, error] { ::std::from_chars(pChars.data(), pChars.data() + pChars.size(), value) };
 				(void)unusedPtr;
+				if (error != std::errc())
+				{
+					return ConvertResult<T>(pChars, error);
+				}
 			}
 
 			// TODO: check for errors
-			return result;
+			return value;
 		}
 	};
 
 	template <class T>
-	T from_chars(DIRE_STRING_VIEW const& pChars)
+	ConvertResult<T> from_chars(DIRE_STRING_VIEW const& pChars)
 	{
-		T key = FromCharsConverter<T>::Convert(pChars);
+		ConvertResult<T> key = FromCharsConverter<T>::Convert(pChars);
 		return key;
 	}
 
