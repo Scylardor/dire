@@ -78,7 +78,7 @@ namespace DIRE_NS
 		}
 	}
 
-	void BinaryReflectorSerializer::SerializeArrayValue(const void * pPropPtr, const ArrayDataStructureHandler * pArrayHandler)
+	void BinaryReflectorSerializer::SerializeArrayValue(const void * pPropPtr, const IArrayDataStructureHandler * pArrayHandler)
 	{
 		if (pArrayHandler == nullptr)
 			return;

@@ -97,7 +97,7 @@ bool	DIRE_NS::Reflector3::ExportToBinaryFile(DIRE_STRING_VIEW pWrittenSettingsFi
 	{
 		return false;
 	}
-	// TODO: check for exception?
+
 	openFile.write(binaryBuffer.data(), binaryBuffer.size());
 
 	return true;

@@ -34,7 +34,7 @@ namespace DIRE_NS
 
 		inline void	SerializeValue(Type pPropType, const void * pPropPtr, const DataStructureHandler * pHandler = nullptr);
 
-		inline void	SerializeArrayValue(const void * pPropPtr, const ArrayDataStructureHandler * pArrayHandler);
+		inline void	SerializeArrayValue(const void * pPropPtr, const IArrayDataStructureHandler * pArrayHandler);
 
 		inline void	SerializeMapValue(const void * pPropPtr, const MapDataStructureHandler * pMapHandler);
 

@@ -10,7 +10,7 @@ namespace DIRE_NS
 {
 	class DataStructureHandler;
 	struct MapDataStructureHandler;
-	struct ArrayDataStructureHandler;
+	struct IArrayDataStructureHandler;
 
 	class RapidJsonReflectorDeserializer : public IDeserializer
 	{
@@ -19,7 +19,7 @@ namespace DIRE_NS
 
 	private:
 
-		void	DeserializeArrayValue(const rapidjson::Value& pVal, void* pPropPtr, const ArrayDataStructureHandler * pArrayHandler) const;
+		void	DeserializeArrayValue(const rapidjson::Value& pVal, void* pPropPtr, const IArrayDataStructureHandler * pArrayHandler) const;
 
 		void	DeserializeMapValue(const rapidjson::Value& pVal, void* pPropPtr, const MapDataStructureHandler * pMapHandler) const;
 

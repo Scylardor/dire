@@ -2,7 +2,6 @@
 
 #include "DireJSONSerializer.h"
 
-#include "DireTypeInfoDatabase.h"
 #include "DireEnumDataStructureHandler.h"
 #include "DireTypeInfo.h"
 #include "DireReflectable.h"
@@ -28,7 +27,7 @@ case Type::TypeEnum:\
 	}
 
 
-	void RapidJsonReflectorSerializer::SerializeArrayValue(const void * pPropPtr, const ArrayDataStructureHandler * pArrayHandler)
+	void RapidJsonReflectorSerializer::SerializeArrayValue(const void * pPropPtr, const IArrayDataStructureHandler * pArrayHandler)
 	{
 		myJsonWriter.StartArray();
 

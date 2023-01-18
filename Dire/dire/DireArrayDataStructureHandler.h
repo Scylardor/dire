@@ -10,139 +10,45 @@ namespace DIRE_NS
 {
 	class DataStructureHandler;
 
-	struct ArrayDataStructureHandler
-	{
-		using ArrayReadFptr = void const* (*)(void const*, size_t);
-		using ArrayUpdateFptr = void (*)(void*, size_t, void const*);
-		using ArrayCreateFptr = void (*)(void*, size_t, void const*);
-		using ArrayEraseFptr = bool	(*)(void*, size_t);
-		using ArrayClearFptr = void	(*)(void*);
-		using ArraySizeFptr = size_t(*)(void const*);
-		using ArrayElementHandlerFptr = DataStructureHandler(*)();
-		using ArrayElementReflectableIDFptr = ReflectableID (*)();
-		using ArrayElementType = Type(*)();
-		using ArrayElementSize = size_t(*)();
-
-		ArrayReadFptr	Read = nullptr;
-		ArrayUpdateFptr Update = nullptr;
-		ArrayCreateFptr	Create = nullptr;
-		ArrayEraseFptr	Erase = nullptr;
-		ArrayClearFptr	Clear = nullptr;
-		ArraySizeFptr	Size = nullptr;
-		ArrayElementHandlerFptr	ElementHandler = nullptr;
-		ArrayElementReflectableIDFptr ElementReflectableID = nullptr;
-		ArrayElementType	ElementType = nullptr;
-		ArrayElementSize	ElementSize = nullptr;
-	};
-
-	// CRUD = Create, Read, Update, Delete
 	template <typename T, typename = void>
 	struct TypedArrayDataStructureHandler
 	{};
 
-	// Base class for reflectable properties that have brackets operator to be able to make operations on the underlying array
-	template <typename T>
-	struct TypedArrayDataStructureHandler<T,
-		typename std::enable_if_t<HasArraySemantics_v<T> && !std::is_array_v<T>>> : ArrayDataStructureHandler
+	struct IArrayDataStructureHandler
 	{
-		using RawElementType = decltype(std::declval<T>()[0]);
-		// Decaying removes the references and fixes the compile error "pointer to reference is illegal"
-		using ElementValueType = std::decay_t<RawElementType>;
+		virtual ~IArrayDataStructureHandler() = default;
 
-		TypedArrayDataStructureHandler()
+		virtual const void*				Read(const void* pArray, size_t pIndex) const = 0;
+		virtual void					Update(void* pArray, size_t pIndex, const void* pUpdateValue) const = 0;
+		virtual void					Create(void* pArray, size_t pIndex, const void* pCreateValue) const = 0;
+		virtual bool					Erase(void* pArray, size_t pIndex) const = 0;
+		virtual void					Clear(void* pArray) const = 0;
+		virtual size_t					Size(const void* pArray) const = 0;
+		virtual DataStructureHandler	ElementHandler() const = 0;
+		virtual ReflectableID			ElementReflectableID() const = 0;
+		virtual Type					ElementType() const = 0;
+		virtual size_t					ElementSize() const = 0;
+	};
+
+
+	class AbstractArrayDataStructureHandler : public IArrayDataStructureHandler
+	{
+	protected:
+		template <typename ElementValueType>
+		static ReflectableID			GetElementReflectableID()
 		{
-			Read = &ArrayRead;
-			Update = &ArrayUpdate;
-			Create = &ArrayCreate;
-			Erase = &ArrayErase;
-			Clear = &ArrayClear;
-			Size = &ArraySize;
-			ElementHandler = &ArrayElementHandler;
-			ElementReflectableID = &ArrayElementReflectableID;
-			ElementType = [] { return Type(FromActualTypeToEnumType<ElementValueType>::EnumType); };
-			ElementSize = [] { return sizeof(ElementValueType); };
-		}
-
-		static_assert(has_ArrayBrackets_v<T>
-			&& has_insert_v<T>
-			&& has_erase_v<T>
-			&& has_clear_v<T>
-			&& has_size_v<T>,
-			"In order to use Array-style reflection indexing, your type has to implement the following member functions with the same signature-style as std::vector:"
-			" operator[], begin, insert(iterator, value), erase, clear, size, resize.");
-
-		static void const* ArrayRead(void const* pArray, size_t pIndex)
-		{
-			if (pArray == nullptr)
+			if constexpr (std::is_base_of_v<Reflectable2, ElementValueType>)
 			{
-				return nullptr;
+				return ElementValueType::GetClassReflectableTypeInfo().GetID();
 			}
-
-			if (pIndex >= ArraySize(pArray))
+			else
 			{
-				ArrayCreate(const_cast<void*>(pArray), pIndex, nullptr);
-			}
-
-			T const* thisArray = static_cast<T const*>(pArray);
-			return &(*thisArray)[pIndex];
-		}
-
-		static void	ArrayUpdate(void* pArray, size_t pIndex, void const* pNewData)
-		{
-			if (pArray == nullptr)
-			{
-				return;
-			}
-
-			T* thisArray = static_cast<T*>(pArray);
-			if (pIndex >= ArraySize(pArray))
-			{
-				thisArray->resize(pIndex + 1);
-			}
-
-			ElementValueType const* actualData = static_cast<ElementValueType const*>(pNewData);
-			(*thisArray)[pIndex] = actualData ? *actualData : ElementValueType();
-		}
-
-		static void	ArrayCreate(void* pArray, size_t pAtIndex, void const* pInitData)
-		{
-			return ArrayUpdate(pArray, pAtIndex, pInitData);
-		}
-
-		static bool	ArrayErase(void* pArray, size_t pAtIndex)
-		{
-			T* thisArray = static_cast<T*>(pArray);
-
-			if (thisArray != nullptr && thisArray->size() > pAtIndex)
-			{
-				thisArray->erase(thisArray->begin() + pAtIndex);
-				return true;
-			}
-
-			return false;
-		}
-
-		static void	ArrayClear(void* pArray)
-		{
-			if (pArray != nullptr)
-			{
-				T* thisArray = static_cast<T*>(pArray);
-				thisArray->clear();
+				return DIRE_NS::INVALID_REFLECTABLE_ID;
 			}
 		}
 
-		static size_t	ArraySize(void const* pArray)
-		{
-			if (pArray != nullptr)
-			{
-				T const* thisArray = static_cast<T const*>(pArray);
-				return thisArray->size();
-			}
-
-			return 0;
-		}
-
-		static DataStructureHandler	ArrayElementHandler()
+		template <typename ElementValueType>
+		static DataStructureHandler	GetTypedElementHandler()
 		{
 			if constexpr (HasMapSemantics_v<ElementValueType>)
 			{
@@ -159,17 +65,117 @@ namespace DIRE_NS
 
 			return {};
 		}
+	};
 
-		static ReflectableID ArrayElementReflectableID()
+
+	// Base class for reflectable properties that have brackets operator to be able to make operations on the underlying array
+	template <typename T>
+	struct TypedArrayDataStructureHandler<T,
+		typename std::enable_if_t<HasArraySemantics_v<T> && !std::is_array_v<T>>> : public AbstractArrayDataStructureHandler
+	{
+		using RawElementType = decltype(std::declval<T>()[0]);
+		// Decaying removes the references and fixes the compile error "pointer to reference is illegal"
+		using ElementValueType = std::decay_t<RawElementType>;
+
+		TypedArrayDataStructureHandler() = default;
+
+		static_assert(has_ArrayBrackets_v<T>
+			&& has_insert_v<T>
+			&& has_erase_v<T>
+			&& has_clear_v<T>
+			&& has_size_v<T>,
+			"In order to use Array-style reflection indexing, your type has to implement the following member functions with the same signature-style as std::vector:"
+			" operator[], begin, insert(iterator, value), erase, clear, size, resize.");
+
+		virtual const void* Read(const void* pArray, size_t pIndex) const override
 		{
-			if constexpr (std::is_base_of_v<Reflectable2, T>)
+			if (pArray == nullptr)
 			{
-				return T::GetClassReflectableTypeInfo().ReflectableID;
+				return nullptr;
 			}
-			else
+
+			if (pIndex >= Size(pArray))
 			{
-				return DIRE_NS::INVALID_REFLECTABLE_ID;
+				Create(const_cast<void*>(pArray), pIndex, nullptr);
 			}
+
+			T const* thisArray = static_cast<T const*>(pArray);
+			return &(*thisArray)[pIndex];
+		}
+
+		virtual void					Update(void* pArray, size_t pIndex, const void* pUpdateValue) const override
+		{
+			if (pArray == nullptr)
+			{
+				return;
+			}
+
+			T* thisArray = static_cast<T*>(pArray);
+			if (pIndex >= Size(pArray))
+			{
+				thisArray->resize(pIndex + 1);
+			}
+
+			ElementValueType const* actualData = static_cast<ElementValueType const*>(pUpdateValue);
+			(*thisArray)[pIndex] = actualData ? *actualData : ElementValueType();
+		}
+
+		virtual void					Create(void* pArray, size_t pIndex, const void* pCreateValue) const override
+		{
+			return Update(pArray, pIndex, pCreateValue);
+		}
+
+		virtual bool					Erase(void* pArray, size_t pIndex) const override
+		{
+			T* thisArray = static_cast<T*>(pArray);
+
+			if (thisArray != nullptr && thisArray->size() > pIndex)
+			{
+				thisArray->erase(thisArray->begin() + pIndex);
+				return true;
+			}
+
+			return false;
+		}
+
+		virtual void					Clear(void* pArray) const override
+		{
+			if (pArray != nullptr)
+			{
+				T* thisArray = static_cast<T*>(pArray);
+				thisArray->clear();
+			}
+		}
+
+		virtual size_t					Size(const void* pArray) const override
+		{
+			if (pArray != nullptr)
+			{
+				T const* thisArray = static_cast<T const*>(pArray);
+				return thisArray->size();
+			}
+
+			return 0;
+		}
+
+		virtual DataStructureHandler	ElementHandler() const override
+		{
+			return GetTypedElementHandler<ElementValueType>();
+		}
+
+		virtual ReflectableID			ElementReflectableID() const override
+		{
+			return GetElementReflectableID<ElementValueType>();
+		}
+
+		virtual Type					ElementType() const override
+		{
+			return Type(FromActualTypeToEnumType<ElementValueType>::EnumType);
+		}
+
+		virtual size_t					ElementSize() const override
+		{
+			return sizeof(ElementValueType);
 		}
 
 		static TypedArrayDataStructureHandler const& GetInstance()
@@ -182,7 +188,7 @@ namespace DIRE_NS
 	// Base class for reflectable properties that are C-arrays to be able to make operations on the underlying array
 	template <typename T>
 	struct TypedArrayDataStructureHandler<T,
-		typename std::enable_if_t<std::is_array_v<T>>> : ArrayDataStructureHandler
+		typename std::enable_if_t<std::is_array_v<T>>> : AbstractArrayDataStructureHandler
 	{
 		using RawElementType = decltype(std::declval<T>()[0]);
 		// remove_reference_t removes the references and fixes the compile error "pointer to reference is illegal"
@@ -190,68 +196,60 @@ namespace DIRE_NS
 
 		inline static const size_t ARRAY_SIZE = std::extent_v<T>;
 
-		TypedArrayDataStructureHandler()
-		{
-			Read = &ArrayRead;
-			Update = &ArrayUpdate;
-			Create = &ArrayCreate;
-			Erase = &ArrayErase;
-			Clear = &ArrayClear;
-			Size = &ArraySize;
-			ElementHandler = &ArrayElementHandler;
-			ElementReflectableID = &ArrayElementReflectableID;
-			ElementType = [] { return Type(FromActualTypeToEnumType<ElementValueType>::EnumType); };
-			ElementSize = [] { return sizeof(ElementValueType); };
-		}
+		TypedArrayDataStructureHandler() = default;
 
-		static void const* ArrayRead(void const* pArray, size_t pIndex)
+		virtual const void*		Read(const void* pArray, size_t pIndex) const override
 		{
 			if (pArray == nullptr)
 			{
 				return nullptr;
 			}
+
+			IndexCheck(pIndex);
+
 			T const* thisArray = static_cast<T const*>(pArray);
 			return &(*thisArray)[pIndex];
 		}
 
-		static void	ArrayUpdate(void* pArray, size_t pIndex, void const* pNewData)
+		virtual void					Update(void* pArray, size_t pIndex, const void* pUpdateValue) const override
 		{
-			if (pArray == nullptr || pNewData == nullptr)
+			if (pArray == nullptr || pUpdateValue == nullptr)
 			{
 				return;
 			}
+
+			IndexCheck(pIndex);
 
 			// Check if the element is assignable to make arrays of arrays work
 			if constexpr (std::is_assignable_v<ElementValueType&, ElementValueType>)
 			{
 				T* thisArray = static_cast<T*>(pArray);
-				ElementValueType const* actualData = static_cast<ElementValueType const*>(pNewData);
+				ElementValueType const* actualData = static_cast<ElementValueType const*>(pUpdateValue);
 				(*thisArray)[pIndex] = *actualData;
 			}
 		}
 
-		static void	ArrayCreate(void* pArray, size_t pAtIndex, void const* pInitData)
+		virtual void					Create(void* pArray, size_t pIndex, const void* pCreateValue) const override
 		{
 			if (pArray == nullptr)
 			{
 				return;
 			}
 
-			// TODO: throw exception if exceptions are enabled
-			assert(pAtIndex < ARRAY_SIZE);
+			IndexCheck(pIndex);
 
 			// Check if the element is assignable to make arrays of arrays work
 			if constexpr (std::is_assignable_v<ElementValueType&, ElementValueType>)
 			{
 				T* thisArray = static_cast<T*>(pArray);
-				ElementValueType const* actualInitData = (pInitData ? static_cast<ElementValueType const*>(pInitData) : nullptr);
-				(*thisArray)[pAtIndex] = actualInitData ? *actualInitData : ElementValueType();
+				ElementValueType const* actualInitData = (pCreateValue ? static_cast<ElementValueType const*>(pCreateValue) : nullptr);
+				(*thisArray)[pIndex] = actualInitData ? *actualInitData : ElementValueType();
 			}
 		}
 
-		static bool	ArrayErase(void* pArray, size_t pAtIndex)
+		virtual bool					Erase(void* pArray, size_t pIndex) const override
 		{
-			if (pArray == nullptr || pAtIndex >= ARRAY_SIZE)
+			if (pArray == nullptr || pIndex >= ARRAY_SIZE)
 			{
 				return false;
 			}
@@ -260,14 +258,14 @@ namespace DIRE_NS
 			if constexpr (std::is_assignable_v<ElementValueType&, ElementValueType>)
 			{
 				T* thisArray = static_cast<T*>(pArray);
-				(*thisArray)[pAtIndex] = ElementValueType();
+				(*thisArray)[pIndex] = ElementValueType();
 				return true;
 			}
 
 			return false;
 		}
 
-		static void	ArrayClear(void* pArray)
+		virtual void					Clear(void* pArray) const override
 		{
 			if (pArray == nullptr)
 			{
@@ -286,46 +284,46 @@ namespace DIRE_NS
 			}
 		}
 
-		static size_t	ArraySize(void const* /*pArray*/)
+		virtual size_t					Size(const void* /*pArray*/) const override
 		{
 			return ARRAY_SIZE;
 		}
 
-		// TODO: Refactor because there is code duplication between the two handler types
-		static DataStructureHandler	ArrayElementHandler()
+		virtual DataStructureHandler	ElementHandler() const override
 		{
-			if constexpr (HasMapSemantics_v<ElementValueType>)
-			{
-				return DataStructureHandler(&TypedMapDataStructureHandler<ElementValueType>::GetInstance());
-			}
-			else if constexpr (HasArraySemantics_v<ElementValueType>)
-			{
-				return DataStructureHandler(&TypedArrayDataStructureHandler<ElementValueType>::GetInstance());
-			}
-			else if constexpr (std::is_base_of_v<Enum, ElementValueType>)
-			{
-				return DataStructureHandler(&TypedEnumDataStructureHandler<ElementValueType>::GetInstance());
-			}
-
-			return {};
+			return GetTypedElementHandler<ElementValueType>();
 		}
 
-		static ReflectableID ArrayElementReflectableID()
+		virtual ReflectableID			ElementReflectableID() const override
 		{
-			if constexpr (std::is_base_of_v<Reflectable2, ElementValueType>)
-			{
-				return ElementValueType::GetClassReflectableTypeInfo().GetID();
-			}
-			else
-			{
-				return DIRE_NS::INVALID_REFLECTABLE_ID;
-			}
+			return GetElementReflectableID<ElementValueType>();
+		}
+
+		virtual Type					ElementType() const override
+		{
+			return Type(FromActualTypeToEnumType<ElementValueType>::EnumType);
+		}
+
+		virtual size_t					ElementSize() const override
+		{
+			return sizeof(ElementValueType);
 		}
 
 		static TypedArrayDataStructureHandler const& GetInstance()
 		{
 			static TypedArrayDataStructureHandler instance{};
 			return instance;
+		}
+
+	private:
+		static void	IndexCheck(size_t pIndex)
+		{
+			if (ARRAY_SIZE <= pIndex)
+			{
+				char buffer[256]{ 0 };
+				std::snprintf(buffer, sizeof(buffer), "Static Array handler was used with an index out of range (index: %llu vs. array size: %llu)", pIndex, ARRAY_SIZE);
+				throw std::out_of_range(buffer);
+			}
 		}
 	};
 }

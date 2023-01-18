@@ -24,7 +24,7 @@ namespace DIRE_NS
 			myName(pName), myMetatype(Type::Unknown), myOffset(pOffset), mySize(pSize), myCopyCtor(pCopyCtor)
 		{}
 
-		[[nodiscard]] const ArrayDataStructureHandler* GetArrayHandler() const
+		[[nodiscard]] const IArrayDataStructureHandler* GetArrayHandler() const
 		{
 			return myDataStructurePropertyHandler.GetArrayHandler();
 		}
@@ -146,9 +146,8 @@ namespace DIRE_NS
 		DataStructureHandler	myDataStructurePropertyHandler; // Useful for array-like or associative data structures, will stay null for other types.
 		CopyConstructorPtr myCopyCtor = nullptr; // if null : this type is not copy-constructible
 
-		// TODO: storing it here is kind of a hack to go quick.
-		// I guess we should have a map of Type->ClassID to be able to easily find the class ID...
-		// without duplicating this information in all the type info structures of every property of the same type.
+		// Storing the reflectable ID here could be considered a kind of hack.
+		// But given that it's an unsigned (by default), all other options would basically take more memory than "just" copying it everywhere!...
 		ReflectableID		myReflectableID = INVALID_REFLECTABLE_ID;
 	};
 

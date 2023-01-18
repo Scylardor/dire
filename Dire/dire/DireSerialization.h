@@ -109,7 +109,7 @@ namespace DIRE_NS
 	IDeserializer::Result IDeserializer::Deserialize(const char* pSerialized, Args&&... pArgs)
 	{
 		static_assert(std::is_base_of_v<Reflectable2, T>, "Deserialize is only able to process Reflectable-derived classes");
-		T* deserializedReflectable = new T(std::forward<Args>(pArgs)...); // TODO: allow customization of new
+		T* deserializedReflectable = AllocateReflectable<T>(std::forward<Args>(pArgs)...);
 		Result result = DeserializeInto(pSerialized, *deserializedReflectable);
 
 		if (result.HasError())

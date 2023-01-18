@@ -26,6 +26,7 @@ set(${PROJECT_NAME}_REFLECTABLE_INSTANTIATE_WITH_DEFAULT_CONSTRUCTOR "If on, def
 set(${PROJECT_NAME}_NAMESPACE "dire" CACHE STRING "Namespace the DIRE library will use (in case of a naming conflict)")
 set(${PROJECT_NAME}_STRING "std::string" CACHE STRING "Type the DIRE library should use for standard dynamic string manipulation.")
 set(${PROJECT_NAME}_ASSERT "assert" CACHE STRING "Assert expression Dire should use in case of error")
+set(${PROJECT_NAME}_REFLECTABLE_ALLOCATOR "std::allocator" CACHE STRING "Stateless allocator Dire should use to dynamically allocate Reflectables (with e.g. Instantiate).")
 
 
 
@@ -114,6 +115,8 @@ endif()
 target_compile_definitions(${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS)
 
 target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_NS=${${PROJECT_NAME}_NAMESPACE})
+
+target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_ALLOCATOR=${${PROJECT_NAME}_REFLECTABLE_ALLOCATOR})
 
 if(${${PROJECT_NAME}_STRING} STREQUAL "std::string")
 	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_USE_STD_STRING=1)

@@ -44,8 +44,7 @@ TEST_CASE("GetProperty Simple", "[Property]")
 	compint = superC.GetProperty<int>("ABCD");
 	REQUIRE(compint == nullptr);
 
-	// TODO: supposed to assert / throw an exception.
-	//compint = superC.GetSafeProperty<int>("ABCD");
+	REQUIRE_THROWS_AS(superC.GetSafeProperty<int>("ABCD"), std::runtime_error);
 }
 
 TEST_CASE("GetProperty Array", "[Property]")

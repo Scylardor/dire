@@ -8,7 +8,7 @@ namespace DIRE_NS
 {
 	class DataStructureHandler;
 	struct MapDataStructureHandler;
-	struct ArrayDataStructureHandler;
+	struct IArrayDataStructureHandler;
 
 	class BinaryReflectorDeserializer : public IDeserializer
 	{
@@ -32,7 +32,7 @@ namespace DIRE_NS
 			return dataPtr;
 		}
 
-		void	DeserializeArrayValue(void* pPropPtr, const ArrayDataStructureHandler * pArrayHandler) const;
+		void	DeserializeArrayValue(void* pPropPtr, const IArrayDataStructureHandler * pArrayHandler) const;
 
 		void	DeserializeMapValue(void* pPropPtr, const MapDataStructureHandler * pMapHandler) const;
 

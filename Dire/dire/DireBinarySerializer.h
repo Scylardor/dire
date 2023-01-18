@@ -60,7 +60,7 @@ namespace DIRE_NS
 
 		void	SerializeValue(Type pPropType, void const* pPropPtr, DataStructureHandler const* pHandler = nullptr);
 
-		void	SerializeArrayValue(void const* pPropPtr, ArrayDataStructureHandler const* pArrayHandler);
+		void	SerializeArrayValue(void const* pPropPtr, IArrayDataStructureHandler const* pArrayHandler);
 
 		void	SerializeMapValue(void const* pPropPtr, MapDataStructureHandler const* pMapHandler);
 

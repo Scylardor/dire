@@ -7,7 +7,7 @@ namespace DIRE_NS
 {
 	class DataStructureHandler;
 
-	class ArrayDataStructureHandler
+	class IArrayDataStructureHandler
 	{
 		using ArrayReadFptr = void const* (*)(void const*, size_t);
 		using ArrayUpdateFptr = void (*)(void*, size_t, void const*);

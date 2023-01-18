@@ -1,7 +1,6 @@
 #pragma once
 #include <any>
 #include <cstddef> // std::byte
-#include <stdexcept> // TODO should be conditional
 
 #include "DireTypeInfo.h"
 #include "DireMacros.h"
@@ -11,6 +10,19 @@
 
 namespace DIRE_NS
 {
+	template <typename T, typename... Args>
+	T*	AllocateReflectable(Args&&... pCtorArgs)
+	{
+		static_assert(std::is_base_of_v<Reflectable2, T>, "AllocateReflectable is supposed to be used only for Reflectable-derived classes.");
+
+		DIRE_ALLOCATOR<T> allocator;
+		T* mem = allocator.allocate(1);
+		DIRE_ASSERT(mem != nullptr);
+		using traits_t = std::allocator_traits<DIRE_ALLOCATOR<T>>;
+		traits_t::construct(allocator, mem, pCtorArgs...);
+		return mem;
+	}
+
 	template <typename T, typename... Args>
 	struct ClassInstantiator final
 	{
@@ -30,11 +42,11 @@ namespace DIRE_NS
 			{
 				return nullptr;
 			}
-			auto f = [](Args... pCtorArgs) -> Reflectable2*
+			auto f = [](Args... pCtorArgs) -> T*
 			{
-				return new T(pCtorArgs...); // TODO: allow for custom allocator usage
+				return AllocateReflectable<T>(pCtorArgs...);
 			};
-			Reflectable2* result = std::apply(f, *argsTuple);
+			T* result = std::apply(f, *argsTuple);
 			return result;
 		}
 	};
@@ -160,10 +172,7 @@ namespace DIRE_NS
 				return *propPtr;
 			}
 
-			// throw exception, or assert
-			// TODO: check if exceptions are enabled
-			DIRE_ASSERT(false);
-			throw std::runtime_error("bad");
+			throw std::runtime_error("GetSafeProperty was called but the property didn't exist.");
 		}
 
 		template <typename TProp>
@@ -217,7 +226,7 @@ namespace DIRE_NS
 
 		[[nodiscard]] GetPropertyResult GetArrayProperty(TypeInfo const* pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const;
 
-		[[nodiscard]] GetPropertyResult RecurseFindArrayProperty(ArrayDataStructureHandler const* pArrayHandler,
+		[[nodiscard]] GetPropertyResult RecurseFindArrayProperty(IArrayDataStructureHandler const* pArrayHandler,
 			DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const;
 
 		[[nodiscard]] GetPropertyResult RecurseArrayMapProperty(DataStructureHandler const& pDataStructureHandler,
@@ -227,6 +236,8 @@ namespace DIRE_NS
 
 		[[nodiscard]] GetPropertyResult GetCompoundProperty(TypeInfo const* pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pFullPath, std::byte const* propertyAddr) const;
 	};
+
+
 }
 
 #define dire_reflectable(ObjectType, ...) \

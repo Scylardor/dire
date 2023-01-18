@@ -127,7 +127,7 @@ namespace DIRE_NS
 		return false;
 	}
 
-	Reflectable2::GetPropertyResult Reflectable2::RecurseFindArrayProperty(ArrayDataStructureHandler const* pArrayHandler,
+	Reflectable2::GetPropertyResult Reflectable2::RecurseFindArrayProperty(IArrayDataStructureHandler const* pArrayHandler,
 		DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath,
 		int pArrayIdx, std::byte const* pPropPtr) const
 	{
@@ -191,7 +191,7 @@ namespace DIRE_NS
 				return {};
 			}
 
-			ArrayDataStructureHandler const* elementHandler = pArrayHandler->ElementHandler().GetArrayHandler();
+			IArrayDataStructureHandler const* elementHandler = pArrayHandler->ElementHandler().GetArrayHandler();
 
 			if (elementHandler == nullptr)
 			{
@@ -374,7 +374,7 @@ namespace DIRE_NS
 		}
 
 		pPropPtr += thisProp->GetOffset();
-		ArrayDataStructureHandler const* arrayHandler = thisProp->GetArrayHandler();
+		IArrayDataStructureHandler const* arrayHandler = thisProp->GetArrayHandler();
 
 		return RecurseFindArrayProperty(arrayHandler, pName, pRemainingPath, pArrayIdx, pPropPtr);
 	}

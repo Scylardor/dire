@@ -2,6 +2,7 @@
 
 #include <type_traits> // enable_if
 #include <charconv> // from_chars
+#include <system_error>
 #include <variant>
 
 /* If user says it's ok to use std::string, include std::string and use it everywhere we need a dynamic string */
@@ -44,9 +45,11 @@ namespace DIRE_NS
 
 		ConvertResult(const DIRE_STRING_VIEW& pToken, std::errc pErrorCode)
 		{
-			auto neededSize = snprintf(nullptr, 0, "Converting '%s' failed: '%s'.", pToken.data(), std::strerror((int)pErrorCode));
+			std::error_code errorCode = std::make_error_code(pErrorCode);
+
+			auto neededSize = snprintf(nullptr, 0, "Converting '%s' failed: '%s'.", pToken.data(), errorCode.message().c_str());
 			ConvertError& error = Value.template emplace<ConvertError>(neededSize + 1, '\0');
-			snprintf(error.data(), error.size(), "Converting '%s' failed: '%s'.", pToken.data(), std::strerror((int)pErrorCode));
+			snprintf(error.data(), error.size(), "Converting '%s' failed: '%s'.", pToken.data(), errorCode.message().c_str());
 		}
 
 		[[nodiscard]] T	GetValue() const { return std::get<T>(Value); }
@@ -105,7 +108,6 @@ namespace DIRE_NS
 				}
 			}
 
-			// TODO: check for errors
 			return value;
 		}
 	};

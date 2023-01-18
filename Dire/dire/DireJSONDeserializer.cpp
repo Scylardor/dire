@@ -44,7 +44,7 @@ namespace DIRE_NS
 		return { &pDeserializedObject };
 	}
 
-	void RapidJsonReflectorDeserializer::DeserializeArrayValue(const rapidjson::Value& pVal, void* pPropPtr, const ArrayDataStructureHandler * pArrayHandler) const
+	void RapidJsonReflectorDeserializer::DeserializeArrayValue(const rapidjson::Value& pVal, void* pPropPtr, const IArrayDataStructureHandler * pArrayHandler) const
 	{
 		DIRE_ASSERT(pVal.IsArray());
 

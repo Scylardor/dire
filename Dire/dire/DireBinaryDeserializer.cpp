@@ -60,7 +60,7 @@ namespace DIRE_NS
 		return &pDeserializedObject;
 	}
 
-	void BinaryReflectorDeserializer::DeserializeArrayValue(void* pPropPtr, const ArrayDataStructureHandler * pArrayHandler) const
+	void BinaryReflectorDeserializer::DeserializeArrayValue(void* pPropPtr, const IArrayDataStructureHandler * pArrayHandler) const
 	{
 		if (pArrayHandler != nullptr)
 		{
