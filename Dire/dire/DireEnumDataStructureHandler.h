@@ -28,10 +28,10 @@ namespace DIRE_NS
 		static void	SetEnumFromString(const char* pEnumStr, void* pEnumAddr)
 		{
 			T* theEnum = (T*)pEnumAddr;
-			const typename T::Values* enumValue = T::GetValueFromString(pEnumStr);
-			if (theEnum && enumValue != nullptr)
+			if (theEnum != nullptr)
 			{
-				*theEnum = *enumValue;
+				const typename T::Values enumValue = T::GetValueFromSafeString(pEnumStr);
+				*theEnum = enumValue;
 			}
 		}
 

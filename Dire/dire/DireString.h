@@ -8,7 +8,6 @@
 /* If user says it's ok to use std::string, include std::string and use it everywhere we need a dynamic string */
 #if DIRE_USE_STD_STRING
 # include <string>
-# include <string_view>
 # define DIRE_STRING std::string
 # define DIRE_STRING_VIEW std::string_view
 #endif
@@ -16,20 +15,23 @@
 
 namespace DIRE_NS
 {
-	// inspired by https://stackoverflow.com/a/33399801/1987466
-	namespace ADL
+	namespace String
 	{
-		template<class T>
-		DIRE_STRING AsString(T&& t)
+		// inspired by https://stackoverflow.com/a/33399801/1987466
+		namespace ADL
 		{
-			using std::to_string;
-			return to_string(std::forward<T>(t));
+			template<class T>
+			DIRE_STRING AsString(T&& t)
+			{
+				using std::to_string;
+				return to_string(std::forward<T>(t));
+			}
 		}
-	}
-	template<class T>
-	DIRE_STRING to_string(T&& t)
-	{
-		return ADL::AsString(std::forward<T>(t));
+		template<class T>
+		DIRE_STRING to_string(T&& t)
+		{
+			return ADL::AsString(std::forward<T>(t));
+		}
 	}
 
 	using ConvertError = DIRE_STRING;
@@ -78,7 +80,7 @@ namespace DIRE_NS
 	{
 		static T Convert(const std::string_view& pChars)
 		{
-			return *T::GetValueFromString(pChars.data());
+			return T::GetValueFromSafeString(pChars.data());
 		}
 	};
 

@@ -3,15 +3,15 @@
 #include "DireMacros.h"
 #include "DireString.h"
 
-#include <string.h> // strcmp
+#include "DireAssert.h"
+
 #include <type_traits> // enable_if
 
 namespace DIRE_NS
 {
-	class Enum
-	{
 
-	};
+	class Enum
+	{};
 
 	template <typename T>
 	constexpr bool IsEnum = std::is_enum_v<T> || std::is_base_of_v<Enum, T>;
@@ -31,29 +31,29 @@ namespace DIRE_NS
 		EnumName(Values pInitVal) :\
 			Value(pInitVal)\
 		{}\
-		EnumName& operator=(EnumName const& pOther)\
+		EnumName& operator=(const EnumName & pOther)\
 		{\
 			Value = pOther.Value;\
 			return *this;\
 		}\
-		EnumName& operator=(Values const pVal)\
+		EnumName& operator=(const Values pVal)\
 		{\
 			Value = pVal;\
 			return *this;\
 		}\
-		bool operator!=(EnumName const& pOther) const\
+		bool operator!=(const EnumName & pOther) const\
 		{\
 			return (Value != pOther.Value);\
 		}\
-		bool operator!=(Values const pVal) const\
+		bool operator!=(const Values  pVal) const\
 		{\
 			return (Value != pVal);\
 		}\
-		bool operator==(EnumName const& pOther) const\
+		bool operator==(const EnumName & pOther) const\
 		{\
 			return !(*this != pOther);\
 		}\
-		bool operator==(Values const pVal) const\
+		bool operator==(const Values pVal) const\
 		{\
 			return (Value == pVal);\
 		}\
@@ -61,21 +61,21 @@ namespace DIRE_NS
 		{\
 			return Value;\
 		}\
-		friend DIRE_STRING	to_string(EnumName const& pSelf)\
+		friend DIRE_STRING	to_string(const EnumName & pSelf)\
 		{\
-			return DIRE_STRING(GetStringFromSafeEnum(pSelf.Value));\
+			return GetStringFromSafeEnum(pSelf.Value);\
 		}\
 		const char*	GetString() const\
 		{\
 			return GetStringFromSafeEnum(Value);\
 		}\
 		/* This one assumes that the parameter value is guaranteed to be within bounds and thus doesn't even bounds check. */\
-		static char const*	GetStringFromSafeEnum(Values enumValue) \
+		static const char *	GetStringFromSafeEnum(Values enumValue) \
 		{ \
 			return nameEnumPairs[(int)enumValue].first; \
 		}\
 		/* We have the guarantee that linear enums values start from 0 and increase 1 by 1 so we can make this function O(1).*/ \
-		static char const*	GetStringFromEnum(Values enumValue) \
+		static const char *	GetStringFromEnum(Values enumValue) \
 		{ \
 			if( (int)enumValue >= DIRE_NARGS(__VA_ARGS__))\
 			{\
@@ -83,7 +83,7 @@ namespace DIRE_NS
 			}\
 			return GetStringFromSafeEnum(enumValue);\
 		}\
-		static Values const*	GetValueFromString(char const* enumStr) \
+		static const Values *	GetValueFromString(const char * enumStr) \
 		{ \
 			for (auto const& pair : nameEnumPairs)\
 			{\
@@ -91,6 +91,17 @@ namespace DIRE_NS
 					return &pair.second;\
 			}\
 			return nullptr;\
+		}\
+		static Values	GetValueFromSafeString(DIRE_STRING_VIEW enumStr) \
+		{ \
+			for (auto const& pair : nameEnumPairs)\
+			{\
+				if (enumStr == pair.first)\
+					return pair.second;\
+			}\
+			/* should never happen!*/\
+			DIRE_ASSERT(false);\
+			return Values();\
 		}\
 		template <typename F>\
 		static void	Enumerate(F&& pEnumerator)\
@@ -186,29 +197,81 @@ namespace DIRE_NS
 		EnumName(Values pInitVal) :\
 			Value(pInitVal)\
 		{}\
-		EnumName& operator=(EnumName const& pOther)\
+		EnumName(Underlying pInitVal) :\
+			Value((Values)pInitVal)\
+		{}\
+		EnumName& operator=(const EnumName & pOther)\
 		{\
 			Value = pOther.Value;\
 			return *this;\
 		}\
-		EnumName& operator=(Values const pVal)\
+		EnumName& operator=(const Values  pVal)\
 		{\
 			Value = pVal;\
 			return *this;\
 		}\
-		bool operator!=(EnumName const& pOther) const\
+		EnumName& operator|=(const Values pVal)\
+		{\
+			Value = (Values) ((Underlying)Value | (Underlying)pVal); \
+			return *this; \
+		}\
+		EnumName operator|(const Values pVal) const\
+		{\
+			return (Values) ((Underlying)Value | (Underlying)pVal); \
+		}\
+		EnumName& operator&=(const Values  pVal)\
+		{\
+			Value = (Values) ((Underlying)Value & (Underlying)pVal); \
+			return *this; \
+		}\
+		EnumName operator&(const Values pVal) const\
+		{\
+			return (Values) ((Underlying)Value & (Underlying)pVal); \
+		}\
+		EnumName& operator<<=(unsigned pLShift)\
+		{\
+			Value = (Values) ((Underlying)Value << pLShift); \
+			return *this; \
+		}\
+		EnumName operator<<(unsigned pLShift) const\
+		{\
+			return (Values) ((Underlying)Value << pLShift); \
+		}\
+		EnumName& operator>>=(unsigned pRShift)\
+		{\
+			Value = (Values) ((Underlying)Value >> pRShift); \
+			return *this; \
+		}\
+		EnumName operator>>(unsigned pRShift) const\
+		{\
+			return (Values) ((Underlying)Value >> pRShift); \
+		}\
+		EnumName& operator^=(const Values pVal)\
+		{\
+			Value = (Values) ((Underlying)Value ^ (Underlying)pVal); \
+			return *this; \
+		}\
+		EnumName operator^(const Values pVal) const\
+		{\
+			return (Values) ((Underlying)Value ^ (Underlying)pVal); \
+		}\
+		EnumName operator~() const\
+		{\
+			return (Values) ((Underlying)~Value);\
+		}\
+		bool operator!=(const EnumName & pOther) const\
 		{\
 			return (Value != pOther.Value);\
 		}\
-		bool operator!=(Values const pVal) const\
+		bool operator!=(const Values  pVal) const\
 		{\
 			return (Value != pVal);\
 		}\
-		bool operator==(EnumName const& pOther) const\
+		bool operator==(const EnumName & pOther) const\
 		{\
 			return !(*this != pOther);\
 		}\
-		bool operator==(Values const pVal) const\
+		bool operator==(const Values  pVal) const\
 		{\
 			return (Value == pVal);\
 		}\
@@ -217,9 +280,9 @@ namespace DIRE_NS
 			return Value;\
 		}\
 		Values	Value{};\
-		friend DIRE_STRING	to_string(EnumName const& pSelf)\
+		friend DIRE_STRING	to_string(const EnumName & pSelf)\
 		{\
-			return DIRE_STRING(GetStringFromSafeEnum(pSelf.Value));\
+			return GetStringFromSafeEnum(pSelf.Value);\
 		}\
 		void SetBit(Values pSetBit)\
 		{\
@@ -237,34 +300,72 @@ namespace DIRE_NS
 		{\
 			return ((Underlying)Value & (Underlying)pBit) != 0;\
 		}\
-		const char*	GetString() const\
+		DIRE_STRING	GetString() const\
 		{\
-			return GetStringFromSafeEnum(Value);\
+			return BuildStringFromEnum(Value);\
 		}\
 		/*This one assumes that the parameter value is guaranteed to be within bounds and thus doesn't even bounds check. */\
-		static char const*	GetStringFromSafeEnum(Values pEnumValue) \
+		static const char*	GetStringFromSafeEnum(Values pEnumValue) \
 		{ \
 			return nameEnumPairs[DIRE_NS::FindFirstSetBit((UnderlyingType)pEnumValue)].first; \
 		}\
 		/* We have the guarantee that bitflags enums values are powers of 2 so we can make this function O(1).*/ \
-		static char const*	GetStringFromEnum(Values pEnumValue)\
+		static DIRE_STRING	GetStringFromEnum(Values pEnumValue)\
 		{ \
-			/* If value is 0 OR not a power of 2 OR bigger than our biggest power of 2, it cannot be valid */\
-			const bool isPowerOf2 = ((UnderlyingType)pEnumValue & ((UnderlyingType)pEnumValue - 1)) == 0;\
-			if ((UnderlyingType)pEnumValue == 0 || !isPowerOf2 || (UnderlyingType)pEnumValue >= (1 << DIRE_NARGS(__VA_ARGS__)))\
+			/* If value is 0, it cannot be valid */\
+			if ((UnderlyingType)pEnumValue == 0)\
 			{\
-				return nullptr;\
+				return "invalid";\
 			}\
 			return GetStringFromSafeEnum(pEnumValue);\
 		}\
-		static Values const*	GetValueFromString(char const* enumStr) \
+		static const Values GetValueFromString(DIRE_STRING_VIEW enumStr) \
 		{ \
-			for (auto const& pair : nameEnumPairs)\
+			/* Happy path: there's no pipe in the string, directly search values */\
+			if (enumStr.find('|') == enumStr.npos)\
 			{\
-				if (strcmp(pair.first, enumStr) == 0)\
-					return &pair.second;\
+				for (const auto& pair : nameEnumPairs)\
+				{\
+					if (enumStr == pair.first)\
+						return pair.second;\
+				}\
+				return (Values)0;\
 			}\
-			return nullptr;\
+			else\
+			{\
+				/* Find each ' | ', then search each token separately*/\
+				size_t tokenPos = 0;\
+				Underlying val = 0;\
+				while (tokenPos != enumStr.npos)\
+				{\
+					DIRE_STRING_VIEW token;\
+					size_t pipePos = enumStr.find(" | ", tokenPos);\
+					if (pipePos != enumStr.npos)\
+						token = enumStr.substr(tokenPos, pipePos - tokenPos);\
+					else\
+						token = enumStr.substr(tokenPos, enumStr.length() - tokenPos);\
+					Underlying oldVal = val;\
+					for (const auto& pair : nameEnumPairs)\
+					{\
+						if (token == pair.first)\
+						{\
+							val = val | pair.second;\
+							break;\
+						}\
+					}\
+					if (oldVal == val) /* not found? error*/\
+						return (Values)0;\
+					if (pipePos != enumStr.npos)\
+						tokenPos = pipePos + 3;\
+					else\
+						tokenPos = enumStr.npos;\
+				}\
+				return (Values)val;\
+			}\
+		}\
+		static Values	GetValueFromSafeString(DIRE_STRING_VIEW enumStr) \
+		{ \
+			return GetValueFromString(enumStr);\
 		}\
 		template <typename F>\
 		static void	Enumerate(F&& pEnumerator)\
@@ -277,6 +378,26 @@ namespace DIRE_NS
 			return DIRE_STRINGIZE(EnumName);\
 		}\
 	private:\
+		static DIRE_STRING	BuildStringFromEnum(Values pEnumValue)\
+		{ \
+			/* If value is 0, it cannot be valid */\
+			if ((UnderlyingType)pEnumValue == 0)\
+			{\
+				return "invalid";\
+			}\
+			DIRE_STRING oredValues;\
+			for (unsigned i = DIRE_NS::FindFirstSetBit((UnderlyingType)pEnumValue); i < DIRE_NARGS(__VA_ARGS__); ++i)\
+			{\
+				const auto& enumNamePair = nameEnumPairs[i];\
+				if ((UnderlyingType)pEnumValue & (UnderlyingType)enumNamePair.second)\
+				{\
+					if (!oredValues.empty())\
+						oredValues += " | ";\
+					oredValues += enumNamePair.first;\
+				}\
+			}\
+			return oredValues;\
+		}\
 		inline static std::pair<const char*, Values> nameEnumPairs[] {DIRE_VA_MACRO(DIRE_BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)};\
 	};
 	//std::ostream& operator<<(std::ostream& pOs, const EnumName& pEnum)\

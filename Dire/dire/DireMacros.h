@@ -90,7 +90,7 @@
 #define DIRE_COMMA_ARGS4(a1, a2, a3, a4) a1 DIRE_COMMA a2 DIRE_COMMA a3 DIRE_COMMA a4
 #define DIRE_COMMA_ARGS5(a1, a2, a3, a4, a5) a1 DIRE_COMMA a2 DIRE_COMMA a3 DIRE_COMMA a4 DIRE_COMMA a5
 
-// TODO: maybe try to use IF_ELSE here
+// If one day, you wanna use IF_ELSE instead, read here http://jhnet.co.uk/articles/cpp_magic
 // Important to use VA_MACRO here otherwise MSVC will expand whole va_args in a single argument
 #define DIRE_INHERITANCE_LIST_OR_REFLECTABLE0(...) DIRE_NS::Reflectable2
 #define DIRE_INHERITANCE_LIST_OR_REFLECTABLE1(...) DIRE_VA_MACRO(DIRE_COMMA_ARGS, __VA_ARGS__)

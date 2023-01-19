@@ -287,7 +287,7 @@ namespace DIRE_NS
 		static std::string	MapKeyToString(OpaqueKeyType pKey)
 		{
 			auto& keyRef = *static_cast<const KeyType*>(pKey);
-			return DIRE_NS::to_string(keyRef);
+			return DIRE_NS::String::to_string(keyRef);
 		}
 #endif
 
