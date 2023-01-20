@@ -37,10 +37,10 @@ TEST_CASE("Subclass Instantiate", "[Reflectable]")
 {
 	// generic instantiate
 	dire::Subclass<a> aSubClass;
-	REQUIRE(aSubClass.GetClassID() == a::GetClassReflectableTypeInfo().GetID());
+	REQUIRE(aSubClass.GetClassID() == a::GetTypeInfo().GetID());
 
-	aSubClass.SetClass(c::GetClassReflectableTypeInfo().GetID());
-	REQUIRE(aSubClass.GetClassID() == c::GetClassReflectableTypeInfo().GetID());
+	aSubClass.SetClass(c::GetTypeInfo().GetID());
+	REQUIRE(aSubClass.GetClassID() == c::GetTypeInfo().GetID());
 	a* newA = aSubClass.Instantiate();
 	REQUIRE((nullptr != newA && dynamic_cast<c*>(newA) != nullptr));
 	delete newA; // So far, Instantiate is handled with new, so deleting the allocated pointer is up to the caller.
@@ -51,8 +51,8 @@ TEST_CASE("Subclass Instantiate", "[Reflectable]")
 	delete anotherInstance;
 
 	// change of class ID
-	aSubClass.SetClass(b::GetClassReflectableTypeInfo().GetID());
-	REQUIRE(aSubClass.GetClassID() == b::GetClassReflectableTypeInfo().GetID());
+	aSubClass.SetClass(b::GetTypeInfo().GetID());
+	REQUIRE(aSubClass.GetClassID() == b::GetTypeInfo().GetID());
 	a* aB = aSubClass.Instantiate();
 	REQUIRE((nullptr != aB && dynamic_cast<b*>(aB) != nullptr));
 	delete aB;
@@ -70,8 +70,8 @@ TEST_CASE("Subclass Instantiate", "[Reflectable]")
 	REQUIRE(null == nullptr);
 
 	// valid id but not a base of the subclass
-	aSubClass.SetClass(SuperCompound::GetClassReflectableTypeInfo().GetID());
-	REQUIRE(aSubClass.GetClassID() == SuperCompound::GetClassReflectableTypeInfo().GetID());
+	aSubClass.SetClass(SuperCompound::GetTypeInfo().GetID());
+	REQUIRE(aSubClass.GetClassID() == SuperCompound::GetTypeInfo().GetID());
 	null = aSubClass.Instantiate();
 	REQUIRE(null == nullptr);
 }
@@ -101,27 +101,27 @@ TEST_CASE("IsA", "[Reflectable]")
 
 TEST_CASE("TypeInfo Name", "[Reflectable]")
 {
-	REQUIRE(a::GetClassReflectableTypeInfo().GetName() == "a");
-	REQUIRE(b::GetClassReflectableTypeInfo().GetName() == "b");
-	REQUIRE(c::GetClassReflectableTypeInfo().GetName() == "c");
-	REQUIRE(SuperCompound::GetClassReflectableTypeInfo().GetName() == "SuperCompound");
-	REQUIRE(testNS::Nested::GetClassReflectableTypeInfo().GetName() == "testNS::Nested");
-	REQUIRE(testNS::Nested2::GetClassReflectableTypeInfo().GetName() == "testNS::Nested2");
+	REQUIRE(a::GetTypeInfo().GetName() == "a");
+	REQUIRE(b::GetTypeInfo().GetName() == "b");
+	REQUIRE(c::GetTypeInfo().GetName() == "c");
+	REQUIRE(SuperCompound::GetTypeInfo().GetName() == "SuperCompound");
+	REQUIRE(testNS::Nested::GetTypeInfo().GetName() == "testNS::Nested");
+	REQUIRE(testNS::Nested2::GetTypeInfo().GetName() == "testNS::Nested2");
 }
 
 TEST_CASE("Reflectable Instantiate", "[Reflectable]")
 {
 	// use default constructor as instantiator
-	DefaultInstantiated* deft = dire::Reflector3::GetSingleton().InstantiateClass<DefaultInstantiated>();
+	DefaultInstantiated* deft = dire::TypeInfoDatabase::GetSingleton().InstantiateClass<DefaultInstantiated>();
 	REQUIRE(deft != nullptr);
 
 	// use custom constructor as instantiator
-	CustomInstantiated* custom = dire::Reflector3::GetSingleton().InstantiateClass<CustomInstantiated>(1337);
+	CustomInstantiated* custom = dire::TypeInfoDatabase::GetSingleton().InstantiateClass<CustomInstantiated>(1337);
 	REQUIRE((custom != nullptr && custom->aConfigVariable == 1337));
 
 	// no constructor takes those parameters, should fail
-	DefaultInstantiated* nodeft = dire::Reflector3::GetSingleton().InstantiateClass<DefaultInstantiated>(1337);
-	CustomInstantiated* nocustom = dire::Reflector3::GetSingleton().InstantiateClass<CustomInstantiated>();
+	DefaultInstantiated* nodeft = dire::TypeInfoDatabase::GetSingleton().InstantiateClass<DefaultInstantiated>(1337);
+	CustomInstantiated* nocustom = dire::TypeInfoDatabase::GetSingleton().InstantiateClass<CustomInstantiated>();
 	REQUIRE((nodeft == nullptr && nocustom == nullptr));
 
 	delete deft;

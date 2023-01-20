@@ -3,7 +3,7 @@
 
 #include <fstream>
 
-const DIRE_NS::TypeInfo * DIRE_NS::Reflector3::GetTypeInfo(ReflectableID classID) const
+const DIRE_NS::TypeInfo * DIRE_NS::TypeInfoDatabase::GetTypeInfo(ReflectableID classID) const
 {
 	// TypeInfos IDs are supposed to match their position in the vector, but not always because of possible binary import/exports.
 	// if possible, use Reflectable::GetTypeInfo instead.
@@ -22,13 +22,13 @@ const DIRE_NS::TypeInfo * DIRE_NS::Reflector3::GetTypeInfo(ReflectableID classID
 	return nullptr;
 }
 
-DIRE_NS::TypeInfo* DIRE_NS::Reflector3::EditTypeInfo(ReflectableID classID)
+DIRE_NS::TypeInfo* DIRE_NS::TypeInfoDatabase::EditTypeInfo(ReflectableID classID)
 {
 	const TypeInfo* typeInfo = GetTypeInfo(classID);
 	return const_cast<TypeInfo*>(typeInfo);
 }
 
-DIRE_NS::Reflectable2* DIRE_NS::Reflector3::TryInstantiate(ReflectableID pClassID, std::any const& pAnyParameterPack) const
+DIRE_NS::Reflectable2* DIRE_NS::TypeInfoDatabase::TryInstantiate(ReflectableID pClassID, std::any const& pAnyParameterPack) const
 {
 	ReflectableFactory::InstantiateFunction anInstantiateFunc = myInstantiateFactory.GetInstantiator(pClassID);
 	if (anInstantiateFunc == nullptr)
@@ -46,7 +46,7 @@ size_t	BinaryWriteAtOffset(char* pDest, const void* pSrc, size_t pCount, size_t 
 	return pWriteOffset + pCount;
 }
 
-DIRE_STRING	DIRE_NS::Reflector3::BinaryExport() const
+DIRE_STRING	DIRE_NS::TypeInfoDatabase::BinaryExport() const
 {
 	// This follows a very simple binary serialization process right now. It encodes:
 	// - file version
@@ -88,7 +88,7 @@ DIRE_STRING	DIRE_NS::Reflector3::BinaryExport() const
 
 	return writeBuffer;
 }
-bool	DIRE_NS::Reflector3::ExportToBinaryFile(DIRE_STRING_VIEW pWrittenSettingsFile) const
+bool	DIRE_NS::TypeInfoDatabase::ExportToBinaryFile(DIRE_STRING_VIEW pWrittenSettingsFile) const
 {
 	auto binaryBuffer = BinaryExport();
 
@@ -103,7 +103,7 @@ bool	DIRE_NS::Reflector3::ExportToBinaryFile(DIRE_STRING_VIEW pWrittenSettingsFi
 	return true;
 }
 
-DIRE_STRING	DIRE_NS::Reflector3::BinaryImport(DIRE_STRING_VIEW pReadSettingsFile)
+DIRE_STRING	DIRE_NS::TypeInfoDatabase::BinaryImport(DIRE_STRING_VIEW pReadSettingsFile)
 {
 	using std::ios;
 	std::ifstream file(pReadSettingsFile.data(), ios::binary | ios::ate);
@@ -117,7 +117,7 @@ DIRE_STRING	DIRE_NS::Reflector3::BinaryImport(DIRE_STRING_VIEW pReadSettingsFile
 	return fileBuffer;
 }
 
-bool	DIRE_NS::Reflector3::ImportFromBinaryFile(DIRE_STRING_VIEW pReadSettingsFile)
+bool	DIRE_NS::TypeInfoDatabase::ImportFromBinaryFile(DIRE_STRING_VIEW pReadSettingsFile)
 {
 	// Importing settings is trickier than exporting them because all the static initialization
 	// is already done at import time. This gives a lot of opportunities to mess up!
@@ -126,7 +126,7 @@ bool	DIRE_NS::Reflector3::ImportFromBinaryFile(DIRE_STRING_VIEW pReadSettingsFil
 	// "orphaned types" (types that were imported but are not in the executable anymore)...
 	// This function tries to "patch the holes" as best as it can.
 
-	std::string readBuffer = BinaryImport(pReadSettingsFile);
+	DIRE_STRING readBuffer = BinaryImport(pReadSettingsFile);
 	if (readBuffer.empty())
 		return false;
 

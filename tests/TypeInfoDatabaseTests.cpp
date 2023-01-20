@@ -20,7 +20,7 @@ auto writeBinaryString = [](const std::string& binarized)
 
 TEST_CASE("Binary Export", "[TypeInfoDatabase]")
 {
-	dire::Reflector3 aDatabase;
+	dire::TypeInfoDatabase aDatabase;
 
 	dire::TypeInfo tata("tata");
 	tata.SetID(aDatabase.RegisterTypeInfo(&tata));
@@ -60,7 +60,7 @@ TEST_CASE("Binary Export", "[TypeInfoDatabase]")
 	{
 		std::string binaryDatabase = aDatabase.BinaryExport();
 
-		std::string fileBuffer = dire::Reflector3::BinaryImport("database.bin");
+		std::string fileBuffer = dire::TypeInfoDatabase::BinaryImport("database.bin");
 		REQUIRE(binaryDatabase == fileBuffer);
 	}
 
@@ -73,7 +73,7 @@ TEST_CASE("Binary Export", "[TypeInfoDatabase]")
 
 TEST_CASE("Binary Import", "[TypeInfoDatabase]")
 {
-	dire::Reflector3 aDatabase;
+	dire::TypeInfoDatabase aDatabase;
 	dire::TypeInfo tata("tata");
 	tata.SetID(aDatabase.RegisterTypeInfo(&tata));
 
@@ -120,7 +120,7 @@ TEST_CASE("Binary Import", "[TypeInfoDatabase]")
 	SECTION("Case study 2 : Types are missing")
 	{
 		{
-			dire::Reflector3 aDatabase2;
+			dire::TypeInfoDatabase aDatabase2;
 			tete.SetID(aDatabase2.RegisterTypeInfo(&tete));
 
 			toto.SetID(aDatabase2.RegisterTypeInfo(&toto));
@@ -141,7 +141,7 @@ TEST_CASE("Binary Import", "[TypeInfoDatabase]")
 		}
 
 		// Reimport again
-		dire::Reflector3 aDatabase3;
+		dire::TypeInfoDatabase aDatabase3;
 		tete.SetID(aDatabase3.RegisterTypeInfo(&tete));
 		toto.SetID(aDatabase3.RegisterTypeInfo(&toto));
 		tutu.SetID(aDatabase3.RegisterTypeInfo(&tutu));
@@ -187,7 +187,7 @@ TEST_CASE("Binary Import", "[TypeInfoDatabase]")
 
 	SECTION("Case study 4 : the 'mega mix' : existing types moved around, some are missing, and new types appeared")
 	{
-		dire::Reflector3 aDatabase4;
+		dire::TypeInfoDatabase aDatabase4;
 
 		tutu.SetID(aDatabase4.RegisterTypeInfo(&tutu));
 

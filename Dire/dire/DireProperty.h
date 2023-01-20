@@ -60,7 +60,7 @@ namespace DIRE_NS
 		ReflectProperty3(const char* pName, std::ptrdiff_t pOffset) :
 			PropertyTypeInfo(pName, pOffset, sizeof(TProp))
 		{
-			TypeInfo& typeInfo = TOwner::EditClassReflectableTypeInfo();
+			TypeInfo& typeInfo = TOwner::EditTypeInfo();
 			typeInfo.PushTypeInfo(*this);
 
 			SelectType<TProp>();

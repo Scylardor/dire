@@ -93,7 +93,7 @@ namespace DIRE_NS
 		{
 			if constexpr (std::is_base_of_v<Reflectable2, TProp>)
 			{
-				myReflectableID = TProp::GetClassReflectableTypeInfo().GetID();
+				myReflectableID = TProp::GetTypeInfo().GetID();
 			}
 			else
 			{
@@ -229,7 +229,7 @@ namespace DIRE_NS
 				(PushBackParameterType(FromActualTypeToEnumType<Args>::EnumType), ...);
 			}
 
-			TypeInfo& theClassReflector = Class::EditClassReflectableTypeInfo();
+			TypeInfo& theClassReflector = Class::EditTypeInfo();
 			theClassReflector.PushFunctionInfo(*this);
 		}
 
@@ -266,7 +266,7 @@ namespace DIRE_NS
 	template <typename Ret = void, typename T, typename... Args>
 	Ret	Invoke(const DIRE_STRING_VIEW& pFuncName, T& pObject, Args&&... pArgs)
 	{
-		const TypeInfo& theClassReflector = T::EditClassReflectableTypeInfo();
+		const TypeInfo& theClassReflector = T::EditTypeInfo();
 		const FunctionInfo* funcInfo = theClassReflector.FindFunction(pFuncName);
 		if constexpr (std::is_void_v<Ret>)
 		{
@@ -288,7 +288,7 @@ namespace DIRE_NS
 	public:
 
 		TypeInfo(const char* pTypename) :
-			ReflectableID(Reflector3::EditSingleton().RegisterTypeInfo(this)),
+			ReflectableID(TypeInfoDatabase::EditSingleton().RegisterTypeInfo(this)),
 			TypeName(pTypename)
 		{}
 
@@ -437,11 +437,6 @@ namespace DIRE_NS
 			return ReflectableID;
 		}
 
-		[[nodiscard]] int	GetVptrOffset() const
-		{
-			return VirtualOffset;
-		}
-
 		void	CloneHierarchyPropertiesOf(Reflectable2& pNewClone, const Reflectable2& pCloned) const;
 
 		void	ClonePropertiesOf(Reflectable2& pNewClone, const Reflectable2& pCloned) const;
@@ -463,7 +458,6 @@ namespace DIRE_NS
 
 	protected:
 		ReflectableID							ReflectableID = INVALID_REFLECTABLE_ID;
-		int										VirtualOffset{ 0 }; // for polymorphic classes
 		DIRE_STRING_VIEW						TypeName;
 		IntrusiveLinkedList<PropertyTypeInfo>	Properties;
 		IntrusiveLinkedList<FunctionInfo>		MemberFunctions;
@@ -486,19 +480,15 @@ namespace DIRE_NS
 			if constexpr (UseDefaultCtorForInstantiate && std::is_default_constructible_v<T>)
 			{
 				static_assert(std::is_base_of_v<Reflectable2, T>, "This class is only supposed to be used as a member variable of a Reflectable-derived class.");
-				Reflector3::EditSingleton().RegisterInstantiateFunction(T::GetClassReflectableTypeInfo().GetID(),
+				TypeInfoDatabase::EditSingleton().RegisterInstantiateFunction(T::GetTypeInfo().GetID(),
 					[](std::any const& pParams) -> Reflectable2*
 					{
 						if (pParams.has_value()) // we've been sent parameters but this is default construction! Error
 							return nullptr;
 
 						return new T();
-					});
-			}
-
-			if constexpr (std::is_polymorphic_v<T>)
-			{
-				VirtualOffset += sizeof(void*); // should be 4 on x86, 8 on x64
+					}
+				);
 			}
 		}
 
@@ -508,7 +498,7 @@ namespace DIRE_NS
 		{
 			if constexpr (!std::is_same_v<TParent, Reflectable2>)
 			{
-				TypeInfo& parentTypeInfo = TParent::EditClassReflectableTypeInfo();
+				TypeInfo& parentTypeInfo = TParent::EditTypeInfo();
 				parentTypeInfo.AddChildClass(this);
 				this->AddParentClass(&parentTypeInfo);
 				RecursiveRegisterParentClasses<typename TParent::Super>();
@@ -541,11 +531,11 @@ namespace DIRE_NS
     constexpr auto DIRE_SelfTypeHelper() -> decltype(DIRE_NS::SelfHelpers::Writer<DIRE_SelfTypeTag, decltype(this)>{}); \
     using Self = DIRE_NS::SelfHelpers::Read<DIRE_SelfTypeTag>;\
 	inline static DIRE_NS::TypedTypeInfo<Self, false>	DIRE_TypeInfo{""};\
-	static DIRE_NS::TypeInfo const&	GetClassReflectableTypeInfo()\
+	static DIRE_NS::TypeInfo const&	GetTypeInfo()\
 	{\
 		return DIRE_TypeInfo;\
 	}\
-	static DIRE_NS::TypeInfo&	EditClassReflectableTypeInfo()\
+	static DIRE_NS::TypeInfo&	EditTypeInfo()\
 	{\
 		return DIRE_TypeInfo;\
 	}

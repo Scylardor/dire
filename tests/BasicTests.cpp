@@ -32,7 +32,7 @@ TEST_CASE("Test DIRE_PROPERTY sets values", "[Basic Properties]")
 TEST_CASE("GetPropertyList with DECLARE_REFLECTABLE_INFO and basic types", "[Basic Properties]")
 {
 	std::ostringstream output;
-	auto& refl = BasicTest::GetClassReflectableTypeInfo();
+	auto& refl = BasicTest::GetTypeInfo();
 
 	for (dire::PropertyTypeInfo const& prop : refl.GetPropertyList())
 	{

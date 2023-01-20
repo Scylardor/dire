@@ -52,7 +52,7 @@ namespace DIRE_NS
 	};
 
 
-	struct Reflector3 : Singleton<Reflector3>, AutomaticTypeCounter<Reflector3, ReflectableID>
+	struct TypeInfoDatabase : Singleton<TypeInfoDatabase>
 	{
 		inline static const unsigned DATABASE_VERSION = 0;
 
@@ -78,8 +78,8 @@ namespace DIRE_NS
 		{
 			static_assert(std::is_base_of_v<Reflectable2, T>, "ClassInstantiator is only meant to be used as a member of Reflectable-derived classes.");
 			if (sizeof...(Args) == 0)
-				return static_cast<T*>(TryInstantiate(T::GetClassReflectableTypeInfo().GetID(), {}));
-			return static_cast<T*>(TryInstantiate(T::GetClassReflectableTypeInfo().GetID(), { std::tuple<Args...>(std::forward<Args>(pArgs)...) }));
+				return static_cast<T*>(TryInstantiate(T::GetTypeInfo().GetID(), {}));
+			return static_cast<T*>(TryInstantiate(T::GetTypeInfo().GetID(), { std::tuple<Args...>(std::forward<Args>(pArgs)...) }));
 		}
 
 
@@ -101,8 +101,8 @@ namespace DIRE_NS
 	// Allow unit tests to build a database that is not the program's singleton.
 #if !DIRE_UNIT_TESTS
 	protected:
-		Reflector3() = default;
-		friend Singleton<Reflector3>;
+		TypeInfoDatabase() = default;
+		friend Singleton<TypeInfoDatabase>;
 
 	private:
 #endif

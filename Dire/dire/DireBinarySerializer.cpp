@@ -21,7 +21,7 @@ namespace DIRE_NS
 		// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
 		const std::byte * reflectableAddr = reinterpret_cast<const std::byte *>(&serializedObject);
 
-		Reflector3::GetSingleton().GetTypeInfo(serializedObject.GetReflectableClassID())->ForEachPropertyInHierarchy([this, &objectHandle, reflectableAddr](const PropertyTypeInfo & pProperty)
+		TypeInfoDatabase::GetSingleton().GetTypeInfo(serializedObject.GetReflectableClassID())->ForEachPropertyInHierarchy([this, &objectHandle, reflectableAddr](const PropertyTypeInfo & pProperty)
 		{
 			const std::byte * propertyAddr = reflectableAddr + pProperty.GetOffset();
 
@@ -128,7 +128,7 @@ namespace DIRE_NS
 	void BinaryReflectorSerializer::SerializeCompoundValue(const void * pPropPtr)
 	{
 		auto* reflectableProp = static_cast<const Reflectable2 *>(pPropPtr);
-		const TypeInfo * compTypeInfo = Reflector3::GetSingleton().GetTypeInfo(reflectableProp->GetReflectableClassID());
+		const TypeInfo * compTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(reflectableProp->GetReflectableClassID());
 		DIRE_ASSERT(compTypeInfo != nullptr);
 
 		const std::byte * reflectableAddr = reinterpret_cast<const std::byte *>(reflectableProp);
@@ -148,7 +148,7 @@ namespace DIRE_NS
 	}
 
 
-	void BinaryReflectorSerializer::SerializeString(std::string_view pSerializedString)
+	void BinaryReflectorSerializer::SerializeString(DIRE_STRING_VIEW pSerializedString)
 	{
 		WriteAsBytes<size_t>(pSerializedString.size());
 		WriteRawBytes(pSerializedString.data(), pSerializedString.size());
@@ -169,7 +169,7 @@ namespace DIRE_NS
 		WriteAsBytes<bool>(pSerializedBool);
 	}
 
-	void BinaryReflectorSerializer::SerializeValuesForObject(std::string_view /*pObjectName*/, SerializedValueFiller /*pFillerFunction*/)
+	void BinaryReflectorSerializer::SerializeValuesForObject(DIRE_STRING_VIEW /*pObjectName*/, SerializedValueFiller /*pFillerFunction*/)
 	{
 		// not implemented for now (mostly used for JSON metadata)
 	}

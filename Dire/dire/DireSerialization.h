@@ -121,13 +121,13 @@ namespace DIRE_NS
 	template <typename ... Args>
 	IDeserializer::Result  IDeserializer::Deserialize(const char* pSerialized, ReflectableID pReflectableClassID, Args&&... pArgs)
 	{
-		const TypeInfo * typeInfo = Reflector3::GetSingleton().GetTypeInfo(pReflectableClassID);
+		const TypeInfo * typeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(pReflectableClassID);
 		if (typeInfo == nullptr) // bad ID
 		{
 			return nullptr;
 		}
 
-		Reflectable2* deserializedReflectable = Reflector3::GetSingleton().TryInstantiate(pReflectableClassID, std::tuple<Args...>(std::forward<Args>(pArgs)...));
+		Reflectable2* deserializedReflectable = TypeInfoDatabase::GetSingleton().TryInstantiate(pReflectableClassID, std::tuple<Args...>(std::forward<Args>(pArgs)...));
 
 		Result result;
 		if (deserializedReflectable)

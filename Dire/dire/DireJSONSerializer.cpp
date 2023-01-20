@@ -81,7 +81,7 @@ case Type::TypeEnum:\
 
 	void RapidJsonReflectorSerializer::SerializeReflectable(const Reflectable2& pReflectable)
 	{
-		const TypeInfo* typeInfo = pReflectable.GetTypeInfo();
+		const TypeInfo* typeInfo = pReflectable.GetReflectableTypeInfo();
 
 		DIRE_ASSERT(typeInfo != nullptr);
 

@@ -6,7 +6,7 @@ namespace DIRE_NS
 {
 	const Reflectable2::GetPropertyResult Reflectable2::GetPropertyImpl(DIRE_STRING_VIEW pFullPath) const
 	{
-		const TypeInfo* thisTypeInfo = GetTypeInfo();
+		const TypeInfo* thisTypeInfo = GetReflectableTypeInfo();
 
 		auto propertyAddr = reinterpret_cast<const std::byte*>(this);
 
@@ -151,7 +151,7 @@ namespace DIRE_NS
 		}
 		if (dotPos != pRemainingPath.npos && dotPos < leftBrackPos) // it's a compound in an array
 		{
-			const TypeInfo * arrayElemTypeInfo = Reflector3::GetSingleton().GetTypeInfo(pArrayHandler->ElementReflectableID());
+			const TypeInfo * arrayElemTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(pArrayHandler->ElementReflectableID());
 			if (arrayElemTypeInfo == nullptr) // compound type that is not Reflectable...
 			{
 				return {};
@@ -247,7 +247,7 @@ namespace DIRE_NS
 		if (pRemainingPath[0] == '.') // it's a nested structure
 		{
 			ReflectableID valueID = propIsAnArray ? pProperty->GetArrayHandler()->ElementReflectableID() : pProperty->GetMapHandler()->ValueReflectableID();
-			const TypeInfo * valueTypeInfo = Reflector3::GetSingleton().GetTypeInfo(valueID);
+			const TypeInfo * valueTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(valueID);
 			auto nextDelimiterPos = pRemainingPath.find_first_of(".[", 1);
 			DIRE_STRING_VIEW propName = pRemainingPath.substr(1, nextDelimiterPos == pRemainingPath.npos ? nextDelimiterPos : nextDelimiterPos - 1);
 			if (nextDelimiterPos == pRemainingPath.npos)
@@ -326,7 +326,7 @@ namespace DIRE_NS
 		if (pRemainingPath[0] == '.') // it's a nested structure
 		{
 			ReflectableID valueID = pArrayHandler->ElementReflectableID();
-			const TypeInfo * valueTypeInfo = Reflector3::GetSingleton().GetTypeInfo(valueID);
+			const TypeInfo * valueTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(valueID);
 			auto nextDelimiterPos = pRemainingPath.find_first_of(".[", 1);
 			DIRE_STRING_VIEW propName = pRemainingPath.substr(1, nextDelimiterPos == pRemainingPath.npos ? nextDelimiterPos : nextDelimiterPos - 1);
 			if (nextDelimiterPos == pRemainingPath.npos)
@@ -398,7 +398,7 @@ namespace DIRE_NS
 		if (pRemainingPath[0] == '.') // it's a nested structure
 		{
 			ReflectableID valueID = pMapHandler->ValueReflectableID();
-			const TypeInfo * valueTypeInfo = Reflector3::GetSingleton().GetTypeInfo(valueID);
+			const TypeInfo * valueTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(valueID);
 			auto nextDelimiterPos = pRemainingPath.find_first_of(".[", 1);
 			DIRE_STRING_VIEW propName = pRemainingPath.substr(1, nextDelimiterPos == pRemainingPath.npos ? nextDelimiterPos : nextDelimiterPos - 1);
 			if (nextDelimiterPos == pRemainingPath.npos)
@@ -472,7 +472,7 @@ namespace DIRE_NS
 		}
 
 		// Yes: recurse one more time, this time using this property's type info (needs to be Reflectable)
-		const TypeInfo * nestedTypeInfo = Reflector3::GetSingleton().GetTypeInfo(thisProp->GetReflectableID());
+		const TypeInfo * nestedTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(thisProp->GetReflectableID());
 		if (nestedTypeInfo != nullptr)
 		{
 			pTypeInfoOwner = nestedTypeInfo;
@@ -533,7 +533,7 @@ namespace DIRE_NS
 
 	FunctionInfo const* Reflectable2::GetFunction(DIRE_STRING_VIEW pMemberFuncName) const
 	{
-		const TypeInfo * thisTypeInfo = GetTypeInfo();
+		const TypeInfo * thisTypeInfo = GetReflectableTypeInfo();
 		for (FunctionInfo const& aFuncInfo : thisTypeInfo->GetFunctionList())
 		{
 			if (aFuncInfo.GetName() == pMemberFuncName)

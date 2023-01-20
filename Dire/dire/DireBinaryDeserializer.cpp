@@ -28,8 +28,8 @@ namespace DIRE_NS
 		if (header.PropertiesCount == 0)
 			return &pDeserializedObject; // just an empty object. Doesn't count like an error I guess?
 
-		const TypeInfo* deserializedTypeInfo = Reflector3::GetSingleton().GetTypeInfo(header.ReflectableID);
-		const TypeInfo* objTypeInfo = Reflector3::GetSingleton().GetTypeInfo(pDeserializedObject.GetReflectableClassID());
+		const TypeInfo* deserializedTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(header.ReflectableID);
+		const TypeInfo* objTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(pDeserializedObject.GetReflectableClassID());
 
 		// cannot dump properties into incompatible reflectable type
 		if (!deserializedTypeInfo->IsParentOf(objTypeInfo->GetID()))
@@ -118,9 +118,9 @@ namespace DIRE_NS
 			return;
 
 		Reflectable2& reflectable = *static_cast<Reflectable2*>(pPropPtr);
-		const TypeInfo* objTypeInfo = Reflector3::GetSingleton().GetTypeInfo(reflectable.GetReflectableClassID());
+		const TypeInfo* objTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(reflectable.GetReflectableClassID());
 
-		const TypeInfo* deserializedTypeInfo = Reflector3::GetSingleton().GetTypeInfo(header.ReflectableID);
+		const TypeInfo* deserializedTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(header.ReflectableID);
 
 		// cannot dump properties into incompatible reflectable type
 		if (!deserializedTypeInfo->IsParentOf(objTypeInfo->GetID()))

@@ -31,7 +31,7 @@ namespace DIRE_NS
 			static_assert(std::is_base_of_v<Reflectable2, T>, "ClassInstantiator is only meant to be used as a member of Reflectable-derived classes.");
 			static_assert(std::is_constructible_v<T, Args...>,
 				"No constructor associated with the parameter types of declared instantiator. Please keep instantiator and constructor synchronized.");
-			Reflector3::EditSingleton().RegisterInstantiateFunction(T::GetClassReflectableTypeInfo().GetID(), &Instantiate);
+			TypeInfoDatabase::EditSingleton().RegisterInstantiateFunction(T::GetTypeInfo().GetID(), &Instantiate);
 		}
 
 		static Reflectable2* Instantiate(std::any const& pCtorParams)
@@ -77,7 +77,7 @@ namespace DIRE_NS
 	public:
 
 		[[nodiscard]] virtual ReflectableID		GetReflectableClassID() const = 0;
-		[[nodiscard]] virtual const TypeInfo*	GetTypeInfo() const = 0;
+		[[nodiscard]] virtual const TypeInfo*	GetReflectableTypeInfo() const = 0;
 
 		template <typename TRefl>
 		[[nodiscard]] bool	IsA() const
@@ -90,7 +90,7 @@ namespace DIRE_NS
 				return true;
 			}
 
-			TypeInfo const& parentTypeInfo = TRefl::GetClassReflectableTypeInfo();
+			TypeInfo const& parentTypeInfo = TRefl::GetTypeInfo();
 			return (parentTypeInfo.GetID() == GetReflectableClassID() || parentTypeInfo.IsParentOf(GetReflectableClassID()));
 		}
 
@@ -99,7 +99,7 @@ namespace DIRE_NS
 		{
 			static_assert(std::is_base_of_v<Reflectable2, T>, "Clone only works with Reflectable-derived class types.");
 
-			const TypeInfo * thisTypeInfo = GetTypeInfo();
+			const TypeInfo * thisTypeInfo = GetReflectableTypeInfo();
 			if (thisTypeInfo == nullptr)
 			{
 				return nullptr;
@@ -121,10 +121,10 @@ namespace DIRE_NS
 		{
 			if constexpr (sizeof...(Args) == 0)
 			{
-				return  Reflector3::GetSingleton().TryInstantiate(GetReflectableClassID(), {});
+				return  TypeInfoDatabase::GetSingleton().TryInstantiate(GetReflectableClassID(), {});
 
 			}
-			return Reflector3::GetSingleton().TryInstantiate(GetReflectableClassID(), {std::tuple<Args...>(std::forward<Args>(pArgs)...)});
+			return TypeInfoDatabase::GetSingleton().TryInstantiate(GetReflectableClassID(), {std::tuple<Args...>(std::forward<Args>(pArgs)...)});
 		}
 
 		void	CloneProperties(Reflectable2 const* pCloned, const TypeInfo * pClonedTypeInfo, Reflectable2* pClone)
@@ -135,12 +135,12 @@ namespace DIRE_NS
 
 		[[nodiscard]] IntrusiveLinkedList<PropertyTypeInfo> const& GetProperties() const
 		{
-			return GetTypeInfo()->GetPropertyList();
+			return GetReflectableTypeInfo()->GetPropertyList();
 		}
 
 		[[nodiscard]] IntrusiveLinkedList<FunctionInfo> const& GetMemberFunctions() const
 		{
-			return GetTypeInfo()->GetFunctionList();
+			return GetReflectableTypeInfo()->GetFunctionList();
 		}
 
 		template <typename T>
@@ -269,7 +269,7 @@ namespace DIRE_NS
 			std::size_t found = funcName.rfind("::");\
 			found = funcName.rfind("::", found-1);\
 			found = funcName.rfind("::", found-1);\
-			if (found != std::string::npos)\
+			if (found != DIRE_STRING::npos)\
 				funcName = funcName.substr(0, found);\
 			return funcName;\
 		}(); \
@@ -277,19 +277,19 @@ namespace DIRE_NS
 	}\
 	inline static DIRE_NS::TypedTypeInfo<Self, DIRE_DEFAULT_CONSTRUCTOR_INSTANTIATE>	DIRE_TypeInfo{ DIRE_GetFullyQualifiedName().c_str() }; \
 	\
-	static const DIRE_NS::TypeInfo & GetClassReflectableTypeInfo()\
+	static const DIRE_NS::TypedTypeInfo<Self, DIRE_DEFAULT_CONSTRUCTOR_INSTANTIATE>& GetTypeInfo()\
 	{\
 		return DIRE_TypeInfo; \
 	}\
-	static DIRE_NS::TypeInfo& EditClassReflectableTypeInfo()\
+	static DIRE_NS::TypedTypeInfo<Self, DIRE_DEFAULT_CONSTRUCTOR_INSTANTIATE>& EditTypeInfo()\
 	{\
 		return DIRE_TypeInfo; \
 	}\
 	[[nodiscard]] virtual DIRE_NS::ReflectableID	GetReflectableClassID() const override\
 	{\
-		return GetClassReflectableTypeInfo().GetID();\
+		return GetTypeInfo().GetID();\
 	}\
-	[[nodiscard]] virtual const DIRE_NS::TypeInfo* GetTypeInfo() const\
+	[[nodiscard]] virtual const DIRE_NS::TypeInfo* GetReflectableTypeInfo() const override\
 	{\
-		return &GetClassReflectableTypeInfo();\
+		return &GetTypeInfo();\
 	}

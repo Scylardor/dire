@@ -19,7 +19,7 @@ void DIRE_NS::TypeInfo::ClonePropertiesOf(Reflectable2& pNewClone, const Reflect
 		auto* propPtr = pCloned.GetProperty<const void *>(prop.GetName());
 		if (propPtr != nullptr)
 		{
-			auto actualOffset = ((const ::std::byte *)propPtr - (const ::std::byte *)&pCloned); // accounting for vptr etc.
+			auto actualOffset = ((const ::std::byte *)propPtr - (const ::std::byte *)&pCloned);
 			if (prop.GetCopyConstructorFunction() != nullptr)
 			{
 				prop.GetCopyConstructorFunction()(&pNewClone, &pCloned, actualOffset);

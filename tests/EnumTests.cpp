@@ -137,7 +137,7 @@ TEST_CASE("Bitmask enum bit manipulation", "[Enums]")
 
 	testops = BitEnum::two;
 	testops = ~testops;
-	REQUIRE((testops.IsBitSet(BitEnum::one) && ~testops.IsBitSet(BitEnum::two) && testops.IsBitSet(BitEnum::four) && testops.IsBitSet(BitEnum::eight)));
+	REQUIRE((testops.IsBitSet(BitEnum::one) && !testops.IsBitSet(BitEnum::two) && testops.IsBitSet(BitEnum::four) && testops.IsBitSet(BitEnum::eight)));
 }
 
 

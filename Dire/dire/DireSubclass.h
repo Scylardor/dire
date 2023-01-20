@@ -9,12 +9,12 @@ namespace DIRE_NS
 
 		Subclass()
 		{
-			SubClassID = T::GetClassReflectableTypeInfo().GetID();
+			SubClassID = T::GetTypeInfo().GetID();
 		}
 
 		[[nodiscard]] bool	IsValid() const
 		{
-			TypeInfo const& parentTypeInfo = T::GetClassReflectableTypeInfo();
+			TypeInfo const& parentTypeInfo = T::GetTypeInfo();
 			return (parentTypeInfo.IsParentOf(SubClassID));
 		}
 
@@ -27,7 +27,7 @@ namespace DIRE_NS
 		void	SetClass()
 		{
 			static_assert(std::is_base_of_v<Reflectable2, T>, "Subclass can only store IDs of Reflectable-derived classes.");
-			SubClassID = T::GetClassReflectableTypeInfo().GetID();
+			SubClassID = T::GetTypeInfo().GetID();
 		}
 
 		ReflectableID	GetClassID() const
@@ -51,11 +51,11 @@ namespace DIRE_NS
 			{
 				using ArgumentPackTuple = std::tuple<Args...>;
 				std::any packedArgs(std::in_place_type<ArgumentPackTuple>, std::forward_as_tuple(std::forward<Args>(pCtorArgs)...));
-				newInstance = Reflector3::GetSingleton().TryInstantiate(SubClassID, packedArgs);
+				newInstance = TypeInfoDatabase::GetSingleton().TryInstantiate(SubClassID, packedArgs);
 			}
 			else
 			{
-				newInstance = Reflector3::GetSingleton().TryInstantiate(SubClassID, {});
+				newInstance = TypeInfoDatabase::GetSingleton().TryInstantiate(SubClassID, {});
 			}
 
 			return static_cast<Ret*>(newInstance);
@@ -63,6 +63,6 @@ namespace DIRE_NS
 
 	private:
 
-		ReflectableID	SubClassID{ T::GetClassReflectableTypeInfo().GetID() };
+		ReflectableID	SubClassID{ T::GetTypeInfo().GetID() };
 	};
 }

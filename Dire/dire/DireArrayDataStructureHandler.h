@@ -39,7 +39,7 @@ namespace DIRE_NS
 		{
 			if constexpr (std::is_base_of_v<Reflectable2, ElementValueType>)
 			{
-				return ElementValueType::GetClassReflectableTypeInfo().GetID();
+				return ElementValueType::GetTypeInfo().GetID();
 			}
 			else
 			{

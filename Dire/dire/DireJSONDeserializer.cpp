@@ -34,7 +34,7 @@ namespace DIRE_NS
 			return { error };
 		}
 
-		Reflector3::GetSingleton().GetTypeInfo(pDeserializedObject.GetReflectableClassID())->ForEachPropertyInHierarchy([&pDeserializedObject, &doc, this](const PropertyTypeInfo& pProperty)
+		TypeInfoDatabase::GetSingleton().GetTypeInfo(pDeserializedObject.GetReflectableClassID())->ForEachPropertyInHierarchy([&pDeserializedObject, &doc, this](const PropertyTypeInfo& pProperty)
 		{
 			void* propPtr = const_cast<void*>(pDeserializedObject.GetProperty(pProperty.GetName()));
 			rapidjson::Value const& propValue = doc[pProperty.GetName().data()];
@@ -86,7 +86,7 @@ namespace DIRE_NS
 	{
 		DIRE_ASSERT(pVal.IsObject());
 		auto* reflectableProp = static_cast<Reflectable2*>(pPropPtr);
-		const TypeInfo * compTypeInfo = Reflector3::GetSingleton().GetTypeInfo(reflectableProp->GetReflectableClassID());
+		const TypeInfo * compTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(reflectableProp->GetReflectableClassID());
 		DIRE_ASSERT(compTypeInfo != nullptr);
 
 		compTypeInfo->ForEachPropertyInHierarchy([this, &pVal, reflectableProp](const PropertyTypeInfo & pProperty)

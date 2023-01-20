@@ -61,7 +61,6 @@ add_library(${PROJECT_NAME} STATIC #TODO customize
 	${DIRE_SOURCE_DIR}/DireTypeInfoDatabase.h
 	${DIRE_SOURCE_DIR}/DireTypeInfoDatabase.cpp
 	${DIRE_SOURCE_DIR}/DireSingleton.h
-	${DIRE_SOURCE_DIR}/DireStaticTypeCounter.h
 	${DIRE_SOURCE_DIR}/DireProperty.h
 	${DIRE_SOURCE_DIR}/DireProperty.inl
 	${DIRE_SOURCE_DIR}/DirePropertyMetadata.h

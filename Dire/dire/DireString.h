@@ -78,7 +78,7 @@ namespace DIRE_NS
 	template <typename T>
 	struct FromCharsConverter<T, typename std::enable_if_t<std::is_base_of_v<Enum, T>, void>>
 	{
-		static T Convert(const std::string_view& pChars)
+		static T Convert(const DIRE_STRING_VIEW& pChars)
 		{
 			return T::GetValueFromSafeString(pChars.data());
 		}
@@ -87,7 +87,7 @@ namespace DIRE_NS
 	template <typename T>
 	struct FromCharsConverter<T, typename std::enable_if_t<std::is_arithmetic_v<T>, void>>
 	{
-		static ConvertResult<T> Convert(const std::string_view& pChars)
+		static ConvertResult<T> Convert(const DIRE_STRING_VIEW& pChars)
 		{
 			T value;
 			if constexpr (std::is_same_v<T, bool>)

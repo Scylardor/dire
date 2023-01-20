@@ -139,7 +139,7 @@ TEST_CASE("Function Type Info", "[Functions]")
 {
 	std::ostringstream ostr;
 
-	for (const dire::FunctionInfo& funcInfo : Test::GetClassReflectableTypeInfo().GetFunctionList())
+	for (const dire::FunctionInfo& funcInfo : Test::GetTypeInfo().GetFunctionList())
 	{
 		ostr << funcInfo.GetName() << ' ';
 		ostr << "Type: " << funcInfo.GetReturnType().GetString() << ' ';
