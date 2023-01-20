@@ -61,10 +61,10 @@ case Type::TypeEnum:\
 				{
 					auto* myself = static_cast<RapidJsonReflectorSerializer*>(pSerializer);
 
-					const std::string keyStr = pMapHandler.KeyToString(pKey);
+					const DIRE_STRING keyStr = pMapHandler.KeyToString(pKey);
 					myself->myJsonWriter.String(keyStr.data(), (rapidjson::SizeType)keyStr.length());
 
-					Type valueType = pMapHandler.GetValueType();
+					Type valueType = pMapHandler.ValueMetaType();
 					myself->SerializeValue(valueType, pVal, &pValueHandler);
 				});
 		}

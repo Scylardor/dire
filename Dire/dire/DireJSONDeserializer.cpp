@@ -72,8 +72,8 @@ namespace DIRE_NS
 
 		DIRE_ASSERT(pVal.IsObject());
 
-		const Type valueType = pMapHandler->GetValueType();
-		const DataStructureHandler valueHandler = pMapHandler->ValueHandler();
+		const Type valueType = pMapHandler->ValueMetaType();
+		const DataStructureHandler valueHandler = pMapHandler->ValueDataHandler();
 		for (rapidjson::Value::ConstMemberIterator itr = pVal.MemberBegin(); itr != pVal.MemberEnd(); ++itr)
 		{
 			void* createdValue = pMapHandler->Create(pPropPtr, itr->name.GetString(), nullptr);

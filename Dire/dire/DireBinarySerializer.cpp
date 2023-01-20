@@ -68,7 +68,7 @@ namespace DIRE_NS
 			break;
 		case Type::Enum:
 		{
-			Type underlyingType = pHandler->GetEnumHandler()->EnumType();
+			Type underlyingType = pHandler->GetEnumHandler()->EnumMetaType();
 			SerializeValue(underlyingType, pPropPtr);
 		}
 		break;
@@ -105,8 +105,8 @@ namespace DIRE_NS
 		if (pPropPtr == nullptr || pMapHandler == nullptr)
 			return;
 
-		const Type keyType = pMapHandler->GetKeyType();
-		const Type valueType = pMapHandler->GetValueType();
+		const Type keyType = pMapHandler->KeyMetaType();
+		const Type valueType = pMapHandler->ValueMetaType();
 		const size_t mapSize = pMapHandler->Size(pPropPtr);
 		const size_t keySize = pMapHandler->SizeofKey();
 		const size_t valueSize = pMapHandler->SizeofValue();
@@ -117,10 +117,10 @@ namespace DIRE_NS
 		{
 			auto* myself = static_cast<BinaryReflectorSerializer*>(pSerializer);
 
-			const Type keyType = pMapHandler.GetKeyType();
+			const Type keyType = pMapHandler.KeyMetaType();
 			myself->SerializeValue(keyType, pKey, &pKeyHandler);
 
-			Type valueType = pMapHandler.GetValueType();
+			Type valueType = pMapHandler.ValueMetaType();
 			myself->SerializeValue(valueType, pVal, &pValueHandler);
 		});
 	}

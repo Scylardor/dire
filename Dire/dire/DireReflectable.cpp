@@ -88,7 +88,7 @@ namespace DIRE_NS
 			if (result.Address != nullptr && result.TypeInfo != nullptr)
 			{
 				DIRE_STRING_VIEW key = pName.substr(leftBrackPos + 1, pName.length() - 1 - leftBrackPos);
-				if (result.TypeInfo->GetArrayHandler() != nullptr)
+				if (result.TypeInfo->GetMetatype() == Type::Array)
 				{
 					void* array = const_cast<void*>(result.Address);
 					ConvertResult<size_t> index = FromCharsConverter<size_t>::Convert(key);
@@ -97,7 +97,7 @@ namespace DIRE_NS
 
 					return result.TypeInfo->GetArrayHandler()->Erase(array, index.GetValue());
 				}
-				if (result.TypeInfo->GetMapHandler() != nullptr)
+				if (result.TypeInfo->GetMetatype() == Type::Map)
 				{
 					void* map = const_cast<void*>(result.Address);
 					return result.TypeInfo->GetMapHandler()->Erase(map, key);
@@ -109,13 +109,13 @@ namespace DIRE_NS
 			GetPropertyResult result = GetPropertyImpl(pName);
 			if (result.Address != nullptr && result.TypeInfo != nullptr)
 			{
-				if (result.TypeInfo->GetArrayHandler() != nullptr)
+				if (result.TypeInfo->GetMetatype() == Type::Array)
 				{
 					void* array = const_cast<void*>(result.Address);
 					result.TypeInfo->GetArrayHandler()->Clear(array);
 					return true;
 				}
-				if (result.TypeInfo->GetMapHandler() != nullptr)
+				if (result.TypeInfo->GetMetatype() == Type::Map)
 				{
 					void* map = const_cast<void*>(result.Address);
 					result.TypeInfo->GetMapHandler()->Clear(map);
@@ -151,7 +151,7 @@ namespace DIRE_NS
 		}
 		if (dotPos != pRemainingPath.npos && dotPos < leftBrackPos) // it's a compound in an array
 		{
-			TypeInfo const* arrayElemTypeInfo = Reflector3::GetSingleton().GetTypeInfo(pArrayHandler->ElementReflectableID());
+			const TypeInfo * arrayElemTypeInfo = Reflector3::GetSingleton().GetTypeInfo(pArrayHandler->ElementReflectableID());
 			if (arrayElemTypeInfo == nullptr) // compound type that is not Reflectable...
 			{
 				return {};
@@ -167,7 +167,7 @@ namespace DIRE_NS
 				return GetCompoundProperty(arrayElemTypeInfo, pName, pRemainingPath, pPropPtr);
 			else // next entry is an array
 			{
-				size_t const rightBrackPos = pRemainingPath.find(']');
+				const size_t rightBrackPos = pRemainingPath.find(']');
 				if (rightBrackPos == pRemainingPath.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 2) //+2 because leftBrackPos is off by 1
 				{
 					return {};
@@ -183,7 +183,7 @@ namespace DIRE_NS
 		}
 		else if (leftBrackPos != pRemainingPath.npos && leftBrackPos < dotPos) // it's an array in an array
 		{
-			size_t const rightBrackPos = pRemainingPath.find(']');
+			const size_t rightBrackPos = pRemainingPath.find(']');
 			// If there is a mismatched bracket, or the closing bracket is before the opening one,
 			// or there is no number between the two brackets, the expression has to be ill-formed!
 			if (rightBrackPos == pRemainingPath.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 1)
@@ -210,22 +210,25 @@ namespace DIRE_NS
 		return {}; // Never supposed to arrive here!
 	}
 
-	Reflectable2::GetPropertyResult Reflectable2::RecurseArrayMapProperty(DataStructureHandler const& pDataStructureHandler, std::byte const* pPropPtr,
+	Reflectable2::GetPropertyResult Reflectable2::RecurseArrayMapProperty(const PropertyTypeInfo * pProperty, const std::byte * pPropPtr,
 		DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey) const
 	{
 		// Find out the type of handler we are interested in
-		void const* value = nullptr;
-		if (pDataStructureHandler.GetArrayHandler())
+		const void * value = nullptr;
+		const bool propIsAnArray = pProperty->GetMetatype() == Type::Array;
+		DIRE_ASSERT(propIsAnArray || pProperty->GetMetatype() == Type::Map);
+
+		if (propIsAnArray)
 		{
 			ConvertResult<size_t> index = FromCharsConverter<size_t>::Convert(pKey);
 			if (index.HasError())
 				return { index.GetError() };
 
-			value = pDataStructureHandler.GetArrayHandler()->Read(pPropPtr, index.GetValue());
+			value = pProperty->GetArrayHandler()->Read(pPropPtr, index.GetValue());
 		}
-		else if (pDataStructureHandler.GetMapHandler())
+		else
 		{
-			value = pDataStructureHandler.GetMapHandler()->Read(pPropPtr, pKey);
+			value = pProperty->GetMapHandler()->Read(pPropPtr, pKey);
 		}
 
 		if (value == nullptr)
@@ -239,12 +242,12 @@ namespace DIRE_NS
 		}
 
 		// there is more: we have to find if it's a compound, an array or a map...
-		auto* valueAsBytes = static_cast<std::byte const*>(value);
+		auto* valueAsBytes = static_cast<const std::byte *>(value);
 
 		if (pRemainingPath[0] == '.') // it's a nested structure
 		{
-			ReflectableID valueID = pDataStructureHandler.GetArrayHandler() ? pDataStructureHandler.GetArrayHandler()->ElementReflectableID() : pDataStructureHandler.GetMapHandler()->ValueReflectableID();
-			TypeInfo const* valueTypeInfo = Reflector3::GetSingleton().GetTypeInfo(valueID);
+			ReflectableID valueID = propIsAnArray ? pProperty->GetArrayHandler()->ElementReflectableID() : pProperty->GetMapHandler()->ValueReflectableID();
+			const TypeInfo * valueTypeInfo = Reflector3::GetSingleton().GetTypeInfo(valueID);
 			auto nextDelimiterPos = pRemainingPath.find_first_of(".[", 1);
 			DIRE_STRING_VIEW propName = pRemainingPath.substr(1, nextDelimiterPos == pRemainingPath.npos ? nextDelimiterPos : nextDelimiterPos - 1);
 			if (nextDelimiterPos == pRemainingPath.npos)
@@ -282,23 +285,173 @@ namespace DIRE_NS
 			pKey = pRemainingPath.substr(1, rightBracketPos - 1);
 			pRemainingPath.remove_prefix(rightBracketPos + 1);
 
-			if (pDataStructureHandler.GetArrayHandler())
+			if (propIsAnArray)
 			{
-				return RecurseArrayMapProperty(pDataStructureHandler.GetArrayHandler()->ElementHandler(), valueAsBytes, pRemainingPath, pKey);
+				return RecurseArrayProperty(pProperty->GetArrayHandler()->ElementHandler().GetArrayHandler(), valueAsBytes, pRemainingPath, pKey);
 			}
-			else if (pDataStructureHandler.GetMapHandler())
+			else
 			{
-				return RecurseArrayMapProperty(pDataStructureHandler.GetMapHandler()->ValueHandler(), valueAsBytes, pRemainingPath, pKey);
+				return RecurseMapProperty(pProperty->GetMapHandler()->ValueDataHandler().GetMapHandler(), valueAsBytes, pRemainingPath, pKey);
 			}
 		}
 
 		return {};
 	}
 
-	[[nodiscard]] Reflectable2::GetPropertyResult Reflectable2::GetCompoundProperty(TypeInfo const* pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pFullPath, std::byte const* propertyAddr) const
+	Reflectable2::GetPropertyResult Reflectable2::RecurseArrayProperty(const IArrayDataStructureHandler* pArrayHandler, const std::byte* pPropPtr,
+		DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey) const
+	{
+		// Find out the type of handler we are interested in
+		const void* value = nullptr;
+
+		ConvertResult<size_t> index = FromCharsConverter<size_t>::Convert(pKey);
+		if (index.HasError())
+			return { index.GetError() };
+
+		value = pArrayHandler->Read(pPropPtr, index.GetValue());
+
+		if (value == nullptr)
+		{
+			return {}; // there was no explorable data structure found: probably a syntax error
+		}
+
+		if (pRemainingPath.empty()) // this was what we were looking for : return
+		{
+			return GetPropertyResult(value, nullptr);
+		}
+
+		// there is more: we have to find if it's a compound, an array or a map...
+		auto* valueAsBytes = static_cast<std::byte const*>(value);
+
+		if (pRemainingPath[0] == '.') // it's a nested structure
+		{
+			ReflectableID valueID = pArrayHandler->ElementReflectableID();
+			const TypeInfo * valueTypeInfo = Reflector3::GetSingleton().GetTypeInfo(valueID);
+			auto nextDelimiterPos = pRemainingPath.find_first_of(".[", 1);
+			DIRE_STRING_VIEW propName = pRemainingPath.substr(1, nextDelimiterPos == pRemainingPath.npos ? nextDelimiterPos : nextDelimiterPos - 1);
+			if (nextDelimiterPos == pRemainingPath.npos)
+			{
+				pRemainingPath.remove_prefix(1);
+				Reflectable2 const* reflectable = reinterpret_cast<Reflectable2 const*>(valueAsBytes);
+				return reflectable->GetPropertyImpl(pRemainingPath);
+			}
+			if (pRemainingPath[nextDelimiterPos] == '.')
+			{
+				pRemainingPath.remove_prefix(1);
+				return GetCompoundProperty(valueTypeInfo, propName, pRemainingPath, valueAsBytes);
+			}
+			else
+			{
+				size_t rightBracketPos = pRemainingPath.find(']', 1);
+				if (rightBracketPos == pRemainingPath.npos || rightBracketPos == 1)
+				{
+					return {}; // syntax error: no right bracket or nothing between the brackets
+				}
+				pKey = pRemainingPath.substr(nextDelimiterPos + 1, rightBracketPos - nextDelimiterPos - 1);
+				pRemainingPath.remove_prefix(rightBracketPos + 1);
+
+				return GetArrayMapProperty(valueTypeInfo, propName, pRemainingPath, pKey, valueAsBytes);
+			}
+		}
+
+		if (pRemainingPath[0] == '[')
+		{
+			size_t rightBracketPos = pRemainingPath.find(']', 1);
+			if (rightBracketPos == pRemainingPath.npos || rightBracketPos == 1)
+			{
+				return {}; // syntax error: no right bracket or nothing between the brackets
+			}
+			pKey = pRemainingPath.substr(1, rightBracketPos - 1);
+			pRemainingPath.remove_prefix(rightBracketPos + 1);
+
+			DataStructureHandler elementHandler = pArrayHandler->ElementHandler();
+			if (pArrayHandler->ElementType() == Type::Array)
+			{
+				return RecurseArrayProperty(elementHandler.GetArrayHandler(), valueAsBytes, pRemainingPath, pKey);
+			}
+
+			return RecurseMapProperty(elementHandler.GetMapHandler(), valueAsBytes, pRemainingPath, pKey);
+		}
+
+		return {};
+	}
+
+	Reflectable2::GetPropertyResult Reflectable2::RecurseMapProperty(const MapDataStructureHandler* pMapHandler, const std::byte* pPropPtr,
+		DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey) const
+	{
+		// Find out the type of handler we are interested in
+		const void* value = pMapHandler->Read(pPropPtr, pKey);
+
+		if (value == nullptr)
+		{
+			return {}; // there was no explorable data structure found: probably a syntax error
+		}
+
+		if (pRemainingPath.empty()) // this was what we were looking for : return
+		{
+			return GetPropertyResult(value, nullptr);
+		}
+
+		// there is more: we have to find if it's a compound, an array or a map...
+		auto* valueAsBytes = static_cast<std::byte const*>(value);
+
+		if (pRemainingPath[0] == '.') // it's a nested structure
+		{
+			ReflectableID valueID = pMapHandler->ValueReflectableID();
+			const TypeInfo * valueTypeInfo = Reflector3::GetSingleton().GetTypeInfo(valueID);
+			auto nextDelimiterPos = pRemainingPath.find_first_of(".[", 1);
+			DIRE_STRING_VIEW propName = pRemainingPath.substr(1, nextDelimiterPos == pRemainingPath.npos ? nextDelimiterPos : nextDelimiterPos - 1);
+			if (nextDelimiterPos == pRemainingPath.npos)
+			{
+				pRemainingPath.remove_prefix(1);
+				Reflectable2 const* reflectable = reinterpret_cast<Reflectable2 const*>(valueAsBytes);
+				return reflectable->GetPropertyImpl(pRemainingPath);
+			}
+			if (pRemainingPath[nextDelimiterPos] == '.')
+			{
+				pRemainingPath.remove_prefix(1);
+				return GetCompoundProperty(valueTypeInfo, propName, pRemainingPath, valueAsBytes);
+			}
+			else
+			{
+				size_t rightBracketPos = pRemainingPath.find(']', 1);
+				if (rightBracketPos == pRemainingPath.npos || rightBracketPos == 1)
+				{
+					return {}; // syntax error: no right bracket or nothing between the brackets
+				}
+				pKey = pRemainingPath.substr(nextDelimiterPos + 1, rightBracketPos - nextDelimiterPos - 1);
+				pRemainingPath.remove_prefix(rightBracketPos + 1);
+
+				return GetArrayMapProperty(valueTypeInfo, propName, pRemainingPath, pKey, valueAsBytes);
+			}
+		}
+
+		if (pRemainingPath[0] == '[')
+		{
+			size_t rightBracketPos = pRemainingPath.find(']', 1);
+			if (rightBracketPos == pRemainingPath.npos || rightBracketPos == 1)
+			{
+				return {}; // syntax error: no right bracket or nothing between the brackets
+			}
+			pKey = pRemainingPath.substr(1, rightBracketPos - 1);
+			pRemainingPath.remove_prefix(rightBracketPos + 1);
+			
+			DataStructureHandler elementHandler = pMapHandler->ValueDataHandler();
+			if (pMapHandler->ValueMetaType() == Type::Array)
+			{
+				return RecurseArrayProperty(elementHandler.GetArrayHandler(), valueAsBytes, pRemainingPath, pKey);
+			}
+
+			return RecurseMapProperty(elementHandler.GetMapHandler(), valueAsBytes, pRemainingPath, pKey);
+		}
+
+		return {};
+	}
+
+	[[nodiscard]] Reflectable2::GetPropertyResult Reflectable2::GetCompoundProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pFullPath, std::byte const* propertyAddr) const
 	{
 		// First, find our compound property
-		PropertyTypeInfo const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
+		const PropertyTypeInfo * thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
 		if (thisProp == nullptr)
 		{
 			return {}; // There was no property with the given name.
@@ -319,7 +472,7 @@ namespace DIRE_NS
 		}
 
 		// Yes: recurse one more time, this time using this property's type info (needs to be Reflectable)
-		TypeInfo const* nestedTypeInfo = Reflector3::GetSingleton().GetTypeInfo(thisProp->GetReflectableID());
+		const TypeInfo * nestedTypeInfo = Reflector3::GetSingleton().GetTypeInfo(thisProp->GetReflectableID());
 		if (nestedTypeInfo != nullptr)
 		{
 			pTypeInfoOwner = nestedTypeInfo;
@@ -333,7 +486,7 @@ namespace DIRE_NS
 
 		if (nextDelimiterPos != pFullPath.npos && pFullPath[nextDelimiterPos] == '[') // it's an array
 		{
-			size_t const rightBrackPos = pFullPath.find(']');
+			const size_t rightBrackPos = pFullPath.find(']');
 			// If there is a mismatched bracket, or the closing bracket is before the opening one,
 			// or there is no number between the two brackets, the expression has to be ill-formed!
 			if (rightBrackPos == pFullPath.npos || rightBrackPos < nextDelimiterPos || rightBrackPos == nextDelimiterPos + 1)
@@ -349,10 +502,10 @@ namespace DIRE_NS
 		return GetCompoundProperty(pTypeInfoOwner, pName, pFullPath, propertyAddr);
 	}
 
-	Reflectable2::GetPropertyResult Reflectable2::GetArrayMapProperty(TypeInfo const* pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey, std::byte const* pPropPtr) const
+	Reflectable2::GetPropertyResult Reflectable2::GetArrayMapProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey, std::byte const* pPropPtr) const
 	{
 		// First, find our array property
-		PropertyTypeInfo const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
+		const PropertyTypeInfo * thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
 		if (thisProp == nullptr)
 		{
 			return {}; // There was no property with the given name.
@@ -360,14 +513,13 @@ namespace DIRE_NS
 
 		pPropPtr += thisProp->GetOffset();
 		// Find out the type of handler we are interested in
-		DataStructureHandler const& dataStructureHandler = thisProp->GetDataStructureHandler();
-		return RecurseArrayMapProperty(dataStructureHandler, pPropPtr, pRemainingPath, pKey);
+		return RecurseArrayMapProperty(thisProp, pPropPtr, pRemainingPath, pKey);
 	}
 
-	[[nodiscard]] Reflectable2::GetPropertyResult Reflectable2::GetArrayProperty(TypeInfo const* pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const
+	[[nodiscard]] Reflectable2::GetPropertyResult Reflectable2::GetArrayProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const
 	{
 		// First, find our array property
-		PropertyTypeInfo const* thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
+		const PropertyTypeInfo * thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
 		if (thisProp == nullptr)
 		{
 			return {}; // There was no property with the given name.
@@ -381,7 +533,7 @@ namespace DIRE_NS
 
 	FunctionInfo const* Reflectable2::GetFunction(DIRE_STRING_VIEW pMemberFuncName) const
 	{
-		TypeInfo const* thisTypeInfo = GetTypeInfo();
+		const TypeInfo * thisTypeInfo = GetTypeInfo();
 		for (FunctionInfo const& aFuncInfo : thisTypeInfo->GetFunctionList())
 		{
 			if (aFuncInfo.GetName() == pMemberFuncName)

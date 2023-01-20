@@ -61,7 +61,7 @@ namespace DIRE_NS
 			return myReflectableTypeInfos.size();
 		}
 
-		[[nodiscard]] TypeInfo const* GetTypeInfo(ReflectableID classID) const;
+		[[nodiscard]] const TypeInfo * GetTypeInfo(ReflectableID classID) const;
 
 		[[nodiscard]] TypeInfo* EditTypeInfo(ReflectableID classID);
 

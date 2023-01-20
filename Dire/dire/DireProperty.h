@@ -54,7 +54,7 @@ namespace DIRE_NS
 
 
 	template <typename TOwner, typename TProp, typename MetadataType>
-	class ReflectProperty3 : public PropertyTypeInfo
+	class ReflectProperty3 final : public PropertyTypeInfo
 	{
 	public:
 		ReflectProperty3(const char* pName, std::ptrdiff_t pOffset) :

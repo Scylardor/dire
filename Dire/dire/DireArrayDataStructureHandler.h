@@ -71,7 +71,7 @@ namespace DIRE_NS
 	// Base class for reflectable properties that have brackets operator to be able to make operations on the underlying array
 	template <typename T>
 	struct TypedArrayDataStructureHandler<T,
-		typename std::enable_if_t<HasArraySemantics_v<T> && !std::is_array_v<T>>> : public AbstractArrayDataStructureHandler
+		typename std::enable_if_t<HasArraySemantics_v<T> && !std::is_array_v<T>>> final : public AbstractArrayDataStructureHandler
 	{
 		using RawElementType = decltype(std::declval<T>()[0]);
 		// Decaying removes the references and fixes the compile error "pointer to reference is illegal"
@@ -188,7 +188,7 @@ namespace DIRE_NS
 	// Base class for reflectable properties that are C-arrays to be able to make operations on the underlying array
 	template <typename T>
 	struct TypedArrayDataStructureHandler<T,
-		typename std::enable_if_t<std::is_array_v<T>>> : AbstractArrayDataStructureHandler
+		typename std::enable_if_t<std::is_array_v<T>>> final : AbstractArrayDataStructureHandler
 	{
 		using RawElementType = decltype(std::declval<T>()[0]);
 		// remove_reference_t removes the references and fixes the compile error "pointer to reference is illegal"

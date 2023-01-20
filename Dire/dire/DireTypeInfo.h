@@ -216,7 +216,7 @@ namespace DIRE_NS
 	struct TypedFunctionInfo; // not defined
 
 	template <typename Class, typename Ret, typename ... Args >
-	struct TypedFunctionInfo<Ret(Class::*)(Args...)> : FunctionInfo
+	struct TypedFunctionInfo<Ret(Class::*)(Args...)> final : FunctionInfo
 	{
 		using MemberFunctionSignature = Ret(Class::*)(Args...);
 
@@ -343,7 +343,7 @@ namespace DIRE_NS
 			return { nullptr, nullptr };
 		}
 
-		[[nodiscard]] PropertyTypeInfo const* FindProperty(const DIRE_STRING_VIEW& pName) const
+		[[nodiscard]] const PropertyTypeInfo * FindProperty(const DIRE_STRING_VIEW& pName) const
 		{
 			for (const auto& prop : Properties)
 			{
@@ -356,7 +356,7 @@ namespace DIRE_NS
 			return nullptr;
 		}
 
-		[[nodiscard]] PropertyTypeInfo const* FindPropertyInHierarchy(const DIRE_STRING_VIEW& pName) const
+		[[nodiscard]] const PropertyTypeInfo * FindPropertyInHierarchy(const DIRE_STRING_VIEW& pName) const
 		{
 			for (auto const& prop : Properties)
 			{
@@ -472,7 +472,7 @@ namespace DIRE_NS
 	};
 
 	template <typename T, bool UseDefaultCtorForInstantiate>
-	class TypedTypeInfo : public TypeInfo
+	class TypedTypeInfo final : public TypeInfo
 	{
 	public:
 		TypedTypeInfo(char const* pTypename) :

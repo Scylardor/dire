@@ -4,35 +4,50 @@ namespace DIRE_NS
 {
 	struct IArrayDataStructureHandler;
 	struct MapDataStructureHandler;
-	struct EnumDataStructureHandler;
+	struct IEnumDataStructureHandler;
 
 	class DataStructureHandler
 	{
 	public:
 		DataStructureHandler() = default;
-		DataStructureHandler(const IArrayDataStructureHandler* pArrayHandler, const MapDataStructureHandler* pMapHandler, const EnumDataStructureHandler* pEnumHandler) :
-			ArrayHandler(pArrayHandler), MapHandler(pMapHandler), EnumHandler(pEnumHandler)
-		{}
 		DataStructureHandler(const IArrayDataStructureHandler * pArrayHandler) :
-			ArrayHandler(pArrayHandler)
+			myHandlers(pArrayHandler)
 		{}
 
 		DataStructureHandler(const MapDataStructureHandler* pMapHandler) :
-			MapHandler(pMapHandler)
+			myHandlers(pMapHandler)
 		{}
 
-		DataStructureHandler(const EnumDataStructureHandler* pEnumHandler) :
-			EnumHandler(pEnumHandler)
+		DataStructureHandler(const IEnumDataStructureHandler* pEnumHandler) :
+			myHandlers(pEnumHandler)
 		{}
 
-
-		[[nodiscard]] const IArrayDataStructureHandler*	GetArrayHandler() const { return ArrayHandler; }
-		[[nodiscard]] const MapDataStructureHandler  *	GetMapHandler() const { return MapHandler; }
-		[[nodiscard]] const EnumDataStructureHandler *	GetEnumHandler() const { return EnumHandler; }
+		[[nodiscard]] const IArrayDataStructureHandler*	GetArrayHandler() const { return myHandlers.ArrayHandler; }
+		[[nodiscard]] const MapDataStructureHandler  *	GetMapHandler() const { return myHandlers.MapHandler; }
+		[[nodiscard]] const IEnumDataStructureHandler *	GetEnumHandler() const { return myHandlers.EnumHandler; }
 
 	private:
-		const IArrayDataStructureHandler *	ArrayHandler = nullptr;
-		const MapDataStructureHandler *		MapHandler = nullptr;
-		const EnumDataStructureHandler *	EnumHandler = nullptr;
+		union HandlersUnion
+		{
+			HandlersUnion() = default;
+
+			HandlersUnion(const IArrayDataStructureHandler* pArrayHandler) :
+				ArrayHandler(pArrayHandler)
+			{}
+
+			HandlersUnion(const MapDataStructureHandler* pMapHandler) :
+				MapHandler(pMapHandler)
+			{}
+
+			HandlersUnion(const IEnumDataStructureHandler* pEnumHandler) :
+				EnumHandler(pEnumHandler)
+			{}
+
+			const IArrayDataStructureHandler*	ArrayHandler = nullptr;
+			const MapDataStructureHandler*		MapHandler;
+			const IEnumDataStructureHandler*	EnumHandler;
+		} ;
+
+		HandlersUnion	myHandlers;
 	};
 }

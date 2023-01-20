@@ -4,28 +4,24 @@
 
 namespace DIRE_NS
 {
-	struct EnumDataStructureHandler
+	struct IEnumDataStructureHandler
 	{
-		using EnumToStringFptr = const char* (*)(const void*);
-		using SetFromStringFptr = void (*)(const char*, void*);
-		using EnumTypeFptr = Type::Values (*)();
+		virtual const char*		EnumToString(const void*) const = 0;
+		virtual void			SetFromString(const char*, void*) const = 0;
+		virtual Type::Values	EnumMetaType() const = 0;
 
-		EnumToStringFptr	EnumToString = nullptr;
-		SetFromStringFptr	SetFromString = nullptr;
-		EnumTypeFptr		EnumType = nullptr;
+		virtual ~IEnumDataStructureHandler() = default;
 	};
 
 	template <class T>
-	struct TypedEnumDataStructureHandler : EnumDataStructureHandler
+	struct TypedEnumDataStructureHandler final : IEnumDataStructureHandler
 	{
-		TypedEnumDataStructureHandler()
+		virtual const char* EnumToString(const void* pVal) const override
 		{
-			EnumToString = [](const void* pVal) { return T::GetStringFromSafeEnum(*(const typename T::Values*)pVal); };
-			SetFromString = &SetEnumFromString;
-			EnumType = &FromEnumToUnderlyingType<T>;
+			return T::GetStringFromSafeEnum(*(const typename T::Values*)pVal);
 		}
 
-		static void	SetEnumFromString(const char* pEnumStr, void* pEnumAddr)
+		virtual void	SetFromString(const char* pEnumStr, void* pEnumAddr) const override
 		{
 			T* theEnum = (T*)pEnumAddr;
 			if (theEnum != nullptr)
@@ -33,6 +29,11 @@ namespace DIRE_NS
 				const typename T::Values enumValue = T::GetValueFromSafeString(pEnumStr);
 				*theEnum = enumValue;
 			}
+		}
+
+		virtual Type::Values	EnumMetaType() const override
+		{
+			return FromEnumToUnderlyingType<T>();
 		}
 
 		static TypedEnumDataStructureHandler const& GetInstance()

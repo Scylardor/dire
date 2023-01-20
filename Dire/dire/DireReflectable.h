@@ -99,7 +99,7 @@ namespace DIRE_NS
 		{
 			static_assert(std::is_base_of_v<Reflectable2, T>, "Clone only works with Reflectable-derived class types.");
 
-			TypeInfo const* thisTypeInfo = GetTypeInfo();
+			const TypeInfo * thisTypeInfo = GetTypeInfo();
 			if (thisTypeInfo == nullptr)
 			{
 				return nullptr;
@@ -127,7 +127,7 @@ namespace DIRE_NS
 			return Reflector3::GetSingleton().TryInstantiate(GetReflectableClassID(), {std::tuple<Args...>(std::forward<Args>(pArgs)...)});
 		}
 
-		void	CloneProperties(Reflectable2 const* pCloned, TypeInfo const* pClonedTypeInfo, Reflectable2* pClone)
+		void	CloneProperties(Reflectable2 const* pCloned, const TypeInfo * pClonedTypeInfo, Reflectable2* pClone)
 		{
 			pClonedTypeInfo->CloneHierarchyPropertiesOf(*pClone, *pCloned);
 		}
@@ -224,17 +224,23 @@ namespace DIRE_NS
 
 	private:
 
-		[[nodiscard]] GetPropertyResult GetArrayProperty(TypeInfo const* pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const;
+		[[nodiscard]] GetPropertyResult GetArrayProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, const std::byte * pPropPtr) const;
 
-		[[nodiscard]] GetPropertyResult RecurseFindArrayProperty(IArrayDataStructureHandler const* pArrayHandler,
-			DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const;
+		[[nodiscard]] GetPropertyResult RecurseFindArrayProperty(const IArrayDataStructureHandler * pArrayHandler,
+			DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, const std::byte * pPropPtr) const;
 
-		[[nodiscard]] GetPropertyResult RecurseArrayMapProperty(DataStructureHandler const& pDataStructureHandler,
-			std::byte const* pPropPtr, DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey) const;
+		[[nodiscard]] GetPropertyResult RecurseArrayMapProperty(const PropertyTypeInfo * pProperty,
+			const std::byte * pPropPtr, DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey) const;
 
-		[[nodiscard]] GetPropertyResult GetArrayMapProperty(TypeInfo const* pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey, std::byte const* pPropPtr) const;
+		[[nodiscard]] GetPropertyResult RecurseArrayProperty(const IArrayDataStructureHandler* pArrayHandler, const std::byte* pPropPtr,
+			DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey) const;
 
-		[[nodiscard]] GetPropertyResult GetCompoundProperty(TypeInfo const* pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pFullPath, std::byte const* propertyAddr) const;
+		[[nodiscard]] GetPropertyResult	RecurseMapProperty(const MapDataStructureHandler* pMapHandler, const std::byte* pPropPtr,
+			DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey) const;
+
+		[[nodiscard]] GetPropertyResult GetArrayMapProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey, const std::byte * pPropPtr) const;
+
+		[[nodiscard]] GetPropertyResult GetCompoundProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pFullPath, const std::byte * propertyAddr) const;
 	};
 
 

@@ -63,7 +63,7 @@ DIRE_STRING	DIRE_NS::Reflector3::BinaryExport() const
 	offset = BinaryWriteAtOffset(writeBuffer.data(), (const char*)&DATABASE_VERSION, sizeof(DATABASE_VERSION), offset);
 	offset = BinaryWriteAtOffset(writeBuffer.data(), (const char*)&nbTypeInfos, sizeof(nbTypeInfos), offset);
 
-	for (TypeInfo const* typeInfo : myReflectableTypeInfos)
+	for (const TypeInfo * typeInfo : myReflectableTypeInfos)
 	{
 		const ReflectableID typeID = typeInfo->GetID();
 

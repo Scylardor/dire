@@ -85,19 +85,19 @@ namespace DIRE_NS
 		if (pPropPtr == nullptr || pMapHandler == nullptr)
 			return;
 
-		const DataStructureHandler valueHandler = pMapHandler->ValueHandler();
-		const Type valueType = pMapHandler->GetValueType();
+		const DataStructureHandler valueHandler = pMapHandler->ValueDataHandler();
+		const Type valueType = pMapHandler->ValueMetaType();
 		const size_t sizeofKeyType = pMapHandler->SizeofKey();
 
 		auto& mapHeader = ReadFromBytes<BinarySerializationHeaders::Map>();
 
 		DIRE_ASSERT(valueType == mapHeader.ValueType && mapHeader.SizeofValueType == pMapHandler->SizeofValue()
-			&& mapHeader.KeyType == pMapHandler->GetKeyType() && mapHeader.SizeofKeyType == sizeofKeyType);
+			&& mapHeader.KeyType == pMapHandler->KeyMetaType() && mapHeader.SizeofKeyType == sizeofKeyType);
 
 		for (int i = 0; i < mapHeader.MapSize; ++i)
 		{
 			const char* keyData = ReadBytes(sizeofKeyType);
-			void* createdValue = pMapHandler->BinaryKeyCreate(pPropPtr, keyData, nullptr);
+			void* createdValue = pMapHandler->BinaryCreate(pPropPtr, keyData, nullptr);
 
 			if (createdValue != nullptr)
 			{
@@ -180,7 +180,7 @@ namespace DIRE_NS
 			break;
 		case Type::Enum:
 		{
-			Type underlyingType = pHandler->GetEnumHandler()->EnumType();
+			Type underlyingType = pHandler->GetEnumHandler()->EnumMetaType();
 			DeserializeValue(underlyingType, pPropPtr);
 		}
 		break;
