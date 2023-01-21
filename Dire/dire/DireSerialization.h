@@ -14,7 +14,7 @@ namespace DIRE_NS
 
 	using SerializationError = DIRE_STRING;
 
-	class ISerializer
+	class Dire_EXPORT ISerializer
 	{
 	public:
 		struct Result
@@ -22,13 +22,13 @@ namespace DIRE_NS
 			static_assert(sizeof(std::byte) == sizeof(char) == 1);
 			using ByteVector = std::vector<std::byte, DIRE_ALLOCATOR<std::byte>>;
 
-			Result() = default;
+			Dire_EXPORT Result() = default;
 
-			Result(const char* pBuffer, size_t pBufferSize) :
+			Dire_EXPORT Result(const char* pBuffer, size_t pBufferSize) :
 				Value(std::in_place_type_t<ByteVector>{}, (const std::byte*)pBuffer, (const std::byte*)pBuffer + pBufferSize)
 			{}
 
-			Result(const SerializationError& pError) :
+			Dire_EXPORT Result(const SerializationError& pError) :
 				Value(pError)
 			{}
 
@@ -36,9 +36,9 @@ namespace DIRE_NS
 				Value(std::move(pMovedVec))
 			{}
 
-			[[nodiscard]] DIRE_STRING AsString() const;
+			Dire_EXPORT [[nodiscard]] DIRE_STRING AsString() const;
 
-			operator DIRE_STRING() const { return AsString();}
+			Dire_EXPORT operator DIRE_STRING() const { return AsString();}
 
 			[[nodiscard]] bool	HasError() const { return std::holds_alternative<SerializationError>(Value); }
 
@@ -63,7 +63,7 @@ namespace DIRE_NS
 		virtual void	SerializeValuesForObject(DIRE_STRING_VIEW pObjectName, SerializedValueFiller pFillerFunction) = 0;
 	};
 
-	class IDeserializer
+	class Dire_EXPORT IDeserializer
 	{
 	public:
 		struct Result

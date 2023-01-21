@@ -209,7 +209,7 @@ TEST_CASE("JSON Serialize enumerations", "[Serialization]")
 #  include "dire/DireBinarySerializer.h"
 
 /* Utility function to print the output of binary generators */
-auto writeBinaryString = [](const std::string& binarized)
+auto writeBinaryString2 = [](const std::string& binarized)
 {
 	std::cout << "\"";
 	for (int i = 0; i < binarized.size(); ++i)

@@ -11,10 +11,10 @@ namespace DIRE_NS
 	class DataStructureHandler;
 
 	template <typename T, typename = void>
-	struct TypedArrayDataStructureHandler
+	class TypedArrayDataStructureHandler
 	{};
 
-	class IArrayDataStructureHandler
+	class Dire_EXPORT IArrayDataStructureHandler
 	{
 	public:
 		virtual ~IArrayDataStructureHandler() = default;
@@ -32,7 +32,7 @@ namespace DIRE_NS
 	};
 
 
-	class AbstractArrayDataStructureHandler : public IArrayDataStructureHandler
+	class Dire_EXPORT AbstractArrayDataStructureHandler : public IArrayDataStructureHandler
 	{
 	protected:
 		template <typename ElementValueType>
@@ -71,7 +71,7 @@ namespace DIRE_NS
 
 	// Base class for reflectable properties that have brackets operator to be able to make operations on the underlying array
 	template <typename T>
-	class TypedArrayDataStructureHandler<T,
+	class Dire_EXPORT TypedArrayDataStructureHandler<T,
 		typename std::enable_if_t<HasArraySemantics_v<T> && !std::is_array_v<T>>> final : public AbstractArrayDataStructureHandler
 	{
 		using RawElementType = decltype(std::declval<T>()[0]);

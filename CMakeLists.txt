@@ -1,6 +1,4 @@
-cmake_minimum_required(VERSION 3.12) # HOMEPAGE_URL is not supported until CMake version 3.12
-
-cmake_policy(SET CMP0048 NEW)
+cmake_minimum_required(VERSION 3.12) # HOMEPAGE_URL is not supported until CMake version 3.12. We also need C++20.
 
 set(PROJECT_NAME Dire)
 string(TOUPPER ${PROJECT_NAME} UPPER_PROJECT_NAME)
@@ -14,9 +12,6 @@ project(${PROJECT_NAME}
 )
 
 # specify the C++ standard
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
-
 # Options
 option(${UPPER_PROJECT_NAME}_SERIALIZATION_ENABLED "Enables the Serialization features of the DIRE library." ON)
 option(${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED "Enables the JSON serialization feature of the DIRE library, using RapidJSON." ON)
@@ -31,12 +26,15 @@ set(${UPPER_PROJECT_NAME}_NAMESPACE dire CACHE STRING "Namespace the DIRE librar
 set(${UPPER_PROJECT_NAME}_STRING std CACHE STRING "String type the DIRE library should use for standard dynamic string manipulation (std::string by default).")
 set(${UPPER_PROJECT_NAME}_ASSERT assert CACHE STRING "Assert expression Dire should use in case of error")
 set(${UPPER_PROJECT_NAME}_ALLOCATOR std::allocator CACHE STRING "Stateless allocator Dire should use to dynamically allocate memory.")
+set(${UPPER_PROJECT_NAME}_CPP_STANDARD 17 CACHE STRING "Set the standard to compile DIRE with. Input 20 to use C++20 features.")
+set(${UPPER_PROJECT_NAME}_LIBRARY_TYPE SHARED CACHE STRING "Type of library DIRE will compile. Use STATIC for archives (.a or .lib on Windows) or SHARED for dynamic (.so or DLL on Windows).")
 
 set(DIRE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}/${PROJECT_NAME})
 set(DIRE_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME})
 
 # Main target creation
-add_library(${PROJECT_NAME} STATIC #TODO customize
+# Set the appropriate lib type (courtesy of https://gitlab.kitware.com/cmake/community/-/wikis/doc/tutorials/BuildingWinDLL)
+add_library(${PROJECT_NAME} ${${UPPER_PROJECT_NAME}_LIBRARY_TYPE}
 	${DIRE_SOURCE_DIR}/Dire.h
 	${DIRE_SOURCE_DIR}/DireMacros.h
 	${DIRE_SOURCE_DIR}/DireTypes.h
@@ -73,6 +71,25 @@ add_library(${PROJECT_NAME} STATIC #TODO customize
 	${DIRE_SOURCE_DIR}/DireDefines.h.in
 	${CMAKE_CURRENT_BINARY_DIR}/DireDefines.h
 )
+
+# specify the C++ standard
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD ${${UPPER_PROJECT_NAME}_CPP_STANDARD} CMAKE_CXX_STANDARD_REQUIRED TRUE)
+
+# Dynamic Library Setup
+include(GenerateExportHeader)
+generate_export_header( ${PROJECT_NAME}
+	BASE_NAME ${PROJECT_NAME}
+	EXPORT_MACRO_NAME ${PROJECT_NAME}_EXPORT
+	EXPORT_FILE_NAME ${PROJECT_NAME}_Export.h
+	STATIC_DEFINE ${PROJECT_NAME}_STATIC
+)
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    C_VISIBILITY_PRESET			hidden
+    CXX_VISIBILITY_PRESET		hidden
+    VISIBILITY_INLINES_HIDDEN	YES
+)
+#! Dynamic Library Setup
 
 # Conditional Sources
 
@@ -127,6 +144,3 @@ target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
 # Unit tests
 add_subdirectory(tests)
-
-
-

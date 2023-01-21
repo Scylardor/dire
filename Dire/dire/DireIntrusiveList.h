@@ -17,7 +17,7 @@ namespace DIRE_NS
 	template <typename T>
 	IntrusiveListNode<T>::IntrusiveListNode(IntrusiveListNode& pNext)
 	{
-		Next = pNext;
+		Next = &pNext;
 	}
 
 	template <typename T>

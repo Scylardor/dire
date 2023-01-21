@@ -9,7 +9,7 @@ namespace DIRE_NS
 {
 	class DataStructureHandler;
 
-	class IMapDataStructureHandler
+	class Dire_EXPORT IMapDataStructureHandler
 	{
 	public:
 		virtual ~IMapDataStructureHandler() = default;
@@ -47,7 +47,7 @@ namespace DIRE_NS
 
 	// Base class for reflectable properties that have brackets operator to be able to make operations on the underlying array
 	template <typename T>
-	class TypedMapDataStructureHandler<T,
+	class Dire_EXPORT TypedMapDataStructureHandler<T,
 		typename std::enable_if_t<HasMapSemantics_v<T>>> final : public IMapDataStructureHandler
 	{
 		using KeyType = typename T::key_type;

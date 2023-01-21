@@ -189,11 +189,9 @@ namespace DIRE_NS
 			return true;
 		}
 
-		[[nodiscard]] bool EraseProperty(DIRE_STRING_VIEW pName);
+		Dire_EXPORT [[nodiscard]] bool EraseProperty(DIRE_STRING_VIEW pName);
 
-		[[nodiscard]] const GetPropertyResult GetPropertyImpl(DIRE_STRING_VIEW pFullPath) const;
-
-		[[nodiscard]] FunctionInfo const* GetFunction(DIRE_STRING_VIEW pMemberFuncName) const;
+		Dire_EXPORT [[nodiscard]] FunctionInfo const* GetFunction(DIRE_STRING_VIEW pMemberFuncName) const;
 
 		template <typename... Args>
 		std::any	InvokeFunction(DIRE_STRING_VIEW pMemberFuncName, Args&&... pFuncArgs)
@@ -224,6 +222,8 @@ namespace DIRE_NS
 
 	private:
 
+		Dire_EXPORT [[nodiscard]] const GetPropertyResult GetPropertyImpl(DIRE_STRING_VIEW pFullPath) const;
+
 		[[nodiscard]] GetPropertyResult GetArrayProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, const std::byte * pPropPtr) const;
 
 		[[nodiscard]] GetPropertyResult RecurseFindArrayProperty(const IArrayDataStructureHandler * pArrayHandler,
@@ -242,8 +242,6 @@ namespace DIRE_NS
 
 		[[nodiscard]] GetPropertyResult GetCompoundProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pFullPath, const std::byte * propertyAddr) const;
 	};
-
-
 }
 
 #define dire_reflectable(ObjectType, ...) \

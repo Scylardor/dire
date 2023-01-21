@@ -18,14 +18,31 @@ if(${UPPER_PROJECT_NAME}_TESTS_ENABLED)
 		TestClasses.h
 	)
 
+	# specify the C++ standard
+	set_target_properties(${PROJECT_NAME}_UnitTests PROPERTIES CXX_STANDARD ${${UPPER_PROJECT_NAME}_CPP_STANDARD} CMAKE_CXX_STANDARD_REQUIRED TRUE)
+
 	# Catch2 dependency setup
 	include(CMake/Catch2.cmake)
-	add_catch2_dependency(catch2 ${${UPPER_PROJECT_NAME}_TESTS_CATCH_VERSION} ${PROJECT_NAME}_UnitTests PRIVATE TRUE)
+	add_catch2_dependency(catch2 ${${UPPER_PROJECT_NAME}_TESTS_CATCH_VERSION} ${PROJECT_NAME}_UnitTests PRIVATE TRUE ${${UPPER_PROJECT_NAME}_CPP_STANDARD})
 
 	target_link_libraries(${PROJECT_NAME}_UnitTests PRIVATE ${PROJECT_NAME})
 
 	set(UNIT_TESTS_DEFINE ${UPPER_PROJECT_NAME}_UNIT_TESTS )
 
 	target_compile_definitions(${PROJECT_NAME}_UnitTests PRIVATE ${UNIT_TESTS_DEFINE}=1)
+
+	if (${UPPER_PROJECT_NAME}_BUILD_SHARED_LIB)
+		add_custom_command(TARGET ${PROJECT_NAME}_UnitTests POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:${PROJECT_NAME}_UnitTests> $<TARGET_FILE_DIR:${PROJECT_NAME}_UnitTests>
+			COMMAND_EXPAND_LISTS
+		)
+	endif()
+
+	install(TARGETS ${PROJECT_NAME}_UnitTests DESTINATION bin)
+
+	install(TARGETS ${PROJECT_NAME}
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib/${PROJECT_NAME})
 
 endif()

@@ -8,13 +8,13 @@ namespace DIRE_NS
 	{
 	public:
 
-		static T& EditSingleton()
+		Dire_EXPORT static T& EditSingleton()
 		{
 			static T theSingleton; // Thread-safe since C++11!
 			return theSingleton;
 		}
 
-		static T const& GetSingleton()
+		Dire_EXPORT static const T & GetSingleton()
 		{
 			return EditSingleton();
 		}

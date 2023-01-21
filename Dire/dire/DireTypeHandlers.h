@@ -6,7 +6,7 @@ namespace DIRE_NS
 	class IMapDataStructureHandler;
 	class IEnumDataStructureHandler;
 
-	class DataStructureHandler
+	class Dire_EXPORT DataStructureHandler
 	{
 	public:
 		DataStructureHandler() = default;
@@ -27,7 +27,7 @@ namespace DIRE_NS
 		[[nodiscard]] const IEnumDataStructureHandler *	GetEnumHandler() const { return myHandlers.EnumHandler; }
 
 	private:
-		union HandlersUnion
+		union Dire_EXPORT HandlersUnion
 		{
 			HandlersUnion() = default;
 

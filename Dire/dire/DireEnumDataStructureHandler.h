@@ -4,7 +4,7 @@
 
 namespace DIRE_NS
 {
-	class IEnumDataStructureHandler
+	class Dire_EXPORT IEnumDataStructureHandler
 	{
 	public:
 		virtual const char*		EnumToString(const void*) const = 0;

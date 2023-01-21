@@ -83,7 +83,7 @@ namespace DIRE_NS
 			MetadataType::Serialize(pSerializer);
 		}
 
-		virtual SerializationState	GetSerializableState() const override
+		virtual SerializationState GetSerializableState() const override
 		{
 #	if DIRE_SERIALIZABLE_PROPERTIES_BY_DEFAULT
 			if (HasMetadataAttribute<NotSerializable>())

@@ -20,21 +20,21 @@ namespace DIRE_NS
 		using CopyConstructorPtr = void (*)(void* pDestAddr, const void * pOther, size_t pOffset);
 
 	public:
-		PropertyTypeInfo(const char * pName, const std::ptrdiff_t pOffset, const size_t pSize, const CopyConstructorPtr pCopyCtor = nullptr) :
+		Dire_EXPORT PropertyTypeInfo(const char * pName, const std::ptrdiff_t pOffset, const size_t pSize, const CopyConstructorPtr pCopyCtor = nullptr) :
 			myName(pName), myMetatype(Type::Unknown), myOffset(pOffset), mySize(pSize), myCopyCtor(pCopyCtor)
 		{}
 
-		[[nodiscard]] const IArrayDataStructureHandler* GetArrayHandler() const
+		Dire_EXPORT [[nodiscard]] const IArrayDataStructureHandler* GetArrayHandler() const
 		{
 			return myDataStructurePropertyHandler.GetArrayHandler();
 		}
 
-		[[nodiscard]] const IMapDataStructureHandler* GetMapHandler() const
+		Dire_EXPORT [[nodiscard]] const IMapDataStructureHandler* GetMapHandler() const
 		{
 			return myDataStructurePropertyHandler.GetMapHandler();
 		}
 
-		[[nodiscard]] const DataStructureHandler& GetDataStructureHandler() const
+		Dire_EXPORT [[nodiscard]] const DataStructureHandler& GetDataStructureHandler() const
 		{
 			return myDataStructurePropertyHandler;
 		}
@@ -52,7 +52,7 @@ namespace DIRE_NS
 		[[nodiscard]] CopyConstructorPtr	GetCopyConstructorFunction() const { return myCopyCtor; }
 
 #ifdef DIRE_SERIALIZATION_ENABLED
-		virtual void	SerializeAttributes(class ISerializer& pSerializer) const = 0;
+		 virtual void	SerializeAttributes(class ISerializer& pSerializer) const = 0;
 
 		struct SerializationState
 		{
@@ -60,7 +60,7 @@ namespace DIRE_NS
 			bool	HasAttributesToSerialize = false;
 		};
 
-		virtual SerializationState	GetSerializableState() const = 0;
+		 virtual SerializationState	GetSerializableState() const = 0;
 #endif
 
 	protected:
@@ -440,7 +440,7 @@ namespace DIRE_NS
 			return ReflectableID;
 		}
 
-		void	CloneHierarchyPropertiesOf(Reflectable& pNewClone, const Reflectable& pCloned) const;
+		Dire_EXPORT void	CloneHierarchyPropertiesOf(Reflectable& pNewClone, const Reflectable& pCloned) const;
 
 		void	ClonePropertiesOf(Reflectable& pNewClone, const Reflectable& pCloned) const;
 

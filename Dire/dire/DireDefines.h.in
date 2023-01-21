@@ -5,6 +5,8 @@
 	Do NOT edit unless you know what you're doing, otherwise your changes will be overwritten.
 */
 
+#include "Dire_Export.h"
+
 #cmakedefine DIRE_USE_STANDARD_ASSERT
 #ifdef DIRE_USE_STANDARD_ASSERT
 	#include <cassert>

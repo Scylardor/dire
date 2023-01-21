@@ -51,7 +51,6 @@ namespace DIRE_NS
 			T::Serialize(pSerializer);
 		}
 
-	public:
 		static void	Serialize(ISerializer& pSerializer)
 		{
 			(Ts::Serialize(pSerializer), ...);
@@ -70,24 +69,27 @@ namespace DIRE_NS
 		}
 	};
 
+	template<>
+	inline void Metadata<>::Serialize(ISerializer&){}
+
 	struct Serializable : IMetadataAttribute
 	{
 #ifdef DIRE_SERIALIZATION_ENABLED
-		static void	Serialize(ISerializer&) {}
+		Dire_EXPORT static void	Serialize(ISerializer&) {}
 #endif
 	};
 
 	struct NotSerializable : IMetadataAttribute
 	{
 #ifdef DIRE_SERIALIZATION_ENABLED
-		static void	Serialize(ISerializer&) {}
+		Dire_EXPORT static void	Serialize(ISerializer&) {}
 #endif
 	};
 
 	struct Transient : IMetadataAttribute
 	{
 #ifdef DIRE_SERIALIZATION_ENABLED
-		static void	Serialize(ISerializer& pSerializer)
+		Dire_EXPORT static void	Serialize(ISerializer& pSerializer)
 		{
 			pSerializer.SerializeValuesForObject("Transient", [](ISerializer& /*pSerializer*/){}); // nothing to do for a "boolean" attribute
 		}
@@ -98,7 +100,7 @@ namespace DIRE_NS
 #if (defined(_MSC_VER) && _MSVC_LANG >= 202002L) || __cplusplus >= 202002L // MSVC doesn't use __cplusplus unless you use /Zc:__cplusplus :/
 	// inspired by https://vector-of-bool.github.io/2021/10/22/string-templates.html
 	template<unsigned N>
-	struct FixedString
+	struct Dire_EXPORT FixedString
 	{
 		char	String[N + 1]{}; // +1 for null terminator
 
@@ -120,8 +122,8 @@ namespace DIRE_NS
 	template<FixedString Str>
 	struct DisplayName : IMetadataAttribute
 	{
-# if DIRE_SERIALIZATION_ENABLED
-		static void	Serialize(ISerializer& pSerializer)
+# ifdef DIRE_SERIALIZATION_ENABLED
+		Dire_EXPORT static void	Serialize(ISerializer& pSerializer)
 		{
 			pSerializer.SerializeValuesForObject("DisplayName", [](ISerializer& pSerializer)
 			{
@@ -140,8 +142,8 @@ namespace DIRE_NS
 	{
 		static_assert(Min <= Max, "Min and Max values are inverted!");
 
-# if DIRE_SERIALIZATION_ENABLED
-		static void	Serialize(ISerializer& pSerializer)
+# ifdef DIRE_SERIALIZATION_ENABLED
+		Dire_EXPORT static void	Serialize(ISerializer& pSerializer)
 		{
 			pSerializer.SerializeValuesForObject("FValueRange", [](ISerializer& pSerializer)
 			{
@@ -162,7 +164,7 @@ namespace DIRE_NS
 		static_assert(Min <= Max, "Min and Max values are inverted!");
 
 #ifdef DIRE_SERIALIZATION_ENABLED
-		static void	Serialize(ISerializer& pSerializer)
+		Dire_EXPORT static void	Serialize(ISerializer& pSerializer)
 		{
 			pSerializer.SerializeValuesForObject("IValueRange", [](ISerializer& pSerializer)
 			{

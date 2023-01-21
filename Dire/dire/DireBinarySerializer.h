@@ -15,15 +15,15 @@ namespace DIRE_NS
 	{
 	public:
 
-		virtual Result	Serialize(Reflectable const& serializedObject) override;
+		virtual Result	Dire_EXPORT Serialize(Reflectable const& serializedObject) override;
 
-		virtual bool	SerializesMetadata() const override { return false; }
+		virtual bool	Dire_EXPORT SerializesMetadata() const override { return false; }
 
-		virtual void	SerializeString(DIRE_STRING_VIEW pSerializedString) override;
-		virtual void	SerializeInt(int32_t pSerializedInt) override;
-		virtual void	SerializeFloat(float pSerializedFloat) override;
-		virtual void	SerializeBool(bool pSerializedBool) override;
-		virtual void	SerializeValuesForObject(DIRE_STRING_VIEW pObjectName, SerializedValueFiller pFillerFunction) override;
+		virtual void	Dire_EXPORT SerializeString(DIRE_STRING_VIEW pSerializedString) override;
+		virtual void	Dire_EXPORT SerializeInt(int32_t pSerializedInt) override;
+		virtual void	Dire_EXPORT SerializeFloat(float pSerializedFloat) override;
+		virtual void	Dire_EXPORT SerializeBool(bool pSerializedBool) override;
+		virtual void	Dire_EXPORT SerializeValuesForObject(DIRE_STRING_VIEW pObjectName, SerializedValueFiller pFillerFunction) override;
 
 	private:
 

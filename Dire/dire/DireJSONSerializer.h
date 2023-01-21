@@ -19,7 +19,7 @@ namespace DIRE_NS
 	{
 	public:
 
-		virtual Result Serialize(const Reflectable & serializedObject) override;
+		Dire_EXPORT virtual Result Serialize(const Reflectable & serializedObject) override;
 
 		virtual bool	SerializesMetadata() const override
 		{
@@ -32,13 +32,13 @@ namespace DIRE_NS
 		inline virtual void	SerializeBool(bool pSerializedBool) override;
 		inline virtual void	SerializeValuesForObject(DIRE_STRING_VIEW pObjectName, SerializedValueFiller pFillerFunction) override;
 
-		inline void	SerializeValue(Type pPropType, const void * pPropPtr, const DataStructureHandler * pHandler = nullptr);
+		void	Dire_EXPORT SerializeValue(Type pPropType, const void * pPropPtr, const DataStructureHandler * pHandler = nullptr);
 
-		inline void	SerializeArrayValue(const void * pPropPtr, const IArrayDataStructureHandler * pArrayHandler);
+		void	Dire_EXPORT SerializeArrayValue(const void * pPropPtr, const IArrayDataStructureHandler * pArrayHandler);
 
-		inline void	SerializeMapValue(const void * pPropPtr, const IMapDataStructureHandler * pMapHandler);
+		void	Dire_EXPORT SerializeMapValue(const void * pPropPtr, const IMapDataStructureHandler * pMapHandler);
 
-		inline void	SerializeCompoundValue(const void * pPropPtr);
+		void	Dire_EXPORT SerializeCompoundValue(const void * pPropPtr);
 
 	private:
 
