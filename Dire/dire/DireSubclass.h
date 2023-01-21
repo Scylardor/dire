@@ -5,7 +5,7 @@ namespace DIRE_NS
 	template <typename T>
 	struct Subclass
 	{
-		static_assert(std::is_base_of_v<Reflectable2, T>, "Subclass only works for Reflectable-derived classes.");
+		static_assert(std::is_base_of_v<Reflectable, T>, "Subclass only works for Reflectable-derived classes.");
 
 		Subclass()
 		{
@@ -26,7 +26,7 @@ namespace DIRE_NS
 		template <typename T>
 		void	SetClass()
 		{
-			static_assert(std::is_base_of_v<Reflectable2, T>, "Subclass can only store IDs of Reflectable-derived classes.");
+			static_assert(std::is_base_of_v<Reflectable, T>, "Subclass can only store IDs of Reflectable-derived classes.");
 			SubClassID = T::GetTypeInfo().GetID();
 		}
 
@@ -45,7 +45,7 @@ namespace DIRE_NS
 				return nullptr;
 			}
 
-			Reflectable2* newInstance;
+			Reflectable* newInstance;
 
 			if constexpr (sizeof...(Args) != 0)
 			{

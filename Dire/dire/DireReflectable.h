@@ -13,7 +13,7 @@ namespace DIRE_NS
 	template <typename T, typename... Args>
 	T*	AllocateReflectable(Args&&... pCtorArgs)
 	{
-		static_assert(std::is_base_of_v<Reflectable2, T>, "AllocateReflectable is supposed to be used only for Reflectable-derived classes.");
+		static_assert(std::is_base_of_v<Reflectable, T>, "AllocateReflectable is supposed to be used only for Reflectable-derived classes.");
 
 		DIRE_ALLOCATOR<T> allocator;
 		T* mem = allocator.allocate(1);
@@ -28,13 +28,13 @@ namespace DIRE_NS
 	{
 		ClassInstantiator()
 		{
-			static_assert(std::is_base_of_v<Reflectable2, T>, "ClassInstantiator is only meant to be used as a member of Reflectable-derived classes.");
+			static_assert(std::is_base_of_v<Reflectable, T>, "ClassInstantiator is only meant to be used as a member of Reflectable-derived classes.");
 			static_assert(std::is_constructible_v<T, Args...>,
 				"No constructor associated with the parameter types of declared instantiator. Please keep instantiator and constructor synchronized.");
 			TypeInfoDatabase::EditSingleton().RegisterInstantiateFunction(T::GetTypeInfo().GetID(), &Instantiate);
 		}
 
-		static Reflectable2* Instantiate(std::any const& pCtorParams)
+		static Reflectable* Instantiate(std::any const& pCtorParams)
 		{
 			using ArgumentPackTuple = std::tuple<Args...>;
 			ArgumentPackTuple const* argsTuple = std::any_cast<ArgumentPackTuple>(&pCtorParams);
@@ -54,7 +54,7 @@ namespace DIRE_NS
 #define DECLARE_INSTANTIATOR(...)  \
 	inline static DIRE_NS::ClassInstantiator<Self, __VA_ARGS__> DIRE_INSTANTIATOR;
 
-	class Reflectable2
+	class Reflectable
 	{
 		using ParseError = DIRE_STRING;
 
@@ -82,10 +82,10 @@ namespace DIRE_NS
 		template <typename TRefl>
 		[[nodiscard]] bool	IsA() const
 		{
-			static_assert(std::is_base_of_v<Reflectable2, TRefl>, "IsA only works with Reflectable-derived class types.");
+			static_assert(std::is_base_of_v<Reflectable, TRefl>, "IsA only works with Reflectable-derived class types.");
 
 			// Special case to manage IsA<Reflectable>, because since all Reflectable are derived from it *implicitly*, IsParentOf would return false.
-			if constexpr (std::is_same_v<TRefl, Reflectable2>)
+			if constexpr (std::is_same_v<TRefl, Reflectable>)
 			{
 				return true;
 			}
@@ -94,10 +94,10 @@ namespace DIRE_NS
 			return (parentTypeInfo.GetID() == GetReflectableClassID() || parentTypeInfo.IsParentOf(GetReflectableClassID()));
 		}
 
-		template <typename T = Reflectable2>
+		template <typename T = Reflectable>
 		T* Clone()
 		{
-			static_assert(std::is_base_of_v<Reflectable2, T>, "Clone only works with Reflectable-derived class types.");
+			static_assert(std::is_base_of_v<Reflectable, T>, "Clone only works with Reflectable-derived class types.");
 
 			const TypeInfo * thisTypeInfo = GetReflectableTypeInfo();
 			if (thisTypeInfo == nullptr)
@@ -105,7 +105,7 @@ namespace DIRE_NS
 				return nullptr;
 			}
 
-			Reflectable2* clone = Instantiate();
+			Reflectable* clone = Instantiate();
 			if (clone == nullptr)
 			{
 				return nullptr;
@@ -117,7 +117,7 @@ namespace DIRE_NS
 		}
 
 		template <typename... Args>
-		Reflectable2*	Instantiate(Args&&... pArgs)
+		Reflectable*	Instantiate(Args&&... pArgs)
 		{
 			if constexpr (sizeof...(Args) == 0)
 			{
@@ -127,7 +127,7 @@ namespace DIRE_NS
 			return TypeInfoDatabase::GetSingleton().TryInstantiate(GetReflectableClassID(), {std::tuple<Args...>(std::forward<Args>(pArgs)...)});
 		}
 
-		void	CloneProperties(Reflectable2 const* pCloned, const TypeInfo * pClonedTypeInfo, Reflectable2* pClone)
+		void	CloneProperties(Reflectable const* pCloned, const TypeInfo * pClonedTypeInfo, Reflectable* pClone)
 		{
 			pClonedTypeInfo->CloneHierarchyPropertiesOf(*pClone, *pCloned);
 		}
@@ -235,7 +235,7 @@ namespace DIRE_NS
 		[[nodiscard]] GetPropertyResult RecurseArrayProperty(const IArrayDataStructureHandler* pArrayHandler, const std::byte* pPropPtr,
 			DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey) const;
 
-		[[nodiscard]] GetPropertyResult	RecurseMapProperty(const MapDataStructureHandler* pMapHandler, const std::byte* pPropPtr,
+		[[nodiscard]] GetPropertyResult	RecurseMapProperty(const IMapDataStructureHandler* pMapHandler, const std::byte* pPropPtr,
 			DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey) const;
 
 		[[nodiscard]] GetPropertyResult GetArrayMapProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey, const std::byte * pPropPtr) const;

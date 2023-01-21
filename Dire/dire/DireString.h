@@ -4,14 +4,7 @@
 #include <charconv> // from_chars
 #include <system_error>
 #include <variant>
-
-/* If user says it's ok to use std::string, include std::string and use it everywhere we need a dynamic string */
-#if DIRE_USE_STD_STRING
-# include <string>
-# define DIRE_STRING std::string
-# define DIRE_STRING_VIEW std::string_view
-#endif
-/* If DIRE_USE_STD_STRING was not set, it means the user provided another string type to use in DIRE_STRING through CMake. */
+#include "DireDefines.h"
 
 namespace DIRE_NS
 {

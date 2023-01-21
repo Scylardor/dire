@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.12) # HOMEPAGE_URL is not supported until CMake version 3.12
 
+cmake_policy(SET CMP0048 NEW)
+
 set(PROJECT_NAME Dire)
+string(TOUPPER ${PROJECT_NAME} UPPER_PROJECT_NAME)
+
 
 project(${PROJECT_NAME}
   VERSION 1.0.0
@@ -14,24 +18,22 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 # Options
-option(${PROJECT_NAME}_SERIALIZATION_ENABLED "Enables the Serialization features of the DIRE library." ON)
-option(${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED "Enables the JSON serialization feature of the DIRE library, using RapidJSON." ON)
-set(${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_VERSION master CACHE STRING "RapidJSON version that DIRE will try to use if not found on the system.")
-set(${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ALLOCATOR "rapidjson::CrtAllocator" CACHE STRING "Allocator passed to RapidJSON for its allocations. Uses RapidJSON's one by default.")
-option(${PROJECT_NAME}_SERIALIZATION_BINARY_ENABLED "Enables the binary serialization feature of the DIRE library." ON)
-option(${PROJECT_NAME}_SERIALIZABLE_PROPERTIES_BY_DEFAULT "If true, Dire properties are serializable by default, unless tagged with the NotSerializable attribute. If false, they are not serializable by default, unless tagged with the Serializable attribute." ON)
+option(${UPPER_PROJECT_NAME}_SERIALIZATION_ENABLED "Enables the Serialization features of the DIRE library." ON)
+option(${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED "Enables the JSON serialization feature of the DIRE library, using RapidJSON." ON)
+set(${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_VERSION master CACHE STRING "RapidJSON version that DIRE will try to use if not found on the system.")
+set(${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ALLOCATOR "rapidjson::CrtAllocator" CACHE STRING "Allocator passed to RapidJSON for its allocations. Uses RapidJSON's one by default.")
+option(${UPPER_PROJECT_NAME}_SERIALIZATION_BINARY_ENABLED "Enables the binary serialization feature of the DIRE library." ON)
+option(${UPPER_PROJECT_NAME}_SERIALIZABLE_PROPERTIES_BY_DEFAULT "If true, Dire properties are serializable by default, unless tagged with the NotSerializable attribute. If false, they are not serializable by default, unless tagged with the Serializable attribute." ON)
 
-set(${PROJECT_NAME}_REFLECTABLE_INSTANTIATE_WITH_DEFAULT_CONSTRUCTOR "If on, default-constructible Reflectable types will automatically register their default constructor as their instantiator function." ON)
+set(${UPPER_PROJECT_NAME}_DEFAULT_CONSTRUCTOR_INSTANTIATE "If on, default-constructible Reflectable types will automatically register their default constructor as their instantiator function." ON)
 
-set(${PROJECT_NAME}_NAMESPACE "dire" CACHE STRING "Namespace the DIRE library will use (in case of a naming conflict)")
-set(${PROJECT_NAME}_STRING "std::string" CACHE STRING "Type the DIRE library should use for standard dynamic string manipulation.")
-set(${PROJECT_NAME}_ASSERT "assert" CACHE STRING "Assert expression Dire should use in case of error")
-set(${PROJECT_NAME}_REFLECTABLE_ALLOCATOR "std::allocator" CACHE STRING "Stateless allocator Dire should use to dynamically allocate Reflectables (with e.g. Instantiate).")
+set(${UPPER_PROJECT_NAME}_NAMESPACE dire CACHE STRING "Namespace the DIRE library will use (in case of a naming conflict)")
+set(${UPPER_PROJECT_NAME}_STRING std CACHE STRING "String type the DIRE library should use for standard dynamic string manipulation (std::string by default).")
+set(${UPPER_PROJECT_NAME}_ASSERT assert CACHE STRING "Assert expression Dire should use in case of error")
+set(${UPPER_PROJECT_NAME}_ALLOCATOR std::allocator CACHE STRING "Stateless allocator Dire should use to dynamically allocate memory.")
 
-
-
-set(DIRE_SOURCE_DIR ${PROJECT_SOURCE_DIR}/${PROJECT_NAME}/${PROJECT_NAME})
-set(DIRE_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/${PROJECT_NAME})
+set(DIRE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}/${PROJECT_NAME})
+set(DIRE_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME})
 
 # Main target creation
 add_library(${PROJECT_NAME} STATIC #TODO customize
@@ -68,25 +70,27 @@ add_library(${PROJECT_NAME} STATIC #TODO customize
 	${DIRE_SOURCE_DIR}/DireSubclass.h
 	${DIRE_SOURCE_DIR}/DireAssert.h
 	${DIRE_SOURCE_DIR}/DireReflectableID.h
+	${DIRE_SOURCE_DIR}/DireDefines.h.in
+	${CMAKE_CURRENT_BINARY_DIR}/DireDefines.h
 )
 
 # Conditional Sources
 
-if(${PROJECT_NAME}_SERIALIZATION_ENABLED)
+if(${UPPER_PROJECT_NAME}_SERIALIZATION_ENABLED)
 	target_sources(${PROJECT_NAME} PRIVATE
 		${DIRE_SOURCE_DIR}/DireSerialization.h
 	)
 endif()
-if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED)
+if(${UPPER_PROJECT_NAME}_SERIALIZATION_ENABLED AND ${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED)
 	target_sources(${PROJECT_NAME} PRIVATE
 		${DIRE_SOURCE_DIR}/DireJSONSerializer.h
 		${DIRE_SOURCE_DIR}/DireJSONDeserializer.h
 		${DIRE_SOURCE_DIR}/DireJSONSerializer.cpp
 		${DIRE_SOURCE_DIR}/DireJSONDeserializer.cpp
 	)
-	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_RAPIDJSON_ALLOCATOR=${${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ALLOCATOR})
+	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_RAPIDJSON_ALLOCATOR=${${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ALLOCATOR})
 endif()
-if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_BINARY_ENABLED)
+if(${UPPER_PROJECT_NAME}_SERIALIZATION_ENABLED AND ${UPPER_PROJECT_NAME}_SERIALIZATION_BINARY_ENABLED)
 	target_sources(${PROJECT_NAME} PRIVATE
 		${DIRE_SOURCE_DIR}/DireBinarySerializer.h
 		${DIRE_SOURCE_DIR}/DireBinaryDeserializer.h
@@ -102,52 +106,24 @@ target_include_directories(${PROJECT_NAME}
 )
 
 # RapidJSON dependency setup
-if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED)
+if(${UPPER_PROJECT_NAME}_SERIALIZATION_ENABLED AND ${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED)
 	include(CMake/Rapidjson.cmake)
-	add_rapidjson_dependency(rapidjson ${${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_VERSION} ${PROJECT_NAME} PUBLIC)
+	add_rapidjson_dependency(rapidjson ${${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_VERSION} ${PROJECT_NAME} PUBLIC)
 endif()
 
 
 # Defines
-
-# Disable MSVC "unsafe" functions warnings
-target_compile_definitions(${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS)
-
-target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_NS=${${PROJECT_NAME}_NAMESPACE})
-
-target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_ALLOCATOR=${${PROJECT_NAME}_REFLECTABLE_ALLOCATOR})
-
-if(${${PROJECT_NAME}_STRING} STREQUAL "std::string")
-	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_USE_STD_STRING=1)
-else()
-	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_STRING=${${PROJECT_NAME}_STRING})
+if(${${UPPER_PROJECT_NAME}_ASSERT} STREQUAL "assert")
+	set(${UPPER_PROJECT_NAME}_USE_STANDARD_ASSERT TRUE)
 endif()
 
-if(${${PROJECT_NAME}_ASSERT} STREQUAL "assert")
-	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_USE_STD_ASSERT=1)
-else()
-	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_ASSERT=${${PROJECT_NAME}_ASSERT})
+if(${${UPPER_PROJECT_NAME}_STRING} STREQUAL "std")
+	set(${UPPER_PROJECT_NAME}_USE_STANDARD_STRING TRUE)
 endif()
 
-if(${PROJECT_NAME}_REFLECTABLE_INSTANTIATE_WITH_DEFAULT_CONSTRUCTOR)
-	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_DEFAULT_CONSTRUCTOR_INSTANTIATE=1)
-endif()
+configure_file(${DIRE_SOURCE_DIR}/DireDefines.h.in DireDefines.h)
 
-if(${PROJECT_NAME}_SERIALIZATION_ENABLED)
-	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_USE_SERIALIZATION=1)
-endif()
-
-if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED)
-	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_USE_JSON_SERIALIZATION=1)
-endif()
-
-if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZATION_BINARY_ENABLED)
-	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_USE_BINARY_SERIALIZATION=1)
-endif()
-
-if(${PROJECT_NAME}_SERIALIZATION_ENABLED AND ${PROJECT_NAME}_SERIALIZABLE_PROPERTIES_BY_DEFAULT)
-	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_SERIALIZABLE_PROPERTIES_BY_DEFAULT=1)
-endif()
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
 # Unit tests
 add_subdirectory(tests)

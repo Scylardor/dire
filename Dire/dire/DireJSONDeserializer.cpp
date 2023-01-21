@@ -1,9 +1,11 @@
-#if DIRE_USE_SERIALIZATION && DIRE_USE_JSON_SERIALIZATION
+
+#include "DireJSONDeserializer.h"
+
+#ifdef DIRE_COMPILE_JSON_SERIALIZATION
 
 #include "DireTypeInfo.h"
 #include "DireTypeInfoDatabase.h"
 #include "DireReflectable.h"
-#include "DireJSONDeserializer.h"
 #include "DireTypeHandlers.h"
 
 #include "DireAssert.h"
@@ -21,7 +23,7 @@
 
 namespace DIRE_NS
 {
-	IDeserializer::Result RapidJsonReflectorDeserializer::DeserializeInto(char const* pJson, Reflectable2& pDeserializedObject)
+	IDeserializer::Result RapidJsonReflectorDeserializer::DeserializeInto(char const* pJson, Reflectable& pDeserializedObject)
 	{
 		rapidjson::Document doc;
 		rapidjson::ParseResult ok = doc.Parse(pJson);
@@ -65,7 +67,7 @@ namespace DIRE_NS
 	}
 
 
-	void RapidJsonReflectorDeserializer::DeserializeMapValue(const rapidjson::Value& pVal, void* pPropPtr, const MapDataStructureHandler * pMapHandler) const
+	void RapidJsonReflectorDeserializer::DeserializeMapValue(const rapidjson::Value& pVal, void* pPropPtr, const IMapDataStructureHandler * pMapHandler) const
 	{
 		if (pPropPtr == nullptr || pMapHandler == nullptr)
 			return;
@@ -85,7 +87,7 @@ namespace DIRE_NS
 	void RapidJsonReflectorDeserializer::DeserializeCompoundValue(const rapidjson::Value& pVal, void* pPropPtr) const
 	{
 		DIRE_ASSERT(pVal.IsObject());
-		auto* reflectableProp = static_cast<Reflectable2*>(pPropPtr);
+		auto* reflectableProp = static_cast<Reflectable*>(pPropPtr);
 		const TypeInfo * compTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(reflectableProp->GetReflectableClassID());
 		DIRE_ASSERT(compTypeInfo != nullptr);
 

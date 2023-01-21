@@ -1,6 +1,7 @@
 #pragma once
 
-#if DIRE_USE_SERIALIZATION && DIRE_USE_BINARY_SERIALIZATION
+#include "DireDefines.h"
+#ifdef DIRE_COMPILE_BINARY_SERIALIZATION
 
 #include "DireTypes.h"
 #include "DireSerialization.h"
@@ -8,14 +9,13 @@
 
 #include <string.h> // memcpy
 
-
 namespace DIRE_NS
 {
 	class BinaryReflectorSerializer : public ISerializer
 	{
 	public:
 
-		virtual Result	Serialize(Reflectable2 const& serializedObject) override;
+		virtual Result	Serialize(Reflectable const& serializedObject) override;
 
 		virtual bool	SerializesMetadata() const override { return false; }
 
@@ -62,7 +62,7 @@ namespace DIRE_NS
 
 		void	SerializeArrayValue(void const* pPropPtr, IArrayDataStructureHandler const* pArrayHandler);
 
-		void	SerializeMapValue(void const* pPropPtr, MapDataStructureHandler const* pMapHandler);
+		void	SerializeMapValue(void const* pPropPtr, IMapDataStructureHandler const* pMapHandler);
 
 		void	SerializeCompoundValue(void const* pPropPtr);
 

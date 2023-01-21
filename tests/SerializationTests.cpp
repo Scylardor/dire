@@ -1,15 +1,46 @@
-#include <iomanip>
-#include <iostream>
+#include "DireDefines.h"
+#ifdef DIRE_SERIALIZATION_ENABLED
+#	include <iomanip>
+#	include <iostream>
 
-#include "catch2/catch_test_macros.hpp"
+#	include "catch2/catch_test_macros.hpp"
 
-#include "dire/DireJSONSerializer.h"
-#include "dire/DireJSONDeserializer.h"
+#	include "TestClasses.h"
 
-#include "dire/DireBinaryDeserializer.h"
-#include "dire/DireBinarySerializer.h"
+DIRE_SEQUENTIAL_ENUM(Kings, int, Philippe, Alexandre, Cesar, Charles);
+DIRE_BITMASK_ENUM(BitEnum, int, one, two, four, eight);
+DIRE_BITMASK_ENUM(Jacks, short, Ogier, Lahire, Hector, Lancelot);
+DIRE_BITMASK_ENUM(Queens, short, Judith, Rachel, Pallas, Argine);
 
-#include "TestClasses.h"
+enum class Faces : uint8_t
+{
+	Jack,
+	Queen,
+	King
+};
+
+dire_reflectable(struct enumTestType)
+{
+	DIRE_REFLECTABLE_INFO()
+
+	DIRE_PROPERTY(Faces, aTestFace);
+	DIRE_PROPERTY(Kings, bestKing, Kings::Alexandre);
+	DIRE_ARRAY_PROPERTY(Kings, worstKings, [2])
+	DIRE_PROPERTY((std::vector<Kings>), playableKings);
+	DIRE_PROPERTY((std::map<Queens, bool>), allowedQueens);
+	DIRE_PROPERTY((std::map<int, Jacks>), pointsPerJack);
+
+	bool operator==(const enumTestType & pRhs) const
+	{
+		return aTestFace == pRhs.aTestFace && bestKing == pRhs.bestKing && memcmp(worstKings, pRhs.worstKings, sizeof(Kings) * 2) == 0
+			&& playableKings == pRhs.playableKings && allowedQueens == pRhs.allowedQueens && pointsPerJack == pRhs.pointsPerJack;
+	}
+};
+
+#	ifdef DIRE_SERIALIZATION_RAPIDJSON_ENABLED
+#		include "dire/DireJSONSerializer.h"
+#		include "dire/DireJSONDeserializer.h"
+
 
 TEST_CASE("JSON simple object", "[Serialization]")
 {
@@ -139,36 +170,6 @@ TEST_CASE("JSON Serialize compound, map in map, and compound value in map", "[Se
 	REQUIRE(serialized == serialized2); // in theory, if serialization output is the same, objects are the same as far as reflection is concerned
 }
 
-
-DIRE_SEQUENTIAL_ENUM(Kings, int, Philippe, Alexandre, Cesar, Charles);
-DIRE_BITMASK_ENUM(Queens, short, Judith, Rachel, Pallas, Argine);
-DIRE_BITMASK_ENUM(Jacks, short, Ogier, Lahire, Hector, Lancelot);
-
-enum class Faces : uint8_t
-{
-	Jack,
-	Queen,
-	King
-};
-
-dire_reflectable(struct enumTestType)
-{
-	DIRE_REFLECTABLE_INFO()
-
-	DIRE_PROPERTY(Faces, aTestFace);
-	DIRE_PROPERTY(Kings, bestKing, Kings::Alexandre);
-	DIRE_ARRAY_PROPERTY(Kings, worstKings, [2])
-	DIRE_PROPERTY((std::vector<Kings>), playableKings);
-	DIRE_PROPERTY((std::map<Queens, bool>), allowedQueens);
-	DIRE_PROPERTY((std::map<int, Jacks>), pointsPerJack);
-
-	bool operator==(const enumTestType & pRhs) const
-	{
-		return aTestFace == pRhs.aTestFace && bestKing == pRhs.bestKing && memcmp(worstKings, pRhs.worstKings, sizeof(Kings) * 2) == 0
-			&& playableKings == pRhs.playableKings && allowedQueens == pRhs.allowedQueens && pointsPerJack == pRhs.pointsPerJack;
-	}
-};
-
 TEST_CASE("JSON Serialize enumerations", "[Serialization]")
 {
 	dire::RapidJsonReflectorSerializer serializer;
@@ -182,6 +183,11 @@ TEST_CASE("JSON Serialize enumerations", "[Serialization]")
 	enums.playableKings = { Kings::Cesar, Kings::Alexandre };
 	enums.allowedQueens = { {Queens::Judith, true}, {Queens::Rachel, false} };
 	enums.pointsPerJack = { {10, Jacks::Ogier}, {20, Jacks::Lahire}, {30, Jacks::Hector}, {40, Jacks::Lancelot} };
+
+	auto str = Queens::GetStringFromEnum(Queens::Judith);
+	auto bitset = DIRE_NS::FindFirstSetBit((int)Queens::Judith);
+	auto lancelot = Jacks::GetStringFromSafeEnum(Jacks::Lancelot);
+	auto lancelo2t = BitEnum::GetStringFromSafeEnum(BitEnum::one);
 	serialized = serializer.Serialize(enums).AsString();
 	REQUIRE(serialized ==
 		"{\"aTestFace\":1,\"bestKing\":\"Alexandre\",\"worstKings\":[\"Philippe\",\"Charles\"],\"playableKings\":[\"Cesar\",\"Alexandre\"],\"allowedQueens\":{\"Judith\":true,\"Rachel\":false},\"pointsPerJack\":{\"10\":\"Ogier\",\"20\":\"Lahire\",\"30\":\"Hector\",\"40\":\"Lancelot\"}}"
@@ -192,6 +198,12 @@ TEST_CASE("JSON Serialize enumerations", "[Serialization]")
 	REQUIRE(enums == deserializedEnums);
 }
 
+#	endif // DIRE_SERIALIZATION_RAPIDJSON_ENABLED
+
+#	ifdef DIRE_SERIALIZATION_BINARY_ENABLED
+
+#  include "dire/DireBinaryDeserializer.h"
+#  include "dire/DireBinarySerializer.h"
 
 /* Utility function to print the output of binary generators */
 auto writeBinaryString = [](const std::string& binarized)
@@ -372,3 +384,6 @@ TEST_CASE("Binary Serialize enumerations", "[Serialization]")
 	deserializer.DeserializeInto(binarized.data(), deserializedEnums);
 	REQUIRE(enums == deserializedEnums);
 }
+#	endif // DIRE_SERIALIZATION_BINARY_ENABLED
+
+#endif // DIRE_SERIALIZATION_ENABLED

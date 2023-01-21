@@ -2,7 +2,7 @@
 #include "DireReflectable.h"
 #include <cstddef> // byte
 
-void DIRE_NS::TypeInfo::CloneHierarchyPropertiesOf(Reflectable2& pNewClone, const Reflectable2& pCloned) const
+void DIRE_NS::TypeInfo::CloneHierarchyPropertiesOf(Reflectable& pNewClone, const Reflectable& pCloned) const
 {
 	for (auto rit = ParentClasses.rbegin(); rit != ParentClasses.rend(); ++rit)
 	{
@@ -12,7 +12,7 @@ void DIRE_NS::TypeInfo::CloneHierarchyPropertiesOf(Reflectable2& pNewClone, cons
 	ClonePropertiesOf(pNewClone, pCloned);
 }
 
-void DIRE_NS::TypeInfo::ClonePropertiesOf(Reflectable2& pNewClone, const Reflectable2& pCloned) const
+void DIRE_NS::TypeInfo::ClonePropertiesOf(Reflectable& pNewClone, const Reflectable& pCloned) const
 {
 	for (const PropertyTypeInfo& prop : Properties)
 	{

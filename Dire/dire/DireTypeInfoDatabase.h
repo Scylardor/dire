@@ -17,12 +17,12 @@ namespace std
 namespace DIRE_NS
 {
 	class TypeInfo;
-	class Reflectable2;
+	class Reflectable;
 
 	class ReflectableFactory
 	{
 	public:
-		using InstantiateFunction = Reflectable2 * (*)(const std::any &);
+		using InstantiateFunction = Reflectable * (*)(const std::any &);
 
 		ReflectableFactory() = default;
 
@@ -52,10 +52,11 @@ namespace DIRE_NS
 	};
 
 
-	struct TypeInfoDatabase : Singleton<TypeInfoDatabase>
+	class TypeInfoDatabase : public Singleton<TypeInfoDatabase>
 	{
 		inline static const unsigned DATABASE_VERSION = 0;
 
+	public:
 		[[nodiscard]] size_t	GetTypeInfoCount() const
 		{
 			return myReflectableTypeInfos.size();
@@ -65,32 +66,21 @@ namespace DIRE_NS
 
 		[[nodiscard]] TypeInfo* EditTypeInfo(ReflectableID classID);
 
-
 		void	RegisterInstantiateFunction(ReflectableID pClassID, ReflectableFactory::InstantiateFunction pInstantiateFunction)
 		{
 			myInstantiateFactory.RegisterInstantiator(pClassID, pInstantiateFunction);
 		}
 
-		[[nodiscard]] Reflectable2* TryInstantiate(ReflectableID pClassID, std::any const& pAnyParameterPack) const;
+		[[nodiscard]] Reflectable* TryInstantiate(ReflectableID pClassID, std::any const& pAnyParameterPack) const;
 
 		template <typename T, typename... Args>
 		[[nodiscard]] T* InstantiateClass(Args &&... pArgs) const
 		{
-			static_assert(std::is_base_of_v<Reflectable2, T>, "ClassInstantiator is only meant to be used as a member of Reflectable-derived classes.");
+			static_assert(std::is_base_of_v<Reflectable, T>, "ClassInstantiator is only meant to be used as a member of Reflectable-derived classes.");
 			if (sizeof...(Args) == 0)
 				return static_cast<T*>(TryInstantiate(T::GetTypeInfo().GetID(), {}));
 			return static_cast<T*>(TryInstantiate(T::GetTypeInfo().GetID(), { std::tuple<Args...>(std::forward<Args>(pArgs)...) }));
 		}
-
-
-		// This follows a very simple binary serialization process right now. It encodes:
-		// - the reflectable type ID
-		// - the typename string
-		struct ExportedTypeInfoData
-		{
-			ReflectableID	ReflectableID;
-			DIRE_STRING		TypeName;
-		};
 
 		DIRE_STRING	BinaryExport() const;
 		bool	ExportToBinaryFile(DIRE_STRING_VIEW pWrittenSettingsFile) const;
@@ -116,6 +106,5 @@ namespace DIRE_NS
 
 		std::vector<TypeInfo*>	myReflectableTypeInfos;
 		ReflectableFactory		myInstantiateFactory;
-
 	};
 }

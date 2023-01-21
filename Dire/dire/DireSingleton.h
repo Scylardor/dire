@@ -1,4 +1,5 @@
 #pragma once
+#include "DireDefines.h"
 
 namespace DIRE_NS
 {

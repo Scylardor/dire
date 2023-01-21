@@ -127,3 +127,13 @@ TEST_CASE("Reflectable Instantiate", "[Reflectable]")
 	delete deft;
 	delete custom;
 }
+
+// reflectable hierarchy
+static_assert(std::is_same_v<c::Self, c>);
+static_assert(std::is_same_v<c::Super, b>);
+
+// top of hierarchy (parent is Reflectable)
+static_assert(std::is_same_v<a::Super, dire::Reflectable>);
+
+// multiple inheritance: Super is the first type in the inheritance list.
+static_assert(std::is_same_v<b::Super, a >);

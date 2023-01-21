@@ -1,6 +1,6 @@
 #pragma once
 
-#if DIRE_USE_SERIALIZATION && DIRE_USE_BINARY_SERIALIZATION
+#ifdef DIRE_COMPILE_BINARY_SERIALIZATION
 
 #include <cstdint>
 #include "DireTypes.h"

@@ -9,8 +9,11 @@ namespace DIRE_NS
 {
 	class DataStructureHandler;
 
-	struct MapDataStructureHandler
+	class IMapDataStructureHandler
 	{
+	public:
+		virtual ~IMapDataStructureHandler() = default;
+
 		virtual const void*				Read(const void*, const DIRE_STRING_VIEW&) const = 0;
 		virtual void					Update(void*, const DIRE_STRING_VIEW&, const void*) const = 0;
 		virtual void*					Create(void*, const DIRE_STRING_VIEW&, const void*) const = 0;
@@ -26,29 +29,26 @@ namespace DIRE_NS
 		virtual size_t					SizeofValue() const = 0;
 		virtual DataStructureHandler	KeyDataHandler() const = 0;
 
-		virtual ~MapDataStructureHandler() = default;
-
-
-#if DIRE_USE_SERIALIZATION
+#ifdef DIRE_SERIALIZATION_ENABLED
 		using OpaqueSerializerType = void*;
 		using OpaqueMapType = const void *;
 		using OpaqueKeyType = const void *;
 		using OpaqueValueType = OpaqueKeyType;
-		using KeyValuePairSerializeFptr = void (*)(OpaqueSerializerType, OpaqueKeyType, OpaqueValueType, const MapDataStructureHandler &, const DataStructureHandler &, const DataStructureHandler &);
+		using KeyValuePairSerializeFptr = void (*)(OpaqueSerializerType, OpaqueKeyType, OpaqueValueType, const IMapDataStructureHandler &, const DataStructureHandler &, const DataStructureHandler &);
 		virtual void		SerializeForEachPair(OpaqueMapType, OpaqueSerializerType, KeyValuePairSerializeFptr) const = 0;
 		virtual DIRE_STRING	KeyToString(OpaqueKeyType) const = 0;
 #endif
 	};
 
 	template <typename T, typename = void>
-	struct TypedMapDataStructureHandler
+	class TypedMapDataStructureHandler
 	{};
 
 
 	// Base class for reflectable properties that have brackets operator to be able to make operations on the underlying array
 	template <typename T>
-	struct TypedMapDataStructureHandler<T,
-		typename std::enable_if_t<HasMapSemantics_v<T>>> final : MapDataStructureHandler
+	class TypedMapDataStructureHandler<T,
+		typename std::enable_if_t<HasMapSemantics_v<T>>> final : public IMapDataStructureHandler
 	{
 		using KeyType = typename T::key_type;
 		using ValueType = typename T::mapped_type;
@@ -59,6 +59,7 @@ namespace DIRE_NS
 			"In order to use Map-style reflection access, your type has to implement the following members with the same signature-style as std::map:"
 			"a key_type typedef, a mapped_type typedef, operator[], begin, end, find, an std::pair-like iterator type, erase, clear, size.");
 
+	public:
 		virtual const void* Read(const void* pMap, const DIRE_STRING_VIEW& pKey) const override
 		{
 			const T* thisMap = static_cast<const T*>(pMap);
@@ -194,7 +195,7 @@ namespace DIRE_NS
 
 		virtual ReflectableID			ValueReflectableID() const override
 		{
-			if constexpr (std::is_base_of_v<Reflectable2, ValueType>)
+			if constexpr (std::is_base_of_v<Reflectable, ValueType>)
 			{
 				return ValueType::GetTypeInfo().GetID();
 			}
@@ -242,7 +243,7 @@ namespace DIRE_NS
 			return {};
 		}
 
-#if DIRE_USE_SERIALIZATION
+#ifdef DIRE_SERIALIZATION_ENABLED
 		virtual void		SerializeForEachPair(OpaqueMapType pMap, OpaqueSerializerType pSerializer, KeyValuePairSerializeFptr pForEachPairCallback) const override
 		{
 			if (pMap != nullptr)

@@ -2,9 +2,9 @@
 
 namespace DIRE_NS
 {
-	struct IArrayDataStructureHandler;
-	struct MapDataStructureHandler;
-	struct IEnumDataStructureHandler;
+	class IArrayDataStructureHandler;
+	class IMapDataStructureHandler;
+	class IEnumDataStructureHandler;
 
 	class DataStructureHandler
 	{
@@ -14,7 +14,7 @@ namespace DIRE_NS
 			myHandlers(pArrayHandler)
 		{}
 
-		DataStructureHandler(const MapDataStructureHandler* pMapHandler) :
+		DataStructureHandler(const IMapDataStructureHandler* pMapHandler) :
 			myHandlers(pMapHandler)
 		{}
 
@@ -23,7 +23,7 @@ namespace DIRE_NS
 		{}
 
 		[[nodiscard]] const IArrayDataStructureHandler*	GetArrayHandler() const { return myHandlers.ArrayHandler; }
-		[[nodiscard]] const MapDataStructureHandler  *	GetMapHandler() const { return myHandlers.MapHandler; }
+		[[nodiscard]] const IMapDataStructureHandler  *	GetMapHandler() const { return myHandlers.MapHandler; }
 		[[nodiscard]] const IEnumDataStructureHandler *	GetEnumHandler() const { return myHandlers.EnumHandler; }
 
 	private:
@@ -35,7 +35,7 @@ namespace DIRE_NS
 				ArrayHandler(pArrayHandler)
 			{}
 
-			HandlersUnion(const MapDataStructureHandler* pMapHandler) :
+			HandlersUnion(const IMapDataStructureHandler* pMapHandler) :
 				MapHandler(pMapHandler)
 			{}
 
@@ -44,7 +44,7 @@ namespace DIRE_NS
 			{}
 
 			const IArrayDataStructureHandler*	ArrayHandler = nullptr;
-			const MapDataStructureHandler*		MapHandler;
+			const IMapDataStructureHandler*		MapHandler;
 			const IEnumDataStructureHandler*	EnumHandler;
 		} ;
 

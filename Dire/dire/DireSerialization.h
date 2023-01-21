@@ -1,17 +1,16 @@
 #pragma once
-#include <iostream>
+#include "DireDefines.h"
 
-#if DIRE_USE_SERIALIZATION
-
-#include <vector>
+#ifdef DIRE_SERIALIZATION_ENABLED
 #include "DireString.h"
 #include "DireTypeInfo.h"
+#include "DireReflectableID.h"
+#include <vector>
 #include <variant>
-#include <optional>
 
 namespace DIRE_NS
 {
-	class Reflectable2;
+	class Reflectable;
 
 	using SerializationError = DIRE_STRING;
 
@@ -51,7 +50,7 @@ namespace DIRE_NS
 
 		virtual ~ISerializer() = default;
 
-		virtual Result	Serialize(Reflectable2 const& serializedObject) = 0;
+		virtual Result	Serialize(Reflectable const& serializedObject) = 0;
 
 		virtual bool	SerializesMetadata() const = 0;
 
@@ -75,15 +74,15 @@ namespace DIRE_NS
 				Value(pError)
 			{}
 
-			Result(Reflectable2* pDeserializedReflectable) :
+			Result(Reflectable* pDeserializedReflectable) :
 				Value(pDeserializedReflectable)
 			{}
 
-			template <typename T = Reflectable2>
+			template <typename T = Reflectable>
 			[[nodiscard]] T* GetReflectable() const
 			{
-				static_assert(std::is_base_of_v<Reflectable2, T>);
-				return (T*)std::get<Reflectable2*>(Value);
+				static_assert(std::is_base_of_v<Reflectable, T>);
+				return (T*)std::get<Reflectable*>(Value);
 			}
 
 			[[nodiscard]] bool	HasError() const { return std::holds_alternative<SerializationError>(Value); }
@@ -91,7 +90,7 @@ namespace DIRE_NS
 			[[nodiscard]] SerializationError	GetError() const;
 
 		private:
-			std::variant<Reflectable2*, SerializationError>	Value{nullptr};
+			std::variant<Reflectable*, SerializationError>	Value{nullptr};
 		};
 
 		virtual ~IDeserializer() = default;
@@ -102,13 +101,13 @@ namespace DIRE_NS
 		template <typename... Args>
 		Result Deserialize(const char* pSerialized, ReflectableID pReflectableClassID, Args&&... pArgs);
 
-		virtual Result	DeserializeInto(const char* pSerialized, Reflectable2& pDeserializedObject) = 0;
+		virtual Result	DeserializeInto(const char* pSerialized, Reflectable& pDeserializedObject) = 0;
 	};
 
 	template <typename T, typename ... Args>
 	IDeserializer::Result IDeserializer::Deserialize(const char* pSerialized, Args&&... pArgs)
 	{
-		static_assert(std::is_base_of_v<Reflectable2, T>, "Deserialize is only able to process Reflectable-derived classes");
+		static_assert(std::is_base_of_v<Reflectable, T>, "Deserialize is only able to process Reflectable-derived classes");
 		T* deserializedReflectable = AllocateReflectable<T>(std::forward<Args>(pArgs)...);
 		Result result = DeserializeInto(pSerialized, *deserializedReflectable);
 
@@ -127,7 +126,7 @@ namespace DIRE_NS
 			return nullptr;
 		}
 
-		Reflectable2* deserializedReflectable = TypeInfoDatabase::GetSingleton().TryInstantiate(pReflectableClassID, std::tuple<Args...>(std::forward<Args>(pArgs)...));
+		Reflectable* deserializedReflectable = TypeInfoDatabase::GetSingleton().TryInstantiate(pReflectableClassID, std::tuple<Args...>(std::forward<Args>(pArgs)...));
 
 		Result result;
 		if (deserializedReflectable)

@@ -1,5 +1,6 @@
-#if DIRE_USE_SERIALIZATION && DIRE_USE_BINARY_SERIALIZATION
 #include "DireBinaryDeserializer.h"
+#ifdef DIRE_COMPILE_BINARY_SERIALIZATION
+
 #include "DireReflectable.h"
 #include "DireTypeInfoDatabase.h"
 #include "BinaryHeaders.h"
@@ -15,7 +16,7 @@ case Type::TypeEnum:\
 
 namespace DIRE_NS
 {
-	IDeserializer::Result BinaryReflectorDeserializer::DeserializeInto(const char * pSerialized, Reflectable2& pDeserializedObject)
+	IDeserializer::Result BinaryReflectorDeserializer::DeserializeInto(const char * pSerialized, Reflectable& pDeserializedObject)
 	{
 		if (pSerialized == nullptr)
 			return {"The binary string is nullptr."};
@@ -80,7 +81,7 @@ namespace DIRE_NS
 		}
 	}
 
-	void BinaryReflectorDeserializer::DeserializeMapValue(void* pPropPtr, const MapDataStructureHandler * pMapHandler) const
+	void BinaryReflectorDeserializer::DeserializeMapValue(void* pPropPtr, const IMapDataStructureHandler * pMapHandler) const
 	{
 		if (pPropPtr == nullptr || pMapHandler == nullptr)
 			return;
@@ -117,7 +118,7 @@ namespace DIRE_NS
 		if (header.PropertiesCount == 0)
 			return;
 
-		Reflectable2& reflectable = *static_cast<Reflectable2*>(pPropPtr);
+		Reflectable& reflectable = *static_cast<Reflectable*>(pPropPtr);
 		const TypeInfo* objTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(reflectable.GetReflectableClassID());
 
 		const TypeInfo* deserializedTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(header.ReflectableID);

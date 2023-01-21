@@ -3,6 +3,19 @@
 
 #include <fstream>
 
+namespace DIRE_NS
+{
+	// This follows a very simple binary serialization process right now. It encodes:
+	// - the reflectable type ID
+	// - the typename string
+	struct ExportedTypeInfoData
+	{
+		ReflectableID	ReflectableID;
+		DIRE_STRING		TypeName;
+	};
+
+}
+
 const DIRE_NS::TypeInfo * DIRE_NS::TypeInfoDatabase::GetTypeInfo(ReflectableID classID) const
 {
 	// TypeInfos IDs are supposed to match their position in the vector, but not always because of possible binary import/exports.
@@ -28,7 +41,7 @@ DIRE_NS::TypeInfo* DIRE_NS::TypeInfoDatabase::EditTypeInfo(ReflectableID classID
 	return const_cast<TypeInfo*>(typeInfo);
 }
 
-DIRE_NS::Reflectable2* DIRE_NS::TypeInfoDatabase::TryInstantiate(ReflectableID pClassID, std::any const& pAnyParameterPack) const
+DIRE_NS::Reflectable* DIRE_NS::TypeInfoDatabase::TryInstantiate(ReflectableID pClassID, std::any const& pAnyParameterPack) const
 {
 	ReflectableFactory::InstantiateFunction anInstantiateFunc = myInstantiateFactory.GetInstantiator(pClassID);
 	if (anInstantiateFunc == nullptr)
@@ -36,7 +49,7 @@ DIRE_NS::Reflectable2* DIRE_NS::TypeInfoDatabase::TryInstantiate(ReflectableID p
 		return nullptr;
 	}
 
-	Reflectable2* newInstance = anInstantiateFunc(pAnyParameterPack);
+	Reflectable* newInstance = anInstantiateFunc(pAnyParameterPack);
 	return newInstance;
 }
 

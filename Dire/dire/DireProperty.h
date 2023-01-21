@@ -1,7 +1,6 @@
 #pragma once
 
 #include "DireTypeInfo.h"
-#include "DireEnumDataStructureHandler.h"
 #include "DirePropertyMetadata.h"
 
 namespace DIRE_NS
@@ -54,10 +53,10 @@ namespace DIRE_NS
 
 
 	template <typename TOwner, typename TProp, typename MetadataType>
-	class ReflectProperty3 final : public PropertyTypeInfo
+	class TypedProperty final : public PropertyTypeInfo
 	{
 	public:
-		ReflectProperty3(const char* pName, std::ptrdiff_t pOffset) :
+		TypedProperty(const char* pName, std::ptrdiff_t pOffset) :
 			PropertyTypeInfo(pName, pOffset, sizeof(TProp))
 		{
 			TypeInfo& typeInfo = TOwner::EditTypeInfo();
@@ -78,7 +77,7 @@ namespace DIRE_NS
 			return MetadataType::template HasAttribute<T>();
 		}
 
-#if DIRE_USE_SERIALIZATION
+#ifdef DIRE_SERIALIZATION_ENABLED
 		virtual void	SerializeAttributes(class ISerializer& pSerializer) const override
 		{
 			MetadataType::Serialize(pSerializer);
@@ -116,7 +115,7 @@ namespace DIRE_NS
 		} \
     }; \
 	DIRE_NS::GetParenthesizedType<void  DIRE_LPAREN DIRE_UNPAREN(type) DIRE_RPAREN>::Type name{ std::make_from_tuple< DIRE_UNPAREN(type) >(name##_tag::ParamExtractor::CtorParameters(std::make_tuple(__VA_ARGS__))) };\
-	inline static DIRE_NS::ReflectProperty3<Self, DIRE_UNPAREN(type), name##_tag::ParamExtractor::MetadataType> name##_TYPEINFO_PROPERTY{DIRE_STRINGIZE(name), name##_tag::Offset() };
+	inline static DIRE_NS::TypedProperty<Self, DIRE_UNPAREN(type), name##_tag::ParamExtractor::MetadataType> name##_TYPEINFO_PROPERTY{DIRE_STRINGIZE(name), name##_tag::Offset() };
 
 #define DIRE_ARRAY_PROPERTY(type, name, size, ...) \
 	struct name##_tag\
@@ -129,4 +128,4 @@ namespace DIRE_NS
 		} \
 	}; \
 	DIRE_NS::GetParenthesizedType<void DIRE_LPAREN DIRE_UNPAREN(type) DIRE_RPAREN>::Type name##size{ std::make_from_tuple< DIRE_UNPAREN(type) >(name##_tag::ParamExtractor::CtorParameters(std::make_tuple(__VA_ARGS__))) }; \
-	inline static DIRE_NS::ReflectProperty3<Self, DIRE_UNPAREN(type) ## size, name##_tag::ParamExtractor::MetadataType> name##_TYPEINFO_PROPERTY{ DIRE_STRINGIZE(name), name##_tag::Offset()};
+	inline static DIRE_NS::TypedProperty<Self, DIRE_UNPAREN(type) ## size, name##_tag::ParamExtractor::MetadataType> name##_TYPEINFO_PROPERTY{ DIRE_STRINGIZE(name), name##_tag::Offset()};

@@ -14,8 +14,9 @@ namespace DIRE_NS
 	struct TypedArrayDataStructureHandler
 	{};
 
-	struct IArrayDataStructureHandler
+	class IArrayDataStructureHandler
 	{
+	public:
 		virtual ~IArrayDataStructureHandler() = default;
 
 		virtual const void*				Read(const void* pArray, size_t pIndex) const = 0;
@@ -37,7 +38,7 @@ namespace DIRE_NS
 		template <typename ElementValueType>
 		static ReflectableID			GetElementReflectableID()
 		{
-			if constexpr (std::is_base_of_v<Reflectable2, ElementValueType>)
+			if constexpr (std::is_base_of_v<Reflectable, ElementValueType>)
 			{
 				return ElementValueType::GetTypeInfo().GetID();
 			}
@@ -70,13 +71,14 @@ namespace DIRE_NS
 
 	// Base class for reflectable properties that have brackets operator to be able to make operations on the underlying array
 	template <typename T>
-	struct TypedArrayDataStructureHandler<T,
+	class TypedArrayDataStructureHandler<T,
 		typename std::enable_if_t<HasArraySemantics_v<T> && !std::is_array_v<T>>> final : public AbstractArrayDataStructureHandler
 	{
 		using RawElementType = decltype(std::declval<T>()[0]);
 		// Decaying removes the references and fixes the compile error "pointer to reference is illegal"
 		using ElementValueType = std::decay_t<RawElementType>;
 
+	public:
 		TypedArrayDataStructureHandler() = default;
 
 		static_assert(has_ArrayBrackets_v<T>
@@ -187,14 +189,16 @@ namespace DIRE_NS
 
 	// Base class for reflectable properties that are C-arrays to be able to make operations on the underlying array
 	template <typename T>
-	struct TypedArrayDataStructureHandler<T,
-		typename std::enable_if_t<std::is_array_v<T>>> final : AbstractArrayDataStructureHandler
+	class TypedArrayDataStructureHandler<T,
+		typename std::enable_if_t<std::is_array_v<T>>> final : public AbstractArrayDataStructureHandler
 	{
 		using RawElementType = decltype(std::declval<T>()[0]);
 		// remove_reference_t removes the references and fixes the compile error "pointer to reference is illegal"
 		using ElementValueType = std::remove_reference_t<RawElementType>;
 
 		inline static const size_t ARRAY_SIZE = std::extent_v<T>;
+
+	public:
 
 		TypedArrayDataStructureHandler() = default;
 

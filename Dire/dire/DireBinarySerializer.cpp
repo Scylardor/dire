@@ -1,5 +1,7 @@
-#if DIRE_USE_SERIALIZATION && DIRE_USE_BINARY_SERIALIZATION
 #include "DireBinarySerializer.h"
+
+#ifdef DIRE_COMPILE_BINARY_SERIALIZATION
+
 #include "BinaryHeaders.h"
 #include "DireAssert.h"
 
@@ -13,12 +15,11 @@ case Type::TypeEnum:\
 
 namespace DIRE_NS
 {
-	ISerializer::Result BinaryReflectorSerializer::Serialize(const Reflectable2 & serializedObject)
+	ISerializer::Result BinaryReflectorSerializer::Serialize(const Reflectable & serializedObject)
 	{
 		// write the header last because we don't know in advance the total number of props
 		auto objectHandle = WriteAsBytes<BinarySerializationHeaders::Object>(serializedObject.GetReflectableClassID());
 
-		// Account for the vtable pointer offset in case our type is polymorphic (aka virtual)
 		const std::byte * reflectableAddr = reinterpret_cast<const std::byte *>(&serializedObject);
 
 		TypeInfoDatabase::GetSingleton().GetTypeInfo(serializedObject.GetReflectableClassID())->ForEachPropertyInHierarchy([this, &objectHandle, reflectableAddr](const PropertyTypeInfo & pProperty)
@@ -100,7 +101,7 @@ namespace DIRE_NS
 		}
 	}
 
-	void BinaryReflectorSerializer::SerializeMapValue(const void * pPropPtr, const MapDataStructureHandler * pMapHandler)
+	void BinaryReflectorSerializer::SerializeMapValue(const void * pPropPtr, const IMapDataStructureHandler * pMapHandler)
 	{
 		if (pPropPtr == nullptr || pMapHandler == nullptr)
 			return;
@@ -112,7 +113,7 @@ namespace DIRE_NS
 		const size_t valueSize = pMapHandler->SizeofValue();
 		WriteAsBytes<BinarySerializationHeaders::Map>(keyType, keySize, valueType, valueSize, mapSize);
 
-		pMapHandler->SerializeForEachPair(pPropPtr, this, [](void* pSerializer, const void* pKey, const void* pVal, MapDataStructureHandler const& pMapHandler,
+		pMapHandler->SerializeForEachPair(pPropPtr, this, [](void* pSerializer, const void* pKey, const void* pVal, IMapDataStructureHandler const& pMapHandler,
 			DataStructureHandler const& pKeyHandler, DataStructureHandler const& pValueHandler)
 		{
 			auto* myself = static_cast<BinaryReflectorSerializer*>(pSerializer);
@@ -127,7 +128,7 @@ namespace DIRE_NS
 
 	void BinaryReflectorSerializer::SerializeCompoundValue(const void * pPropPtr)
 	{
-		auto* reflectableProp = static_cast<const Reflectable2 *>(pPropPtr);
+		auto* reflectableProp = static_cast<const Reflectable *>(pPropPtr);
 		const TypeInfo * compTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(reflectableProp->GetReflectableClassID());
 		DIRE_ASSERT(compTypeInfo != nullptr);
 

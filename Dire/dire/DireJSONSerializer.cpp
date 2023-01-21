@@ -1,6 +1,7 @@
-#if DIRE_USE_SERIALIZATION && DIRE_USE_JSON_SERIALIZATION
 
 #include "DireJSONSerializer.h"
+
+#ifdef DIRE_COMPILE_JSON_SERIALIZATION
 
 #include "DireEnumDataStructureHandler.h"
 #include "DireTypeInfo.h"
@@ -16,7 +17,7 @@ case Type::TypeEnum:\
 	break;
 
 
-	ISerializer::Result RapidJsonReflectorSerializer::Serialize(const Reflectable2& serializedObject)
+	ISerializer::Result RapidJsonReflectorSerializer::Serialize(const Reflectable& serializedObject)
 	{
 		myBuffer.Clear(); // to clean any previously written information
 		myJsonWriter.Reset(myBuffer); // to wipe the root of a previously serialized object
@@ -50,13 +51,13 @@ case Type::TypeEnum:\
 		myJsonWriter.EndArray();
 	}
 
-	void RapidJsonReflectorSerializer::SerializeMapValue(const void * pPropPtr, const MapDataStructureHandler * pMapHandler)
+	void RapidJsonReflectorSerializer::SerializeMapValue(const void * pPropPtr, const IMapDataStructureHandler * pMapHandler)
 	{
 		myJsonWriter.StartObject();
 
 		if (pPropPtr != nullptr && pMapHandler != nullptr)
 		{
-			pMapHandler->SerializeForEachPair(pPropPtr, this, [](void* pSerializer, const void* pKey, const void* pVal, const MapDataStructureHandler & pMapHandler,
+			pMapHandler->SerializeForEachPair(pPropPtr, this, [](void* pSerializer, const void* pKey, const void* pVal, const IMapDataStructureHandler & pMapHandler,
 				const DataStructureHandler & /*pKeyHandler*/, const DataStructureHandler & pValueHandler)
 				{
 					auto* myself = static_cast<RapidJsonReflectorSerializer*>(pSerializer);
@@ -75,11 +76,11 @@ case Type::TypeEnum:\
 	void RapidJsonReflectorSerializer::SerializeCompoundValue(const void * pPropPtr)
 	{
 		DIRE_ASSERT(pPropPtr != nullptr);
-		auto* reflectableProp = static_cast<const Reflectable2 *>(pPropPtr);
+		auto* reflectableProp = static_cast<const Reflectable *>(pPropPtr);
 		SerializeReflectable(*reflectableProp);
 	}
 
-	void RapidJsonReflectorSerializer::SerializeReflectable(const Reflectable2& pReflectable)
+	void RapidJsonReflectorSerializer::SerializeReflectable(const Reflectable& pReflectable)
 	{
 		const TypeInfo* typeInfo = pReflectable.GetReflectableTypeInfo();
 

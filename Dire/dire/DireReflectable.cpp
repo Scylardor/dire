@@ -4,7 +4,7 @@
 
 namespace DIRE_NS
 {
-	const Reflectable2::GetPropertyResult Reflectable2::GetPropertyImpl(DIRE_STRING_VIEW pFullPath) const
+	const Reflectable::GetPropertyResult Reflectable::GetPropertyImpl(DIRE_STRING_VIEW pFullPath) const
 	{
 		const TypeInfo* thisTypeInfo = GetReflectableTypeInfo();
 
@@ -73,7 +73,7 @@ namespace DIRE_NS
 		return {};
 	}
 
-	[[nodiscard]] bool Reflectable2::EraseProperty(DIRE_STRING_VIEW pName)
+	[[nodiscard]] bool Reflectable::EraseProperty(DIRE_STRING_VIEW pName)
 	{
 		// if we're trying to erase from an array or a map, search for the array or map property first.
 		if (pName.back() == ']')
@@ -127,7 +127,7 @@ namespace DIRE_NS
 		return false;
 	}
 
-	Reflectable2::GetPropertyResult Reflectable2::RecurseFindArrayProperty(IArrayDataStructureHandler const* pArrayHandler,
+	Reflectable::GetPropertyResult Reflectable::RecurseFindArrayProperty(IArrayDataStructureHandler const* pArrayHandler,
 		DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath,
 		int pArrayIdx, std::byte const* pPropPtr) const
 	{
@@ -210,7 +210,7 @@ namespace DIRE_NS
 		return {}; // Never supposed to arrive here!
 	}
 
-	Reflectable2::GetPropertyResult Reflectable2::RecurseArrayMapProperty(const PropertyTypeInfo * pProperty, const std::byte * pPropPtr,
+	Reflectable::GetPropertyResult Reflectable::RecurseArrayMapProperty(const PropertyTypeInfo * pProperty, const std::byte * pPropPtr,
 		DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey) const
 	{
 		// Find out the type of handler we are interested in
@@ -253,7 +253,7 @@ namespace DIRE_NS
 			if (nextDelimiterPos == pRemainingPath.npos)
 			{
 				pRemainingPath.remove_prefix(1);
-				Reflectable2 const* reflectable = reinterpret_cast<Reflectable2 const*>(valueAsBytes);
+				Reflectable const* reflectable = reinterpret_cast<Reflectable const*>(valueAsBytes);
 				return reflectable->GetPropertyImpl(pRemainingPath);
 			}
 			if (pRemainingPath[nextDelimiterPos] == '.')
@@ -298,7 +298,7 @@ namespace DIRE_NS
 		return {};
 	}
 
-	Reflectable2::GetPropertyResult Reflectable2::RecurseArrayProperty(const IArrayDataStructureHandler* pArrayHandler, const std::byte* pPropPtr,
+	Reflectable::GetPropertyResult Reflectable::RecurseArrayProperty(const IArrayDataStructureHandler* pArrayHandler, const std::byte* pPropPtr,
 		DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey) const
 	{
 		// Find out the type of handler we are interested in
@@ -332,7 +332,7 @@ namespace DIRE_NS
 			if (nextDelimiterPos == pRemainingPath.npos)
 			{
 				pRemainingPath.remove_prefix(1);
-				Reflectable2 const* reflectable = reinterpret_cast<Reflectable2 const*>(valueAsBytes);
+				Reflectable const* reflectable = reinterpret_cast<Reflectable const*>(valueAsBytes);
 				return reflectable->GetPropertyImpl(pRemainingPath);
 			}
 			if (pRemainingPath[nextDelimiterPos] == '.')
@@ -376,7 +376,7 @@ namespace DIRE_NS
 		return {};
 	}
 
-	Reflectable2::GetPropertyResult Reflectable2::RecurseMapProperty(const MapDataStructureHandler* pMapHandler, const std::byte* pPropPtr,
+	Reflectable::GetPropertyResult Reflectable::RecurseMapProperty(const IMapDataStructureHandler* pMapHandler, const std::byte* pPropPtr,
 		DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey) const
 	{
 		// Find out the type of handler we are interested in
@@ -404,7 +404,7 @@ namespace DIRE_NS
 			if (nextDelimiterPos == pRemainingPath.npos)
 			{
 				pRemainingPath.remove_prefix(1);
-				Reflectable2 const* reflectable = reinterpret_cast<Reflectable2 const*>(valueAsBytes);
+				Reflectable const* reflectable = reinterpret_cast<Reflectable const*>(valueAsBytes);
 				return reflectable->GetPropertyImpl(pRemainingPath);
 			}
 			if (pRemainingPath[nextDelimiterPos] == '.')
@@ -448,7 +448,7 @@ namespace DIRE_NS
 		return {};
 	}
 
-	[[nodiscard]] Reflectable2::GetPropertyResult Reflectable2::GetCompoundProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pFullPath, std::byte const* propertyAddr) const
+	[[nodiscard]] Reflectable::GetPropertyResult Reflectable::GetCompoundProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pFullPath, std::byte const* propertyAddr) const
 	{
 		// First, find our compound property
 		const PropertyTypeInfo * thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
@@ -502,7 +502,7 @@ namespace DIRE_NS
 		return GetCompoundProperty(pTypeInfoOwner, pName, pFullPath, propertyAddr);
 	}
 
-	Reflectable2::GetPropertyResult Reflectable2::GetArrayMapProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey, std::byte const* pPropPtr) const
+	Reflectable::GetPropertyResult Reflectable::GetArrayMapProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey, std::byte const* pPropPtr) const
 	{
 		// First, find our array property
 		const PropertyTypeInfo * thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
@@ -516,7 +516,7 @@ namespace DIRE_NS
 		return RecurseArrayMapProperty(thisProp, pPropPtr, pRemainingPath, pKey);
 	}
 
-	[[nodiscard]] Reflectable2::GetPropertyResult Reflectable2::GetArrayProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const
+	[[nodiscard]] Reflectable::GetPropertyResult Reflectable::GetArrayProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const
 	{
 		// First, find our array property
 		const PropertyTypeInfo * thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
@@ -531,7 +531,7 @@ namespace DIRE_NS
 		return RecurseFindArrayProperty(arrayHandler, pName, pRemainingPath, pArrayIdx, pPropPtr);
 	}
 
-	FunctionInfo const* Reflectable2::GetFunction(DIRE_STRING_VIEW pMemberFuncName) const
+	FunctionInfo const* Reflectable::GetFunction(DIRE_STRING_VIEW pMemberFuncName) const
 	{
 		const TypeInfo * thisTypeInfo = GetReflectableTypeInfo();
 		for (FunctionInfo const& aFuncInfo : thisTypeInfo->GetFunctionList())

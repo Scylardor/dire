@@ -1,6 +1,8 @@
 #pragma once
 
-#if DIRE_USE_SERIALIZATION && DIRE_USE_JSON_SERIALIZATION
+#include "DireDefines.h"
+
+#ifdef DIRE_COMPILE_JSON_SERIALIZATION
 
 # include <rapidjson/rapidjson.h>
 # include <rapidjson/stringbuffer.h>	// wrapper of C stream for prettywriter as output
@@ -11,15 +13,13 @@
 #include "DireTypes.h"
 #include "DireTypeHandlers.h"
 
-
-
 namespace DIRE_NS
 {
 	class RapidJsonReflectorSerializer : public ISerializer
 	{
 	public:
 
-		virtual Result Serialize(const Reflectable2 & serializedObject) override;
+		virtual Result Serialize(const Reflectable & serializedObject) override;
 
 		virtual bool	SerializesMetadata() const override
 		{
@@ -36,13 +36,13 @@ namespace DIRE_NS
 
 		inline void	SerializeArrayValue(const void * pPropPtr, const IArrayDataStructureHandler * pArrayHandler);
 
-		inline void	SerializeMapValue(const void * pPropPtr, const MapDataStructureHandler * pMapHandler);
+		inline void	SerializeMapValue(const void * pPropPtr, const IMapDataStructureHandler * pMapHandler);
 
 		inline void	SerializeCompoundValue(const void * pPropPtr);
 
 	private:
 
-		void	SerializeReflectable(const Reflectable2& pReflectable);
+		void	SerializeReflectable(const Reflectable& pReflectable);
 
 		using StringBuffer = rapidjson::GenericStringBuffer<rapidjson::UTF8<>, DIRE_RAPIDJSON_ALLOCATOR>;
 		using Writer = rapidjson::Writer<StringBuffer>;

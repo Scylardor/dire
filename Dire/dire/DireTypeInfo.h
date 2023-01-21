@@ -1,19 +1,19 @@
 #pragma once
 
+#include "DireDefines.h"
 #include "DireIntrusiveList.h"
 #include "DireString.h"
 #include "DireTypeHandlers.h"
 #include "DireTypes.h"
 
 #include "DireTypeInfoDatabase.h"
-#include "DireReflectableID.h"
 
 #include <any>
 #include <vector>
 
 namespace DIRE_NS
 {
-	class Reflectable2;
+	class Reflectable;
 
 	class PropertyTypeInfo : public IntrusiveListNode<PropertyTypeInfo>
 	{
@@ -29,7 +29,7 @@ namespace DIRE_NS
 			return myDataStructurePropertyHandler.GetArrayHandler();
 		}
 
-		[[nodiscard]] const MapDataStructureHandler* GetMapHandler() const
+		[[nodiscard]] const IMapDataStructureHandler* GetMapHandler() const
 		{
 			return myDataStructurePropertyHandler.GetMapHandler();
 		}
@@ -51,7 +51,7 @@ namespace DIRE_NS
 
 		[[nodiscard]] CopyConstructorPtr	GetCopyConstructorFunction() const { return myCopyCtor; }
 
-#if DIRE_USE_SERIALIZATION
+#ifdef DIRE_SERIALIZATION_ENABLED
 		virtual void	SerializeAttributes(class ISerializer& pSerializer) const = 0;
 
 		struct SerializationState
@@ -91,7 +91,7 @@ namespace DIRE_NS
 		template <typename TProp>
 		void	SetReflectableID()
 		{
-			if constexpr (std::is_base_of_v<Reflectable2, TProp>)
+			if constexpr (std::is_base_of_v<Reflectable, TProp>)
 			{
 				myReflectableID = TProp::GetTypeInfo().GetID();
 			}
@@ -437,9 +437,9 @@ namespace DIRE_NS
 			return ReflectableID;
 		}
 
-		void	CloneHierarchyPropertiesOf(Reflectable2& pNewClone, const Reflectable2& pCloned) const;
+		void	CloneHierarchyPropertiesOf(Reflectable& pNewClone, const Reflectable& pCloned) const;
 
-		void	ClonePropertiesOf(Reflectable2& pNewClone, const Reflectable2& pCloned) const;
+		void	ClonePropertiesOf(Reflectable& pNewClone, const Reflectable& pCloned) const;
 
 		[[nodiscard]] const IntrusiveLinkedList<PropertyTypeInfo>& GetPropertyList() const
 		{
@@ -472,16 +472,16 @@ namespace DIRE_NS
 		TypedTypeInfo(char const* pTypename) :
 			TypeInfo(pTypename)
 		{
-			if constexpr (std::is_base_of_v<Reflectable2, T>)
+			if constexpr (std::is_base_of_v<Reflectable, T>)
 			{
 				RecursiveRegisterParentClasses <typename T::Super>();
 			}
 
 			if constexpr (UseDefaultCtorForInstantiate && std::is_default_constructible_v<T>)
 			{
-				static_assert(std::is_base_of_v<Reflectable2, T>, "This class is only supposed to be used as a member variable of a Reflectable-derived class.");
+				static_assert(std::is_base_of_v<Reflectable, T>, "This class is only supposed to be used as a member variable of a Reflectable-derived class.");
 				TypeInfoDatabase::EditSingleton().RegisterInstantiateFunction(T::GetTypeInfo().GetID(),
-					[](std::any const& pParams) -> Reflectable2*
+					[](std::any const& pParams) -> Reflectable*
 					{
 						if (pParams.has_value()) // we've been sent parameters but this is default construction! Error
 							return nullptr;
@@ -496,7 +496,7 @@ namespace DIRE_NS
 		template <typename TParent>
 		void	RecursiveRegisterParentClasses()
 		{
-			if constexpr (!std::is_same_v<TParent, Reflectable2>)
+			if constexpr (!std::is_same_v<TParent, Reflectable>)
 			{
 				TypeInfo& parentTypeInfo = TParent::EditTypeInfo();
 				parentTypeInfo.AddChildClass(this);

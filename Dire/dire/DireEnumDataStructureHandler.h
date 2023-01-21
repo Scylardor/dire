@@ -4,8 +4,9 @@
 
 namespace DIRE_NS
 {
-	struct IEnumDataStructureHandler
+	class IEnumDataStructureHandler
 	{
+	public:
 		virtual const char*		EnumToString(const void*) const = 0;
 		virtual void			SetFromString(const char*, void*) const = 0;
 		virtual Type::Values	EnumMetaType() const = 0;
@@ -14,8 +15,9 @@ namespace DIRE_NS
 	};
 
 	template <class T>
-	struct TypedEnumDataStructureHandler final : IEnumDataStructureHandler
+	class TypedEnumDataStructureHandler final : public IEnumDataStructureHandler
 	{
+	public:
 		virtual const char* EnumToString(const void* pVal) const override
 		{
 			return T::GetStringFromSafeEnum(*(const typename T::Values*)pVal);

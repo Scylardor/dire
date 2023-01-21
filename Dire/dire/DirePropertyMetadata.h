@@ -1,6 +1,6 @@
 #pragma once
 
-#if DIRE_USE_SERIALIZATION
+#ifdef DIRE_SERIALIZATION_ENABLED
 # include "DireSerialization.h"
 #endif
 
@@ -44,7 +44,7 @@ namespace DIRE_NS
 			return sizeof...(Ts);
 		}
 
-#if DIRE_USE_SERIALIZATION
+#ifdef DIRE_SERIALIZATION_ENABLED
 		template <typename T>
 		static void	SerializeAttribute(class ISerializer& pSerializer)
 		{
@@ -72,21 +72,21 @@ namespace DIRE_NS
 
 	struct Serializable : IMetadataAttribute
 	{
-#if DIRE_USE_SERIALIZATION
+#ifdef DIRE_SERIALIZATION_ENABLED
 		static void	Serialize(ISerializer&) {}
 #endif
 	};
 
 	struct NotSerializable : IMetadataAttribute
 	{
-#if DIRE_USE_SERIALIZATION
+#ifdef DIRE_SERIALIZATION_ENABLED
 		static void	Serialize(ISerializer&) {}
 #endif
 	};
 
 	struct Transient : IMetadataAttribute
 	{
-#if DIRE_USE_SERIALIZATION
+#ifdef DIRE_SERIALIZATION_ENABLED
 		static void	Serialize(ISerializer& pSerializer)
 		{
 			pSerializer.SerializeValuesForObject("Transient", [](ISerializer& /*pSerializer*/){}); // nothing to do for a "boolean" attribute
@@ -120,7 +120,7 @@ namespace DIRE_NS
 	template<FixedString Str>
 	struct DisplayName : IMetadataAttribute
 	{
-# if DIRE_USE_SERIALIZATION
+# if DIRE_SERIALIZATION_ENABLED
 		static void	Serialize(ISerializer& pSerializer)
 		{
 			pSerializer.SerializeValuesForObject("DisplayName", [](ISerializer& pSerializer)
@@ -140,7 +140,7 @@ namespace DIRE_NS
 	{
 		static_assert(Min <= Max, "Min and Max values are inverted!");
 
-# if DIRE_USE_SERIALIZATION
+# if DIRE_SERIALIZATION_ENABLED
 		static void	Serialize(ISerializer& pSerializer)
 		{
 			pSerializer.SerializeValuesForObject("FValueRange", [](ISerializer& pSerializer)
@@ -161,7 +161,7 @@ namespace DIRE_NS
 	{
 		static_assert(Min <= Max, "Min and Max values are inverted!");
 
-#if DIRE_USE_SERIALIZATION
+#ifdef DIRE_SERIALIZATION_ENABLED
 		static void	Serialize(ISerializer& pSerializer)
 		{
 			pSerializer.SerializeValuesForObject("IValueRange", [](ISerializer& pSerializer)

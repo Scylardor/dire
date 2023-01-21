@@ -186,7 +186,7 @@ namespace DIRE_NS
 	class EnumName : public DIRE_NS::Enum\
 	{ \
 		private:\
-		enum LocalCounter_t { COUNTER_BASE = __COUNTER__, OFFSET = (COUNTER_BASE == 0 ? 0 : 1) };\
+		enum LocalCounter_t { COUNTER_BASE = __COUNTER__, OFFSET = (1) };\
 	public:\
 		using Underlying = UnderlyingType; \
 		enum Values : UnderlyingType\

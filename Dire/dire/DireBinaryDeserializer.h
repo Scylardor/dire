@@ -1,5 +1,8 @@
 #pragma once
-#if DIRE_USE_SERIALIZATION && DIRE_USE_BINARY_SERIALIZATION
+
+#include "DireDefines.h"
+
+#ifdef DIRE_COMPILE_BINARY_SERIALIZATION
 #include "DireSerialization.h"
 #include "DireTypes.h"
 
@@ -7,13 +10,13 @@
 namespace DIRE_NS
 {
 	class DataStructureHandler;
-	struct MapDataStructureHandler;
-	struct IArrayDataStructureHandler;
+	class IMapDataStructureHandler;
+	class IArrayDataStructureHandler;
 
 	class BinaryReflectorDeserializer : public IDeserializer
 	{
 	public:
-		virtual Result	DeserializeInto(char const* pSerialized, Reflectable2& pDeserializedObject) override;
+		virtual Result	DeserializeInto(char const* pSerialized, Reflectable& pDeserializedObject) override;
 
 	private:
 
@@ -34,7 +37,7 @@ namespace DIRE_NS
 
 		void	DeserializeArrayValue(void* pPropPtr, const IArrayDataStructureHandler * pArrayHandler) const;
 
-		void	DeserializeMapValue(void* pPropPtr, const MapDataStructureHandler * pMapHandler) const;
+		void	DeserializeMapValue(void* pPropPtr, const IMapDataStructureHandler * pMapHandler) const;
 
 		void	DeserializeCompoundValue(void* pPropPtr) const;
 
