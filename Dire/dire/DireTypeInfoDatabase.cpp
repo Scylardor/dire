@@ -155,7 +155,7 @@ bool	DIRE_NS::TypeInfoDatabase::ImportFromBinaryFile(DIRE_STRING_VIEW pReadSetti
 
 	const unsigned& nbTypeInfos = *reinterpret_cast<unsigned*>(readBuffer.data() + offset);
 	offset += sizeof(nbTypeInfos);
-	std::vector<ExportedTypeInfoData> theReadData(nbTypeInfos);
+	std::vector<ExportedTypeInfoData, DIRE_ALLOCATOR<ExportedTypeInfoData>> theReadData(nbTypeInfos);
 
 	unsigned iTypeInfo = 0;
 	ReflectableID maxTypeInfoID = 0; // will be useful to assign new IDs to new types not in the database

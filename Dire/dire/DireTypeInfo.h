@@ -163,6 +163,8 @@ namespace DIRE_NS
 	class FunctionInfo : public IntrusiveListNode<FunctionInfo>, IFunctionTypeInfo
 	{
 	public:
+		using ParameterList = std::vector<Type, DIRE_ALLOCATOR<Type>>;
+
 		FunctionInfo(const char* pName, Type pReturnType) :
 			Name(pName), ReturnType(pReturnType)
 		{}
@@ -195,7 +197,7 @@ namespace DIRE_NS
 
 		const DIRE_STRING& GetName() const { return Name; }
 		Type	GetReturnType() const { return ReturnType; }
-		const std::vector<Type>& GetParametersTypes() const { return Parameters; }
+		const ParameterList& GetParametersTypes() const { return Parameters; }
 
 	protected:
 
@@ -206,9 +208,9 @@ namespace DIRE_NS
 
 	private:
 
-		DIRE_STRING	Name;
-		Type		ReturnType{ Type::Void };
-		std::vector<Type> Parameters;
+		DIRE_STRING		Name;
+		Type			ReturnType{ Type::Void };
+		ParameterList	Parameters;
 
 	};
 
@@ -286,6 +288,7 @@ namespace DIRE_NS
 	class TypeInfo
 	{
 	public:
+		using TypeInfoList = std::vector<TypeInfo*, DIRE_ALLOCATOR<TypeInfo*>>;
 
 		TypeInfo(const char* pTypename) :
 			ReflectableID(TypeInfoDatabase::EditSingleton().RegisterTypeInfo(this)),
@@ -451,9 +454,14 @@ namespace DIRE_NS
 			return MemberFunctions;
 		}
 
-		[[nodiscard]] const std::vector<TypeInfo*>& GetParentClasses() const
+		[[nodiscard]] const TypeInfoList& GetParentClasses() const
 		{
 			return ParentClasses;
+		}
+
+		[[nodiscard]] const TypeInfoList& GetChildrenClasses() const
+		{
+			return ChildrenClasses;
 		}
 
 	protected:
@@ -461,8 +469,8 @@ namespace DIRE_NS
 		DIRE_STRING_VIEW						TypeName;
 		IntrusiveLinkedList<PropertyTypeInfo>	Properties;
 		IntrusiveLinkedList<FunctionInfo>		MemberFunctions;
-		std::vector<TypeInfo*>	ParentClasses;
-		std::vector<TypeInfo*>	ChildrenClasses;
+		TypeInfoList	ParentClasses;
+		TypeInfoList	ChildrenClasses;
 	};
 
 	template <typename T, bool UseDefaultCtorForInstantiate>

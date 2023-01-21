@@ -184,10 +184,13 @@ TEST_CASE("JSON Serialize enumerations", "[Serialization]")
 	enums.allowedQueens = { {Queens::Judith, true}, {Queens::Rachel, false} };
 	enums.pointsPerJack = { {10, Jacks::Ogier}, {20, Jacks::Lahire}, {30, Jacks::Hector}, {40, Jacks::Lancelot} };
 
-	auto str = Queens::GetStringFromEnum(Queens::Judith);
-	auto bitset = DIRE_NS::FindFirstSetBit((int)Queens::Judith);
-	auto lancelot = Jacks::GetStringFromSafeEnum(Jacks::Lancelot);
-	auto lancelo2t = BitEnum::GetStringFromSafeEnum(BitEnum::one);
+	REQUIRE(Queens::GetStringFromEnum(Queens::Judith) == "Judith");
+	REQUIRE(Jacks::GetStringFromEnum(Jacks::Lancelot) == "Lancelot");
+	REQUIRE(BitEnum::GetStringFromEnum(BitEnum::one) == "one");
+	REQUIRE((int)Queens::Judith == 1);
+	REQUIRE((int)Jacks::Lancelot == 8);
+	REQUIRE((int)BitEnum::eight == 8);
+
 	serialized = serializer.Serialize(enums).AsString();
 	REQUIRE(serialized ==
 		"{\"aTestFace\":1,\"bestKing\":\"Alexandre\",\"worstKings\":[\"Philippe\",\"Charles\"],\"playableKings\":[\"Cesar\",\"Alexandre\"],\"allowedQueens\":{\"Judith\":true,\"Rachel\":false},\"pointsPerJack\":{\"10\":\"Ogier\",\"20\":\"Lahire\",\"30\":\"Hector\",\"40\":\"Lancelot\"}}"
@@ -375,6 +378,13 @@ TEST_CASE("Binary Serialize enumerations", "[Serialization]")
 	enums.allowedQueens = { {Queens::Judith, true}, {Queens::Rachel, false} };
 	enums.pointsPerJack = { {10, Jacks::Ogier}, {20, Jacks::Lahire}, {30, Jacks::Hector}, {40, Jacks::Lancelot} };
 	binarized = serializer.Serialize(enums);
+
+	REQUIRE(Queens::GetStringFromEnum(Queens::Judith) == "Judith");
+	REQUIRE(Jacks::GetStringFromEnum(Jacks::Lancelot) == "Lancelot");
+	REQUIRE(BitEnum::GetStringFromEnum(BitEnum::one) == "one");
+	REQUIRE((int)Queens::Judith == 1);
+	REQUIRE((int)Jacks::Lancelot == 8);
+	REQUIRE((int)BitEnum::eight == 8);
 
 	REQUIRE(memcmp(binarized.data(),
 		"\x13\x00\x00\x00\x06\x00\x00\x00\x0d\x00\x00\x00\x08\x00\x00\x00\x01\x0b\x00\x00\x00\x0c\x00\x00\x00\x01\x00\x00\x00\x09\x00\x00\x00\x10\x00\x00\x00\x0b\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00\x09\x00\x00\x00\x18\x00\x00\x00\x0b\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x01\x00\x00\x00\x0a\x00\x00\x00\x38\x00\x00\x00\x0b\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x01\x00\x01\x02\x00\x00\x0a\x00\x00\x00\x50\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x0b\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x0a\x00\x00\x00\x01\x00\x14\x00\x00\x00\x02\x00\x1e\x00\x00\x00\x04\x00\x28\x00\x00\x00\x08\x00"

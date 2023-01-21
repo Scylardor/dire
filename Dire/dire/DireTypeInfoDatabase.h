@@ -48,7 +48,11 @@ namespace DIRE_NS
 		}
 
 	private:
-		std::unordered_map<ReflectableID, InstantiateFunction>	myInstantiators;
+		using InstantiatorsHashTable =
+			std::unordered_map<ReflectableID, InstantiateFunction, std::hash<ReflectableID>, std::equal_to<ReflectableID>,
+			DIRE_ALLOCATOR<std::pair<const ReflectableID, InstantiateFunction>>>;
+
+		InstantiatorsHashTable	myInstantiators;
 	};
 
 
@@ -104,7 +108,7 @@ namespace DIRE_NS
 			return (ReflectableID)GetTypeInfoCount() - 1;
 		}
 
-		std::vector<TypeInfo*>	myReflectableTypeInfos;
+		std::vector<TypeInfo*, DIRE_ALLOCATOR<TypeInfo*>>	myReflectableTypeInfos;
 		ReflectableFactory		myInstantiateFactory;
 	};
 }

@@ -20,7 +20,7 @@ namespace DIRE_NS
 		struct Result
 		{
 			static_assert(sizeof(std::byte) == sizeof(char) == 1);
-			using ByteVector = std::vector<std::byte>;
+			using ByteVector = std::vector<std::byte, DIRE_ALLOCATOR<std::byte>>;
 
 			Result() = default;
 
