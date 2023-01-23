@@ -5,6 +5,19 @@
 
 namespace DIRE_NS
 {
+	template <>
+	Dire_EXPORT TypeInfoDatabase& Singleton<TypeInfoDatabase>::EditSingleton()
+	{
+		static TypeInfoDatabase theSingleton; // Thread-safe since C++11!
+		return theSingleton;
+	}
+
+	template <>
+	Dire_EXPORT const TypeInfoDatabase& Singleton<TypeInfoDatabase>::GetSingleton()
+	{
+		return EditSingleton();
+	}
+
 	// This follows a very simple binary serialization process right now. It encodes:
 	// - the reflectable type ID
 	// - the typename string

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DireTypes.h"
+#include "dire/Types/DireTypes.h"
 
 namespace DIRE_NS
 {

@@ -1,5 +1,5 @@
 #include "DireTypeInfo.h"
-#include "DireReflectable.h"
+#include "dire/DireReflectable.h"
 #include <cstddef> // byte
 
 void DIRE_NS::TypeInfo::CloneHierarchyPropertiesOf(Reflectable& pNewClone, const Reflectable& pCloned) const

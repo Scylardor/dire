@@ -3,8 +3,7 @@
 #include "DireDefines.h"
 #ifdef DIRE_COMPILE_BINARY_SERIALIZATION
 #include "DireSerialization.h"
-#include "DireTypes.h"
-
+#include "dire/Types/DireTypes.h"
 
 namespace DIRE_NS
 {
@@ -12,10 +11,10 @@ namespace DIRE_NS
 	class IMapDataStructureHandler;
 	class IArrayDataStructureHandler;
 
-	class Dire_EXPORT BinaryReflectorDeserializer : public IDeserializer
+	class BinaryReflectorDeserializer : public IDeserializer
 	{
 	public:
-		virtual Result	DeserializeInto(char const* pSerialized, Reflectable& pDeserializedObject) override;
+		Dire_EXPORT virtual Result	DeserializeInto(char const* pSerialized, Reflectable& pDeserializedObject) override;
 
 	private:
 

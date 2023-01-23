@@ -1,8 +1,8 @@
 #pragma once
 
-#include "DireEnums.h"
-#include "DireMacros.h"
-#include "DireTypeTraits.h"
+#include "dire/DireEnums.h"
+#include "dire/Utils/DireMacros.h"
+#include "dire/Utils/DireTypeTraits.h"
 
 namespace DIRE_NS
 {

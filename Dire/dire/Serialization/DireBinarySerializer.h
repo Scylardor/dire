@@ -3,9 +3,9 @@
 #include "DireDefines.h"
 #ifdef DIRE_COMPILE_BINARY_SERIALIZATION
 
-#include "DireTypes.h"
+#include "dire/Types/DireTypes.h"
 #include "DireSerialization.h"
-#include "DireReflectable.h"
+#include "dire/DireReflectable.h"
 
 #include <string.h> // memcpy
 

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "DireTypes.h"
-#include "DireString.h"
-#include "DireTypeTraits.h"
-#include "DireReflectableID.h"
+#include "dire/Types/DireTypes.h"
+#include "dire/Utils/DireString.h"
+#include "dire/Utils/DireTypeTraits.h"
+#include "dire/DireReflectableID.h"
 
 namespace DIRE_NS
 {

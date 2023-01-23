@@ -3,12 +3,10 @@
 
 #ifdef DIRE_COMPILE_JSON_SERIALIZATION
 
-#include "DireTypeInfo.h"
-#include "DireTypeInfoDatabase.h"
-#include "DireReflectable.h"
-#include "DireTypeHandlers.h"
-
-#include "DireAssert.h"
+#include "dire/Types/DireTypeInfo.h"
+#include "dire/Types/DireTypeInfoDatabase.h"
+#include "dire/DireReflectable.h"
+#include "dire/Handlers/DireTypeHandlers.h"
 
 #include <rapidjson/error/en.h>
 #include <rapidjson/document.h>

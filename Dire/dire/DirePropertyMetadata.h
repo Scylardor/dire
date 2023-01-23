@@ -1,7 +1,7 @@
 #pragma once
 
 #ifdef DIRE_SERIALIZATION_ENABLED
-# include "DireSerialization.h"
+# include "Serialization/DireSerialization.h"
 #endif
 
 namespace DIRE_NS

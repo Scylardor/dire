@@ -1,7 +1,7 @@
 
 #include "catch2/catch_test_macros.hpp"
-#include "dire/DireTypeInfo.h"
-#include "Dire/DireTypeInfoDatabase.h"
+#include "dire/Types/DireTypeInfo.h"
+#include "Dire/Types/DireTypeInfoDatabase.h"
 
 #include <iomanip>
 

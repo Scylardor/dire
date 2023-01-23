@@ -1,10 +1,10 @@
 #pragma once
 
 #include "DireDefines.h"
-#include "DireIntrusiveList.h"
-#include "DireString.h"
-#include "DireTypeHandlers.h"
-#include "DireTypes.h"
+#include "dire/Utils/DireIntrusiveList.h"
+#include "dire/Utils/DireString.h"
+#include "dire/Handlers/DireTypeHandlers.h"
+#include "dire/Types/DireTypes.h"
 
 #include "DireTypeInfoDatabase.h"
 

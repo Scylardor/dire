@@ -3,7 +3,7 @@
 #ifdef DIRE_COMPILE_BINARY_SERIALIZATION
 
 #include <cstdint>
-#include "DireTypes.h"
+#include "Dire/Types/DireTypes.h"
 
 namespace DIRE_NS
 {

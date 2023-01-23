@@ -38,8 +38,8 @@ dire_reflectable(struct enumTestType)
 };
 
 #	ifdef DIRE_SERIALIZATION_RAPIDJSON_ENABLED
-#		include "dire/DireJSONSerializer.h"
-#		include "dire/DireJSONDeserializer.h"
+#		include "dire/Serialization/DireJSONSerializer.h"
+#		include "dire/Serialization/DireJSONDeserializer.h"
 
 
 TEST_CASE("JSON simple object", "[Serialization]")
@@ -205,8 +205,8 @@ TEST_CASE("JSON Serialize enumerations", "[Serialization]")
 
 #	ifdef DIRE_SERIALIZATION_BINARY_ENABLED
 
-#  include "dire/DireBinaryDeserializer.h"
-#  include "dire/DireBinarySerializer.h"
+#  include "dire/Serialization/DireBinaryDeserializer.h"
+#  include "dire/Serialization/DireBinarySerializer.h"
 
 /* Utility function to print the output of binary generators */
 auto writeBinaryString2 = [](const std::string& binarized)

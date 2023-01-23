@@ -3,10 +3,9 @@
 
 #ifdef DIRE_COMPILE_JSON_SERIALIZATION
 
-#include "DireEnumDataStructureHandler.h"
-#include "DireTypeInfo.h"
-#include "DireReflectable.h"
-#include "DireAssert.h"
+#include "dire/Handlers/DireEnumDataStructureHandler.h"
+#include "dire/Types/DireTypeInfo.h"
+#include "dire/DireReflectable.h"
 
 namespace DIRE_NS
 {

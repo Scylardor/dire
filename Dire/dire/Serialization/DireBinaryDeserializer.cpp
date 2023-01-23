@@ -1,10 +1,9 @@
 #include "DireBinaryDeserializer.h"
 #ifdef DIRE_COMPILE_BINARY_SERIALIZATION
 
-#include "DireReflectable.h"
-#include "DireTypeInfoDatabase.h"
-#include "BinaryHeaders.h"
-#include "DireAssert.h"
+#include "dire/DireReflectable.h"
+#include "dire/Types/DireTypeInfoDatabase.h"
+#include "DireBinaryHeaders.h"
 
 #define BINARY_DESERIALIZE_VALUE_CASE(TypeEnum) \
 case Type::TypeEnum:\

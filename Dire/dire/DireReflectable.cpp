@@ -1,7 +1,5 @@
 #include "DireReflectable.h"
 
-#include "DireAssert.h"
-
 namespace DIRE_NS
 {
 	const Reflectable::GetPropertyResult Reflectable::GetPropertyImpl(DIRE_STRING_VIEW pFullPath) const

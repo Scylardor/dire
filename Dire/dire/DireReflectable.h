@@ -2,11 +2,10 @@
 #include <any>
 #include <cstddef> // std::byte
 
-#include "DireTypeInfo.h"
-#include "DireMacros.h"
-#include "DireArrayDataStructureHandler.h"
-#include "DireAssert.h"
-#include "DireString.h"
+#include "Types/DireTypeInfo.h"
+#include "Handlers/DireArrayDataStructureHandler.h"
+#include "Utils/DireMacros.h"
+#include "Utils/DireString.h"
 
 namespace DIRE_NS
 {

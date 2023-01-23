@@ -5,7 +5,7 @@ string(TOUPPER ${PROJECT_NAME} UPPER_PROJECT_NAME)
 
 
 project(${PROJECT_NAME}
-  VERSION 1.0.0
+  VERSION 0.1
   LANGUAGES CXX
   # TODO: HOMEPAGE_URL "DIRE URL"
   DESCRIPTION "A library for Dynamically Interpreted Reflection Expressions (DIRE)."
@@ -26,110 +26,94 @@ set(${UPPER_PROJECT_NAME}_NAMESPACE dire CACHE STRING "Namespace the DIRE librar
 set(${UPPER_PROJECT_NAME}_STRING std CACHE STRING "String type the DIRE library should use for standard dynamic string manipulation (std::string by default).")
 set(${UPPER_PROJECT_NAME}_ASSERT assert CACHE STRING "Assert expression Dire should use in case of error")
 set(${UPPER_PROJECT_NAME}_ALLOCATOR std::allocator CACHE STRING "Stateless allocator Dire should use to dynamically allocate memory.")
-set(${UPPER_PROJECT_NAME}_CPP_STANDARD 17 CACHE STRING "Set the standard to compile DIRE with. Input 20 to use C++20 features.")
-set(${UPPER_PROJECT_NAME}_LIBRARY_TYPE SHARED CACHE STRING "Type of library DIRE will compile. Use STATIC for archives (.a or .lib on Windows) or SHARED for dynamic (.so or DLL on Windows).")
+set(${UPPER_PROJECT_NAME}_CPP_STANDARD cxx_std_17 CACHE STRING "Set the standard to compile DIRE with. Use cxx_std_20 to enable C++20 features.")
+option(${UPPER_PROJECT_NAME}_BUILD_SHARED_LIB "Type of library DIRE will compile. Use STATIC for archives (.a or .lib on Windows) or SHARED for dynamic (.so or DLL on Windows)." ON)
 
-set(DIRE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}/${PROJECT_NAME})
+set(DIRE_SOURCE_DIR ${PROJECT_NAME}/${PROJECT_NAME})
 set(DIRE_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME})
+set(DIRE_GENERATED_INCLUDES_DIR generated-includes/Dire)
 
 # Main target creation
 # Set the appropriate lib type (courtesy of https://gitlab.kitware.com/cmake/community/-/wikis/doc/tutorials/BuildingWinDLL)
-add_library(${PROJECT_NAME} ${${UPPER_PROJECT_NAME}_LIBRARY_TYPE}
+set(${PROJECT_NAME}_SOURCES
 	${DIRE_SOURCE_DIR}/Dire.h
-	${DIRE_SOURCE_DIR}/DireMacros.h
-	${DIRE_SOURCE_DIR}/DireTypes.h
-	${DIRE_SOURCE_DIR}/DireTypeTraits.h
-	${DIRE_SOURCE_DIR}/DireIntrusiveList.h
-	${DIRE_SOURCE_DIR}/DireIntrusiveList.inl
-	${DIRE_SOURCE_DIR}/DireTypeInfo.h
-	${DIRE_SOURCE_DIR}/DireTypeInfo.inl
-	${DIRE_SOURCE_DIR}/DireTypeInfo.cpp
-	${DIRE_SOURCE_DIR}/DireTypeHandlers.h
-	${DIRE_SOURCE_DIR}/DireTypeHandlers.inl
-	${DIRE_SOURCE_DIR}/DireArrayDataStructureHandler.h
-	${DIRE_SOURCE_DIR}/DireArrayDataStructureHandler.inl
-	${DIRE_SOURCE_DIR}/DireMapDataStructureHandler.h
-	${DIRE_SOURCE_DIR}/DireMapDataStructureHandler.inl
-	${DIRE_SOURCE_DIR}/DireEnumDataStructureHandler.h
 	${DIRE_SOURCE_DIR}/DireEnums.h
 	${DIRE_SOURCE_DIR}/DireEnums.inl
-	${DIRE_SOURCE_DIR}/DireCRTP.h
 	${DIRE_SOURCE_DIR}/DireReflectable.h
 	${DIRE_SOURCE_DIR}/DireReflectable.cpp
-	${DIRE_SOURCE_DIR}/DireString.h
-	${DIRE_SOURCE_DIR}/DireString.inl
-	${DIRE_SOURCE_DIR}/DireTypeInfoDatabase.h
-	${DIRE_SOURCE_DIR}/DireTypeInfoDatabase.cpp
-	${DIRE_SOURCE_DIR}/DireSingleton.h
 	${DIRE_SOURCE_DIR}/DireProperty.h
 	${DIRE_SOURCE_DIR}/DireProperty.inl
 	${DIRE_SOURCE_DIR}/DirePropertyMetadata.h
 	${DIRE_SOURCE_DIR}/DirePropertyMetadata.inl
 	${DIRE_SOURCE_DIR}/DireSubclass.h
-	${DIRE_SOURCE_DIR}/DireAssert.h
 	${DIRE_SOURCE_DIR}/DireReflectableID.h
 	${DIRE_SOURCE_DIR}/DireDefines.h.in
-	${CMAKE_CURRENT_BINARY_DIR}/DireDefines.h
+	${DIRE_SOURCE_DIR}/Handlers/DireTypeHandlers.h
+	${DIRE_SOURCE_DIR}/Handlers/DireTypeHandlers.inl
+	${DIRE_SOURCE_DIR}/Handlers/DireArrayDataStructureHandler.h
+	${DIRE_SOURCE_DIR}/Handlers/DireArrayDataStructureHandler.inl
+	${DIRE_SOURCE_DIR}/Handlers/DireMapDataStructureHandler.h
+	${DIRE_SOURCE_DIR}/Handlers/DireMapDataStructureHandler.inl
+	${DIRE_SOURCE_DIR}/Handlers/DireEnumDataStructureHandler.h
+	${DIRE_SOURCE_DIR}/Serialization/DireSerialization.h
+	${DIRE_SOURCE_DIR}/Serialization/DireJSONSerializer.h
+	${DIRE_SOURCE_DIR}/Serialization/DireJSONDeserializer.h
+	${DIRE_SOURCE_DIR}/Serialization/DireJSONSerializer.cpp
+	${DIRE_SOURCE_DIR}/Serialization/DireJSONDeserializer.cpp
+	${DIRE_SOURCE_DIR}/Serialization/DireBinarySerializer.h
+	${DIRE_SOURCE_DIR}/Serialization/DireBinaryDeserializer.h
+	${DIRE_SOURCE_DIR}/Serialization/DireBinarySerializer.cpp
+	${DIRE_SOURCE_DIR}/Serialization/DireBinaryDeserializer.cpp
+	${DIRE_SOURCE_DIR}/Serialization/DireBinaryHeaders.h
+	${DIRE_SOURCE_DIR}/Types/DireTypes.h
+	${DIRE_SOURCE_DIR}/Types/DireTypeInfoDatabase.h
+	${DIRE_SOURCE_DIR}/Types/DireTypeInfoDatabase.cpp
+	${DIRE_SOURCE_DIR}/Types/DireTypeInfo.h
+	${DIRE_SOURCE_DIR}/Types/DireTypeInfo.inl
+	${DIRE_SOURCE_DIR}/Types/DireTypeInfo.cpp
+	${DIRE_SOURCE_DIR}/Utils/DireMacros.h
+	${DIRE_SOURCE_DIR}/Utils/DireTypeTraits.h
+	${DIRE_SOURCE_DIR}/Utils/DireSingleton.h
+	${DIRE_SOURCE_DIR}/Utils/DireIntrusiveList.h
+	${DIRE_SOURCE_DIR}/Utils/DireIntrusiveList.inl
+	${DIRE_SOURCE_DIR}/Utils/DireString.h
+	${DIRE_SOURCE_DIR}/Utils/DireString.inl
+	${CMAKE_CURRENT_BINARY_DIR}/${DIRE_GENERATED_INCLUDES_DIR}/DireDefines.h
+	${CMAKE_CURRENT_BINARY_DIR}/${DIRE_GENERATED_INCLUDES_DIR}/Dire_Export.h
 )
+
+# Create the source groups for source tree with root at CMAKE_CURRENT_SOURCE_DIR.
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${${PROJECT_NAME}_SOURCES})
+
+# Decide on the type of library to build
+if (${${UPPER_PROJECT_NAME}_BUILD_SHARED_LIB})
+	set(${UPPER_PROJECT_NAME}_LIBRARY_TYPE SHARED)
+else()
+	set(${UPPER_PROJECT_NAME}_LIBRARY_TYPE STATIC)
+endif()
+
+add_library(${PROJECT_NAME} ${${UPPER_PROJECT_NAME}_LIBRARY_TYPE}
+	${${PROJECT_NAME}_SOURCES}
+)
+# Alias target
+add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
+
+# Target properties
+set_target_properties(${PROJECT_NAME} PROPERTIES
+	DEBUG_POSTFIX _d
+	VERSION ${PROJECT_VERSION}
+	SOVERSION ${PROJECT_VERSION_MAJOR})
+
+# On Windows, set a different name for the import library to not be confused with a static build of the library
+# (both have .lib extension)
+if (CMAKE_IMPORT_LIBRARY_SUFFIX AND ${${UPPER_PROJECT_NAME}_BUILD_SHARED_LIB})
+	SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES ARCHIVE_OUTPUT_NAME ${PROJECT_NAME}_imp)
+endif()
 
 # specify the C++ standard
-set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD ${${UPPER_PROJECT_NAME}_CPP_STANDARD} CMAKE_CXX_STANDARD_REQUIRED TRUE)
+target_compile_features(${PROJECT_NAME} PUBLIC ${${UPPER_PROJECT_NAME}_CPP_STANDARD})
 
-# Dynamic Library Setup
-include(GenerateExportHeader)
-generate_export_header( ${PROJECT_NAME}
-	BASE_NAME ${PROJECT_NAME}
-	EXPORT_MACRO_NAME ${PROJECT_NAME}_EXPORT
-	EXPORT_FILE_NAME ${PROJECT_NAME}_Export.h
-	STATIC_DEFINE ${PROJECT_NAME}_STATIC
-)
-
-set_target_properties(${PROJECT_NAME} PROPERTIES
-    C_VISIBILITY_PRESET			hidden
-    CXX_VISIBILITY_PRESET		hidden
-    VISIBILITY_INLINES_HIDDEN	YES
-)
-#! Dynamic Library Setup
-
-# Conditional Sources
-
-if(${UPPER_PROJECT_NAME}_SERIALIZATION_ENABLED)
-	target_sources(${PROJECT_NAME} PRIVATE
-		${DIRE_SOURCE_DIR}/DireSerialization.h
-	)
-endif()
-if(${UPPER_PROJECT_NAME}_SERIALIZATION_ENABLED AND ${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED)
-	target_sources(${PROJECT_NAME} PRIVATE
-		${DIRE_SOURCE_DIR}/DireJSONSerializer.h
-		${DIRE_SOURCE_DIR}/DireJSONDeserializer.h
-		${DIRE_SOURCE_DIR}/DireJSONSerializer.cpp
-		${DIRE_SOURCE_DIR}/DireJSONDeserializer.cpp
-	)
-	target_compile_definitions(${PROJECT_NAME} PUBLIC DIRE_RAPIDJSON_ALLOCATOR=${${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ALLOCATOR})
-endif()
-if(${UPPER_PROJECT_NAME}_SERIALIZATION_ENABLED AND ${UPPER_PROJECT_NAME}_SERIALIZATION_BINARY_ENABLED)
-	target_sources(${PROJECT_NAME} PRIVATE
-		${DIRE_SOURCE_DIR}/DireBinarySerializer.h
-		${DIRE_SOURCE_DIR}/DireBinaryDeserializer.h
-		${DIRE_SOURCE_DIR}/DireBinarySerializer.cpp
-		${DIRE_SOURCE_DIR}/DireBinaryDeserializer.cpp
-	)
-endif()
-
-target_include_directories(${PROJECT_NAME}
-    PUBLIC
-        $<INSTALL_INTERFACE:${PROJECT_NAME}>
-        $<BUILD_INTERFACE:${DIRE_INCLUDE_DIR}>
-)
-
-# RapidJSON dependency setup
-if(${UPPER_PROJECT_NAME}_SERIALIZATION_ENABLED AND ${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED)
-	include(CMake/Rapidjson.cmake)
-	add_rapidjson_dependency(rapidjson ${${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_VERSION} ${PROJECT_NAME} PUBLIC)
-endif()
-
-
-# Defines
+# Defines (Warning: do this before configure_file or it won't be setup correctly!)
 if(${${UPPER_PROJECT_NAME}_ASSERT} STREQUAL "assert")
 	set(${UPPER_PROJECT_NAME}_USE_STANDARD_ASSERT TRUE)
 endif()
@@ -138,9 +122,88 @@ if(${${UPPER_PROJECT_NAME}_STRING} STREQUAL "std")
 	set(${UPPER_PROJECT_NAME}_USE_STANDARD_STRING TRUE)
 endif()
 
-configure_file(${DIRE_SOURCE_DIR}/DireDefines.h.in DireDefines.h)
+# Generate the final defines file and add include directories so that clients can find it
+configure_file(${DIRE_SOURCE_DIR}/DireDefines.h.in ${DIRE_GENERATED_INCLUDES_DIR}/DireDefines.h)
 
-target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+# Dynamic Library Setup
+include(GenerateExportHeader)
+generate_export_header( ${PROJECT_NAME}
+	BASE_NAME ${PROJECT_NAME}
+	EXPORT_MACRO_NAME ${PROJECT_NAME}_EXPORT
+	EXPORT_FILE_NAME ${CMAKE_CURRENT_BINARY_DIR}/${DIRE_GENERATED_INCLUDES_DIR}/${PROJECT_NAME}_Export.h
+	STATIC_DEFINE ${PROJECT_NAME}_STATIC
+)
+
+# Follow the MSVC convention of "hide symbols by default and explicitly export what we want"
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    C_VISIBILITY_PRESET			hidden
+    CXX_VISIBILITY_PRESET		hidden
+    VISIBILITY_INLINES_HIDDEN	YES
+)
+#! Dynamic Library Setup
+
+# RapidJSON dependency setup
+if(${UPPER_PROJECT_NAME}_SERIALIZATION_ENABLED AND ${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED)
+	include(CMake/Rapidjson.cmake)
+	add_rapidjson_dependency(rapidjson ${${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_VERSION} ${PROJECT_NAME} PUBLIC)
+endif()
+
+# Use a generator expression so that the install interface redirects to the right folder after installation.
+set(BUILD_INCLUDE_DIRS
+	${DIRE_INCLUDE_DIR}
+	${DIRE_GENERATED_INCLUDES_DIR}
+)
+
+target_include_directories(${PROJECT_NAME}
+    PUBLIC
+        $<INSTALL_INTERFACE:include>
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/${DIRE_GENERATED_INCLUDES_DIR};${DIRE_INCLUDE_DIR}>"
+)
+
+include(GNUInstallDirs) # defines variables like CMAKE_INSTALL_LIBDIR, etc.
+set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/Dire)
+
+# Install and packaging commands
+install(TARGETS ${PROJECT_NAME}
+	EXPORT ${PROJECT_NAME}Targets
+	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} # MODULEs (probably unnecessary)
+	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} # Static libraries or Import library on Windows (for DLL)
+	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} # DLL file on Windows
+)
+
+# Version file
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+    ${PROJECT_NAME}ConfigVersion.cmake
+    VERSION ${PROJECT_VERSION} # use the version of the most recent project() seen (not CMAKE_PROJECT_VERSION)
+    COMPATIBILITY AnyNewerVersion
+)
+
+install(EXPORT ${PROJECT_NAME}Targets
+	FILE ${PROJECT_NAME}Targets.cmake
+	NAMESPACE ${PROJECT_NAME}::
+	DESTINATION ${INSTALL_CONFIGDIR}
+)
+
+install(FILES
+	#"${CMAKE_CURRENT_LIST_DIR}/CMake/FindRapidJSON.cmake" (do not install it for now, uncomment if one day we vendor Rapidjson)
+	"${CMAKE_CURRENT_LIST_DIR}/CMake/${PROJECT_NAME}Config.cmake"
+	"${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+	DESTINATION ${INSTALL_CONFIGDIR}
+)
+
+# Install public headers
+list(FILTER ${PROJECT_NAME}_SOURCES INCLUDE REGEX "^.*\\.(h|inl)$")
+install(FILES ${${PROJECT_NAME}_SOURCES} DESTINATION include/${PROJECT_NAME})
+
+
+export(EXPORT ${PROJECT_NAME}Targets
+    FILE ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Targets.cmake
+    NAMESPACE ${PROJECT_NAME}::)
+
+# Export it to CMake Package Registry too
+set(CMAKE_EXPORT_PACKAGE_REGISTRY ON)
+export(PACKAGE ${PROJECT_NAME})
 
 # Unit tests
 add_subdirectory(tests)

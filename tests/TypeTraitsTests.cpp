@@ -4,7 +4,7 @@
 
 #include "Dire/DireProperty.h"
 #include "dire/DireReflectable.h"
-#include "dire/DireTypeTraits.h"
+#include "dire/Utils/DireTypeTraits.h"
 #include <unordered_map>
 
 static_assert(dire::has_ArrayBrackets_v<std::string>);

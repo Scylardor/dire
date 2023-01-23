@@ -10,8 +10,7 @@
 
 #include "DireSerialization.h"
 
-#include "DireTypes.h"
-#include "DireTypeHandlers.h"
+#include "dire/Types/DireTypes.h"
 
 namespace DIRE_NS
 {

@@ -23,7 +23,7 @@ function(ADD_RAPIDJSON_DEPENDENCY DOWNLOAD_PREFIX GIT_VERSION TARGET_NAME SCOPE)
 		set(RAPIDJSON_INCLUDE_DIR "${SOURCE_DIR}/include")
 	endif()
 
-	target_include_directories(${TARGET_NAME} ${SCOPE} ${RAPIDJSON_INCLUDE_DIR})
+	target_include_directories(${TARGET_NAME} ${SCOPE} $<BUILD_INTERFACE:${RAPIDJSON_INCLUDE_DIR}>)
 	add_dependencies(${TARGET_NAME} rapidjson)
 endfunction()
 

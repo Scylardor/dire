@@ -1,9 +1,7 @@
 #pragma once
 
-#include "DireMacros.h"
-#include "DireString.h"
-
-#include "DireAssert.h"
+#include "Utils/DireMacros.h"
+#include "Utils/DireString.h"
 
 #include <type_traits> // enable_if
 

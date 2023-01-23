@@ -2,9 +2,9 @@
 #include "DireDefines.h"
 
 #ifdef DIRE_SERIALIZATION_ENABLED
-#include "DireString.h"
-#include "DireTypeInfo.h"
-#include "DireReflectableID.h"
+#include "dire/Utils/DireString.h"
+#include "dire/Types/DireTypeInfo.h"
+#include "dire/DireReflectableID.h"
 #include <vector>
 #include <variant>
 
@@ -63,18 +63,18 @@ namespace DIRE_NS
 		virtual void	SerializeValuesForObject(DIRE_STRING_VIEW pObjectName, SerializedValueFiller pFillerFunction) = 0;
 	};
 
-	class Dire_EXPORT IDeserializer
+	class IDeserializer
 	{
 	public:
 		struct Result
 		{
-			Result() = default;
+			Dire_EXPORT Result() = default;
 
-			Result(const SerializationError& pError) :
+			Dire_EXPORT Result(const SerializationError& pError) :
 				Value(pError)
 			{}
 
-			Result(Reflectable* pDeserializedReflectable) :
+			Dire_EXPORT Result(Reflectable* pDeserializedReflectable) :
 				Value(pDeserializedReflectable)
 			{}
 
@@ -93,7 +93,7 @@ namespace DIRE_NS
 			std::variant<Reflectable*, SerializationError>	Value{nullptr};
 		};
 
-		virtual ~IDeserializer() = default;
+		Dire_EXPORT virtual ~IDeserializer() = default;
 
 		template <typename T, typename... Args>
 		Result Deserialize(const char* pSerialized, Args&&... pArgs);
@@ -101,7 +101,7 @@ namespace DIRE_NS
 		template <typename... Args>
 		Result Deserialize(const char* pSerialized, ReflectableID pReflectableClassID, Args&&... pArgs);
 
-		virtual Result	DeserializeInto(const char* pSerialized, Reflectable& pDeserializedObject) = 0;
+		Dire_EXPORT virtual Result	DeserializeInto(const char* pSerialized, Reflectable& pDeserializedObject) = 0;
 	};
 
 	template <typename T, typename ... Args>

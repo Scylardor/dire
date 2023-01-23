@@ -8,16 +8,8 @@ namespace DIRE_NS
 	{
 	public:
 
-		Dire_EXPORT static T& EditSingleton()
-		{
-			static T theSingleton; // Thread-safe since C++11!
-			return theSingleton;
-		}
-
-		Dire_EXPORT static const T & GetSingleton()
-		{
-			return EditSingleton();
-		}
+		Dire_EXPORT static T&		EditSingleton();
+		Dire_EXPORT static const T& GetSingleton();
 
 		template <typename... Args>
 		T& ReinitializeSingleton(Args&&... pCtorParams)

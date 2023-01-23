@@ -4,7 +4,7 @@
 #ifdef DIRE_COMPILE_JSON_SERIALIZATION
 
 #include "DireSerialization.h"
-#include "DireTypes.h"
+#include "dire/Types/DireTypes.h"
 
 #include <rapidjson/document.h>
 
@@ -17,7 +17,7 @@ namespace DIRE_NS
 	class RapidJsonReflectorDeserializer : public IDeserializer
 	{
 	public:
-		virtual Result	Dire_EXPORT DeserializeInto(char const* pJson, Reflectable& pDeserializedObject) override;
+		Dire_EXPORT virtual Result	DeserializeInto(char const* pJson, Reflectable& pDeserializedObject) override;
 
 	private:
 

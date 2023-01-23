@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DireTypeInfo.h"
+#include "Types/DireTypeInfo.h"
 #include "DirePropertyMetadata.h"
 
 namespace DIRE_NS

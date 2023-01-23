@@ -2,8 +2,7 @@
 
 #ifdef DIRE_COMPILE_BINARY_SERIALIZATION
 
-#include "BinaryHeaders.h"
-#include "DireAssert.h"
+#include "DireBinaryHeaders.h"
 
 #define BINARY_SERIALIZE_VALUE_CASE(TypeEnum) \
 case Type::TypeEnum:\

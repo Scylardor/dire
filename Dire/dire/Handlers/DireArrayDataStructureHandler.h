@@ -3,8 +3,8 @@
 #include "DireTypeHandlers.h"
 #include "DireEnumDataStructureHandler.h"
 #include "DireMapDataStructureHandler.h"
-#include "DireTypes.h"
-#include "DireReflectableID.h"
+#include "dire/Types/DireTypes.h"
+#include "dire/DireReflectableID.h"
 
 namespace DIRE_NS
 {

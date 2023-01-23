@@ -1,13 +1,12 @@
 #pragma once
 
-#include "DireSingleton.h"
-#include "DireStaticTypeCounter.h"
+#include "dire/Utils/DireSingleton.h"
 
 #include <vector>
 #include <unordered_map>
 
-#include "DireString.h"
-#include "DireReflectableID.h"
+#include "dire/Utils/DireString.h"
+#include "dire/DireReflectableID.h"
 
 namespace std
 {
@@ -114,6 +113,7 @@ namespace DIRE_NS
 
 	// Important for DLL builds, because otherwise, the client program will use its own singleton in client code,
 	// and DIRE uses its own singleton in DIRE code, which creates inconsistencies.
-	Dire_EXPORT const TypeInfoDatabase& Singleton<TypeInfoDatabase>::GetSingleton();
-	Dire_EXPORT TypeInfoDatabase& Singleton<TypeInfoDatabase>::EditSingleton();
+
+	extern template Dire_EXPORT const TypeInfoDatabase& Singleton<TypeInfoDatabase>::GetSingleton();
+	extern template Dire_EXPORT TypeInfoDatabase& Singleton<TypeInfoDatabase>::EditSingleton();
 }
