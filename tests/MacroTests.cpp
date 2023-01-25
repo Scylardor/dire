@@ -1,5 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
-#include "Dire/DireMacros.h"
+#include "Dire/Utils/DireMacros.h"
 
 
 TEST_CASE("DIRE_NARGS (Args counting macro)", "[macros]")
