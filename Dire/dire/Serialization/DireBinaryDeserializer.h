@@ -14,7 +14,7 @@ namespace DIRE_NS
 	class BinaryReflectorDeserializer : public IDeserializer
 	{
 	public:
-		Dire_EXPORT virtual Result	DeserializeInto(char const* pSerialized, Reflectable& pDeserializedObject) override;
+		Dire_EXPORT virtual Result	DeserializeInto(const char * pSerialized, Reflectable& pDeserializedObject) override;
 
 	private:
 

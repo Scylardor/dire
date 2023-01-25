@@ -40,6 +40,8 @@ namespace DIRE_NS
 
 			Dire_EXPORT operator DIRE_STRING() const { return AsString();}
 
+			const ByteVector& GetBytes() const { return std::get<ByteVector>(Value); }
+
 			[[nodiscard]] bool	HasError() const { return std::holds_alternative<SerializationError>(Value); }
 
 			[[nodiscard]] SerializationError	GetError() const;

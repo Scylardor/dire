@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Types/DireTypeInfoDatabase.h"
-#include "Types/DireTypeInfo.h"
-#include "Utils/DireString.h"
-#include "DireProperty.h"
-#include "DireReflectable.h"
+#include <Dire/Types/DireTypeInfoDatabase.h>
+#include <Dire/Types/DireTypeInfo.h>
+#include <Dire/Utils/DireString.h>
+#include <Dire/DireProperty.h>
+#include <Dire/DireReflectable.h>

@@ -30,7 +30,6 @@ set(${UPPER_PROJECT_NAME}_CPP_STANDARD cxx_std_17 CACHE STRING "Set the standard
 option(${UPPER_PROJECT_NAME}_BUILD_SHARED_LIB "Type of library DIRE will compile. Use STATIC for archives (.a or .lib on Windows) or SHARED for dynamic (.so or DLL on Windows)." ON)
 
 set(DIRE_SOURCE_DIR ${PROJECT_NAME}/${PROJECT_NAME})
-set(DIRE_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME})
 set(DIRE_GENERATED_INCLUDES_DIR generated-includes/Dire)
 
 # Main target creation
@@ -145,19 +144,15 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 # RapidJSON dependency setup
 if(${UPPER_PROJECT_NAME}_SERIALIZATION_ENABLED AND ${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED)
 	include(CMake/Rapidjson.cmake)
-	add_rapidjson_dependency(rapidjson ${${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_VERSION} ${PROJECT_NAME} PUBLIC)
+	find_rapidjson_dependency(rapidjson ${${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_VERSION})
+	target_link_libraries(${PROJECT_NAME} PUBLIC rapidjson)
 endif()
 
 # Use a generator expression so that the install interface redirects to the right folder after installation.
-set(BUILD_INCLUDE_DIRS
-	${DIRE_INCLUDE_DIR}
-	${DIRE_GENERATED_INCLUDES_DIR}
-)
-
 target_include_directories(${PROJECT_NAME}
     PUBLIC
         $<INSTALL_INTERFACE:include>
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/${DIRE_GENERATED_INCLUDES_DIR};${DIRE_INCLUDE_DIR}>"
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME};${CMAKE_CURRENT_BINARY_DIR}/${DIRE_GENERATED_INCLUDES_DIR}>"
 )
 
 include(GNUInstallDirs) # defines variables like CMAKE_INSTALL_LIBDIR, etc.
@@ -193,8 +188,12 @@ install(FILES
 )
 
 # Install public headers
-list(FILTER ${PROJECT_NAME}_SOURCES INCLUDE REGEX "^.*\\.(h|inl)$")
-install(FILES ${${PROJECT_NAME}_SOURCES} DESTINATION include/${PROJECT_NAME})
+install(DIRECTORY ${DIRE_SOURCE_DIR} DESTINATION include FILES_MATCHING PATTERN "*.h" PATTERN "*.inl")
+
+install(FILES
+	${CMAKE_CURRENT_BINARY_DIR}/${DIRE_GENERATED_INCLUDES_DIR}/DireDefines.h
+	${CMAKE_CURRENT_BINARY_DIR}/${DIRE_GENERATED_INCLUDES_DIR}/Dire_Export.h
+	DESTINATION include)
 
 
 export(EXPORT ${PROJECT_NAME}Targets
