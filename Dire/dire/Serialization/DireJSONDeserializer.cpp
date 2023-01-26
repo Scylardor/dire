@@ -15,8 +15,8 @@
 
 /* This macro does a cast on the right side of the equal sign to silence warnings about casting char to int for example */
 #define JSON_DESERIALIZE_VALUE_CASE(TypeEnum, JsonFunc) \
-	case Type::TypeEnum:\
-	*(FromEnumTypeToActualType<Type::TypeEnum>::ActualType *)(pPropPtr) = (FromEnumTypeToActualType<Type::TypeEnum>::ActualType) jsonVal->Get##JsonFunc();\
+	case MetaType::TypeEnum:\
+	*(FromEnumTypeToActualType<MetaType::TypeEnum>::ActualType *)(pPropPtr) = (FromEnumTypeToActualType<MetaType::TypeEnum>::ActualType) jsonVal->Get##JsonFunc();\
 	break;
 
 namespace DIRE_NS
@@ -36,7 +36,8 @@ namespace DIRE_NS
 
 		TypeInfoDatabase::GetSingleton().GetTypeInfo(pDeserializedObject.GetReflectableClassID())->ForEachPropertyInHierarchy([&pDeserializedObject, &doc, this](const PropertyTypeInfo& pProperty)
 		{
-			void* propPtr = const_cast<void*>(pDeserializedObject.GetProperty(pProperty.GetName()));
+			Reflectable::PropertyAccessor accessor = pDeserializedObject.GetProperty(pProperty.GetName());
+			void* propPtr = const_cast<void*>(accessor.GetPointer());
 			rapidjson::Value const& propValue = doc[pProperty.GetName().data()];
 			DeserializeValue(&propValue, pProperty.GetMetatype(), propPtr, &pProperty.GetDataStructureHandler());
 		});
@@ -52,8 +53,8 @@ namespace DIRE_NS
 		{
 			DataStructureHandler elemHandler = pArrayHandler->ElementHandler();
 
-			Type elemType = pArrayHandler->ElementType();
-			if (elemType != Type::Unknown)
+			MetaType elemType = pArrayHandler->ElementType();
+			if (elemType != MetaType::Unknown)
 			{
 				for (auto iElem = 0u; iElem < pVal.Size(); ++iElem)
 				{
@@ -72,7 +73,7 @@ namespace DIRE_NS
 
 		DIRE_ASSERT(pVal.IsObject());
 
-		const Type valueType = pMapHandler->ValueMetaType();
+		const MetaType valueType = pMapHandler->ValueMetaType();
 		const DataStructureHandler valueHandler = pMapHandler->ValueDataHandler();
 		for (rapidjson::Value::ConstMemberIterator itr = pVal.MemberBegin(); itr != pVal.MemberEnd(); ++itr)
 		{
@@ -91,19 +92,20 @@ namespace DIRE_NS
 
 		compTypeInfo->ForEachPropertyInHierarchy([this, &pVal, reflectableProp](const PropertyTypeInfo & pProperty)
 			{
-				void* propPtr = const_cast<void*>(reflectableProp->GetProperty(pProperty.GetName()));
-				rapidjson::Value const& propValue = pVal[pProperty.GetName().data()];
+				Reflectable::PropertyAccessor prop = reflectableProp->GetProperty(pProperty.GetName());
+				void* propPtr = const_cast<void*>(prop.GetPointer());
+				const rapidjson::Value & propValue = pVal[pProperty.GetName().data()];
 				DeserializeValue(&propValue, pProperty.GetMetatype(), propPtr, &pProperty.GetDataStructureHandler());
 			});
 	}
 
-	void	RapidJsonReflectorDeserializer::DeserializeValue(void const* pSerializedVal, Type pPropType, void* pPropPtr, const DataStructureHandler* pHandler) const
+	void	RapidJsonReflectorDeserializer::DeserializeValue(void const* pSerializedVal, MetaType pPropType, void* pPropPtr, const DataStructureHandler* pHandler) const
 	{
 		auto* jsonVal = static_cast<const rapidjson::Value*>(pSerializedVal);
 
 		switch (pPropType.Value)
 		{
-			JSON_DESERIALIZE_VALUE_CASE(Type::Bool, Bool)
+			JSON_DESERIALIZE_VALUE_CASE(MetaType::Bool, Bool)
 			// JSON doesn't have a concept of "small types" like char and short so just decode it as int.
 			JSON_DESERIALIZE_VALUE_CASE(Char, Int)
 			JSON_DESERIALIZE_VALUE_CASE(UChar, Int)
@@ -115,22 +117,22 @@ namespace DIRE_NS
 			JSON_DESERIALIZE_VALUE_CASE(Uint64, Uint64)
 			JSON_DESERIALIZE_VALUE_CASE(Float, Double)
 			JSON_DESERIALIZE_VALUE_CASE(Double, Double)
-		case Type::Array:
+		case MetaType::Array:
 			if (pHandler != nullptr)
 			{
 				DeserializeArrayValue(*jsonVal, pPropPtr, pHandler->GetArrayHandler());
 			}
 			break;
-		case Type::Map:
+		case MetaType::Map:
 			if (pHandler != nullptr)
 			{
 				DeserializeMapValue(*jsonVal, pPropPtr, pHandler->GetMapHandler());
 			}
 			break;
-		case Type::Object:
+		case MetaType::Object:
 			DeserializeCompoundValue(*jsonVal, pPropPtr);
 			break;
-		case Type::Enum:
+		case MetaType::Enum:
 			pHandler->GetEnumHandler()->SetFromString(jsonVal->GetString(), pPropPtr);
 			break;
 		default:

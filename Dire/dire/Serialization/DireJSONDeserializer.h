@@ -27,7 +27,7 @@ namespace DIRE_NS
 
 		void	DeserializeCompoundValue(const rapidjson::Value& pVal, void* pPropPtr) const;
 
-		void	DeserializeValue(void const* pSerializedVal, Type pPropType, void* pPropPtr, const DataStructureHandler* pHandler = nullptr) const;
+		void	DeserializeValue(void const* pSerializedVal, MetaType pPropType, void* pPropPtr, const DataStructureHandler* pHandler = nullptr) const;
 	};
 }
 #endif

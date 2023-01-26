@@ -32,7 +32,7 @@ namespace DIRE_NS
 
 			if (const PropertyTypeInfo* thisProp = thisTypeInfo->FindPropertyInHierarchy(propName))
 			{
-				if (thisProp->GetMetatype() == Type::Array)
+				if (thisProp->GetMetatype() == MetaType::Array)
 				{
 					const ConvertResult<int> propIndex = FromCharsConverter<int>::Convert((pFullPath.data() + leftBrackPos + 1));
 					if (propIndex.HasError())
@@ -41,7 +41,7 @@ namespace DIRE_NS
 					pFullPath.remove_prefix(rightBrackPos + 1);
 					return GetArrayProperty(thisTypeInfo, propName, pFullPath, propIndex.GetValue(), propertyAddr);
 				}
-				else if (thisProp->GetMetatype() == Type::Map)
+				else if (thisProp->GetMetatype() == MetaType::Map)
 				{
 					const auto keyStartPos = leftBrackPos + 1;
 					DIRE_STRING_VIEW key(pFullPath.data() + keyStartPos, rightBrackPos - keyStartPos);
@@ -86,7 +86,7 @@ namespace DIRE_NS
 			if (result.Address != nullptr && result.TypeInfo != nullptr)
 			{
 				DIRE_STRING_VIEW key = pName.substr(leftBrackPos + 1, pName.length() - 1 - leftBrackPos);
-				if (result.TypeInfo->GetMetatype() == Type::Array)
+				if (result.TypeInfo->GetMetatype() == MetaType::Array)
 				{
 					void* array = const_cast<void*>(result.Address);
 					ConvertResult<size_t> index = FromCharsConverter<size_t>::Convert(key);
@@ -95,7 +95,7 @@ namespace DIRE_NS
 
 					return result.TypeInfo->GetArrayHandler()->Erase(array, index.GetValue());
 				}
-				if (result.TypeInfo->GetMetatype() == Type::Map)
+				if (result.TypeInfo->GetMetatype() == MetaType::Map)
 				{
 					void* map = const_cast<void*>(result.Address);
 					return result.TypeInfo->GetMapHandler()->Erase(map, key);
@@ -107,13 +107,13 @@ namespace DIRE_NS
 			GetPropertyResult result = GetPropertyImpl(pName);
 			if (result.Address != nullptr && result.TypeInfo != nullptr)
 			{
-				if (result.TypeInfo->GetMetatype() == Type::Array)
+				if (result.TypeInfo->GetMetatype() == MetaType::Array)
 				{
 					void* array = const_cast<void*>(result.Address);
 					result.TypeInfo->GetArrayHandler()->Clear(array);
 					return true;
 				}
-				if (result.TypeInfo->GetMetatype() == Type::Map)
+				if (result.TypeInfo->GetMetatype() == MetaType::Map)
 				{
 					void* map = const_cast<void*>(result.Address);
 					result.TypeInfo->GetMapHandler()->Clear(map);
@@ -152,7 +152,7 @@ namespace DIRE_NS
 			const TypeInfo * arrayElemTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(pArrayHandler->ElementReflectableID());
 			if (arrayElemTypeInfo == nullptr) // compound type that is not Reflectable...
 			{
-				return {};
+				return {"Not a Reflectable"};
 			}
 			pRemainingPath.remove_prefix(1); // strip the leading dot
 			// Lookup the next dot (if any) to know if we should search for a compound or an array.
@@ -168,7 +168,7 @@ namespace DIRE_NS
 				const size_t rightBrackPos = pRemainingPath.find(']');
 				if (rightBrackPos == pRemainingPath.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 2) //+2 because leftBrackPos is off by 1
 				{
-					return {};
+					return { "Syntax error: Mismatched bracket or empty brackets." };
 				}
 				ConvertResult<int> propIndex = FromCharsConverter<int>::Convert(pRemainingPath.data() + leftBrackPos);
 				if (propIndex.HasError())
@@ -186,14 +186,14 @@ namespace DIRE_NS
 			// or there is no number between the two brackets, the expression has to be ill-formed!
 			if (rightBrackPos == pRemainingPath.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 1)
 			{
-				return {};
+				return { "Syntax error: Mismatched bracket or empty brackets." };
 			}
 
 			IArrayDataStructureHandler const* elementHandler = pArrayHandler->ElementHandler().GetArrayHandler();
 
 			if (elementHandler == nullptr)
 			{
-				return {}; // Tried to access a property type that is not an array or not a Reflectable
+				return { "This type doesn't support array indexing." }; // Tried to access a property type that is not an array or not a Reflectable
 			}
 
 			ConvertResult<int> propIndex = FromCharsConverter<int>::Convert(pRemainingPath.data() + leftBrackPos + 1);
@@ -213,7 +213,7 @@ namespace DIRE_NS
 	{
 		// Find out the type of handler we are interested in
 		const void * value = nullptr;
-		const bool propIsAnArray = pProperty->GetMetatype() == Type::Array;
+		const bool propIsAnArray = pProperty->GetMetatype() == MetaType::Array;
 		DIRE_ASSERT(propIsAnArray || pProperty->GetMetatype() == Type::Map);
 
 		if (propIsAnArray)
@@ -343,7 +343,7 @@ namespace DIRE_NS
 				size_t rightBracketPos = pRemainingPath.find(']', 1);
 				if (rightBracketPos == pRemainingPath.npos || rightBracketPos == 1)
 				{
-					return {}; // syntax error: no right bracket or nothing between the brackets
+					return { "Syntax error: Mismatched bracket or empty brackets." }; // syntax error: no right bracket or nothing between the brackets
 				}
 				pKey = pRemainingPath.substr(nextDelimiterPos + 1, rightBracketPos - nextDelimiterPos - 1);
 				pRemainingPath.remove_prefix(rightBracketPos + 1);
@@ -357,13 +357,13 @@ namespace DIRE_NS
 			size_t rightBracketPos = pRemainingPath.find(']', 1);
 			if (rightBracketPos == pRemainingPath.npos || rightBracketPos == 1)
 			{
-				return {}; // syntax error: no right bracket or nothing between the brackets
+				return { "Syntax error: Mismatched bracket or empty brackets." }; // syntax error: no right bracket or nothing between the brackets
 			}
 			pKey = pRemainingPath.substr(1, rightBracketPos - 1);
 			pRemainingPath.remove_prefix(rightBracketPos + 1);
 
 			DataStructureHandler elementHandler = pArrayHandler->ElementHandler();
-			if (pArrayHandler->ElementType() == Type::Array)
+			if (pArrayHandler->ElementType() == MetaType::Array)
 			{
 				return RecurseArrayProperty(elementHandler.GetArrayHandler(), valueAsBytes, pRemainingPath, pKey);
 			}
@@ -415,7 +415,7 @@ namespace DIRE_NS
 				size_t rightBracketPos = pRemainingPath.find(']', 1);
 				if (rightBracketPos == pRemainingPath.npos || rightBracketPos == 1)
 				{
-					return {}; // syntax error: no right bracket or nothing between the brackets
+					return { "Syntax error: Mismatched bracket or empty brackets." }; // syntax error: no right bracket or nothing between the brackets
 				}
 				pKey = pRemainingPath.substr(nextDelimiterPos + 1, rightBracketPos - nextDelimiterPos - 1);
 				pRemainingPath.remove_prefix(rightBracketPos + 1);
@@ -429,13 +429,13 @@ namespace DIRE_NS
 			size_t rightBracketPos = pRemainingPath.find(']', 1);
 			if (rightBracketPos == pRemainingPath.npos || rightBracketPos == 1)
 			{
-				return {}; // syntax error: no right bracket or nothing between the brackets
+				return { "Syntax error: Mismatched bracket or empty brackets." }; // syntax error: no right bracket or nothing between the brackets
 			}
 			pKey = pRemainingPath.substr(1, rightBracketPos - 1);
 			pRemainingPath.remove_prefix(rightBracketPos + 1);
 			
 			DataStructureHandler elementHandler = pMapHandler->ValueDataHandler();
-			if (pMapHandler->ValueMetaType() == Type::Array)
+			if (pMapHandler->ValueMetaType() == MetaType::Array)
 			{
 				return RecurseArrayProperty(elementHandler.GetArrayHandler(), valueAsBytes, pRemainingPath, pKey);
 			}
@@ -452,7 +452,11 @@ namespace DIRE_NS
 		const PropertyTypeInfo * thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
 		if (thisProp == nullptr)
 		{
-			return {}; // There was no property with the given name.
+			DIRE_STRING errorMsg;
+			int toWrite = std::snprintf(nullptr, 0, "Property %s not found.", pName.data());
+			errorMsg.resize(toWrite + 1); // +1 for \0
+			std::snprintf(errorMsg.data(), errorMsg.size(), "Property %s not found.", pName.data());
+			return { errorMsg };
 		}
 
 		// We found our compound property: consume its name from the "full path"
@@ -489,7 +493,7 @@ namespace DIRE_NS
 			// or there is no number between the two brackets, the expression has to be ill-formed!
 			if (rightBrackPos == pFullPath.npos || rightBrackPos < nextDelimiterPos || rightBrackPos == nextDelimiterPos + 1)
 			{
-				return {};
+				return { "Syntax error: Mismatched bracket or empty brackets." };
 			}
 			pName = DIRE_STRING_VIEW(pFullPath.data(), nextDelimiterPos);
 			DIRE_STRING_VIEW key = pFullPath.substr(nextDelimiterPos + 1, rightBrackPos - nextDelimiterPos - 1);
@@ -504,9 +508,13 @@ namespace DIRE_NS
 	{
 		// First, find our array property
 		const PropertyTypeInfo * thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
-		if (thisProp == nullptr)
+		if (thisProp == nullptr) // There was no property with the given name.
 		{
-			return {}; // There was no property with the given name.
+			DIRE_STRING errorMsg;
+			int toWrite = std::snprintf(nullptr, 0, "Property %s not found.", pName.data());
+			errorMsg.resize(toWrite + 1); // +1 for \0
+			std::snprintf(errorMsg.data(), errorMsg.size(), "Property %s not found.", pName.data());
+			return { errorMsg };
 		}
 
 		pPropPtr += thisProp->GetOffset();
@@ -520,7 +528,11 @@ namespace DIRE_NS
 		const PropertyTypeInfo * thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
 		if (thisProp == nullptr)
 		{
-			return {}; // There was no property with the given name.
+			DIRE_STRING errorMsg;
+			int toWrite = std::snprintf(nullptr, 0, "Property %s not found.", pName.data());
+			errorMsg.resize(toWrite + 1); // +1 for \0
+			std::snprintf(errorMsg.data(), errorMsg.size(), "Property %s not found.", pName.data());
+			return { errorMsg };
 		}
 
 		pPropPtr += thisProp->GetOffset();

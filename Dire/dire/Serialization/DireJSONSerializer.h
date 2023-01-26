@@ -31,7 +31,7 @@ namespace DIRE_NS
 		inline virtual void	SerializeBool(bool pSerializedBool) override;
 		inline virtual void	SerializeValuesForObject(DIRE_STRING_VIEW pObjectName, SerializedValueFiller pFillerFunction) override;
 
-		void	Dire_EXPORT SerializeValue(Type pPropType, const void * pPropPtr, const DataStructureHandler * pHandler = nullptr);
+		void	Dire_EXPORT SerializeValue(MetaType pPropType, const void * pPropPtr, const DataStructureHandler * pHandler = nullptr);
 
 		void	Dire_EXPORT SerializeArrayValue(const void * pPropPtr, const IArrayDataStructureHandler * pArrayHandler);
 

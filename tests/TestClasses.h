@@ -203,3 +203,33 @@ dire_reflectable(struct d, c)
 
 	DIRE_PROPERTY(MapCompound, aStruct);
 };
+
+DIRE_SEQUENTIAL_ENUM(Kings, int, Philippe, Alexandre, Cesar, Charles);
+DIRE_BITMASK_ENUM(BitEnum, int, one, two, four, eight);
+DIRE_BITMASK_ENUM(Jacks, short, Ogier, Lahire, Hector, Lancelot);
+DIRE_BITMASK_ENUM(Queens, short, Judith, Rachel, Pallas, Argine);
+
+enum class Faces : uint8_t
+{
+	Jack,
+	Queen,
+	King
+};
+
+dire_reflectable(struct enumTestType)
+{
+	DIRE_REFLECTABLE_INFO()
+
+	DIRE_PROPERTY(Faces, aTestFace);
+	DIRE_PROPERTY(Kings, bestKing, Kings::Alexandre);
+	DIRE_ARRAY_PROPERTY(Kings, worstKings, [2])
+	DIRE_PROPERTY((std::vector<Kings>), playableKings);
+	DIRE_PROPERTY((std::map<Queens, bool>), allowedQueens);
+	DIRE_PROPERTY((std::map<int, Jacks>), pointsPerJack);
+
+	bool operator==(const enumTestType & pRhs) const
+	{
+		return aTestFace == pRhs.aTestFace && bestKing == pRhs.bestKing && memcmp(worstKings, pRhs.worstKings, sizeof(Kings) * 2) == 0
+			&& playableKings == pRhs.playableKings && allowedQueens == pRhs.allowedQueens && pointsPerJack == pRhs.pointsPerJack;
+	}
+};

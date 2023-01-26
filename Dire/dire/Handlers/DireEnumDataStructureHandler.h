@@ -7,9 +7,9 @@ namespace DIRE_NS
 	class Dire_EXPORT IEnumDataStructureHandler
 	{
 	public:
-		virtual const char*		EnumToString(const void*) const = 0;
-		virtual void			SetFromString(const char*, void*) const = 0;
-		virtual Type::Values	EnumMetaType() const = 0;
+		virtual const char*			EnumToString(const void*) const = 0;
+		virtual void				SetFromString(const char*, void*) const = 0;
+		virtual MetaType::Values	EnumMetaType() const = 0;
 
 		virtual ~IEnumDataStructureHandler() = default;
 	};
@@ -33,7 +33,7 @@ namespace DIRE_NS
 			}
 		}
 
-		virtual Type::Values	EnumMetaType() const override
+		virtual MetaType::Values	EnumMetaType() const override
 		{
 			return FromEnumToUnderlyingType<T>();
 		}

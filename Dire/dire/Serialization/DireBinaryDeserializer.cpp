@@ -6,9 +6,9 @@
 #include "DireBinaryHeaders.h"
 
 #define BINARY_DESERIALIZE_VALUE_CASE(TypeEnum) \
-case Type::TypeEnum:\
+case MetaType::TypeEnum:\
 {\
-	using ActualType = FromEnumTypeToActualType<Type::TypeEnum>::ActualType;\
+	using ActualType = FromEnumTypeToActualType<MetaType::TypeEnum>::ActualType;\
 	*static_cast<ActualType*>(pPropPtr) = ReadFromBytes<ActualType>();\
 	break;\
 }
@@ -69,7 +69,7 @@ namespace DIRE_NS
 
 			DIRE_ASSERT(pArrayHandler->ElementType() == arrayHeader.ElementType
 			&& pArrayHandler->ElementSize() == arrayHeader.SizeofElement);
-			if (arrayHeader.ElementType != Type::Unknown)
+			if (arrayHeader.ElementType != MetaType::Unknown)
 			{
 				for (auto iElem = 0; iElem < arrayHeader.ArraySize; ++iElem)
 				{
@@ -86,7 +86,7 @@ namespace DIRE_NS
 			return;
 
 		const DataStructureHandler valueHandler = pMapHandler->ValueDataHandler();
-		const Type valueType = pMapHandler->ValueMetaType();
+		const MetaType valueType = pMapHandler->ValueMetaType();
 		const size_t sizeofKeyType = pMapHandler->SizeofKey();
 
 		auto& mapHeader = ReadFromBytes<BinarySerializationHeaders::Map>();
@@ -148,7 +148,7 @@ namespace DIRE_NS
 		});
 	}
 
-	void	BinaryReflectorDeserializer::DeserializeValue(Type pPropType, void* pPropPtr, const DataStructureHandler* pHandler) const
+	void	BinaryReflectorDeserializer::DeserializeValue(MetaType pPropType, void* pPropPtr, const DataStructureHandler* pHandler) const
 	{
 		switch (pPropType.Value)
 		{
@@ -163,24 +163,24 @@ namespace DIRE_NS
 				BINARY_DESERIALIZE_VALUE_CASE(Uint64)
 				BINARY_DESERIALIZE_VALUE_CASE(Float)
 				BINARY_DESERIALIZE_VALUE_CASE(Double)
-		case Type::Array:
+		case MetaType::Array:
 			if (pHandler != nullptr)
 			{
 				DeserializeArrayValue(pPropPtr, pHandler->GetArrayHandler());
 			}
 			break;
-		case Type::Map:
+		case MetaType::Map:
 			if (pHandler != nullptr)
 			{
 				DeserializeMapValue(pPropPtr, pHandler->GetMapHandler());
 			}
 			break;
-		case Type::Object:
+		case MetaType::Object:
 			DeserializeCompoundValue(pPropPtr);
 			break;
-		case Type::Enum:
+		case MetaType::Enum:
 		{
-			Type underlyingType = pHandler->GetEnumHandler()->EnumMetaType();
+			MetaType underlyingType = pHandler->GetEnumHandler()->EnumMetaType();
 			DeserializeValue(underlyingType, pPropPtr);
 		}
 		break;

@@ -39,7 +39,7 @@ namespace DIRE_NS
 
 		void	DeserializeCompoundValue(void* pPropPtr) const;
 
-		void	DeserializeValue(Type pPropType, void* pPropPtr, const DataStructureHandler* pHandler = nullptr) const;
+		void	DeserializeValue(MetaType pPropType, void* pPropPtr, const DataStructureHandler* pHandler = nullptr) const;
 
 		const char*		mySerializedBytes = nullptr;
 		mutable size_t	myReadingOffset = 0;

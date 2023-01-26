@@ -44,6 +44,7 @@ TEST_CASE("GetProperty Simple", "[Property]")
 	compint = superC.GetProperty<int>("ABCD");
 	REQUIRE(compint == nullptr);
 
+	// Safe property MUSTS refer to a valid name
 	REQUIRE_THROWS_AS(superC.GetSafeProperty<int>("ABCD"), std::runtime_error);
 }
 
@@ -90,6 +91,25 @@ TEST_CASE("GetProperty Array", "[Property]")
 	REQUIRE(superC.GetProperty<int>("aVector[0]") != nullptr);
 	val = superC.GetSafeProperty<int>("aVector[2]");
 	REQUIRE(val == 3);
+
+	// Array of Reflectables
+	MegaCompound mega;
+	mega.toto[0].titi[2] = 0x1337;
+	REQUIRE(mega.GetProperty<int>("toto[0]") != nullptr);
+	const SuperCompound& super = mega.GetSafeProperty<SuperCompound>("toto[0]");
+	REQUIRE((&super == &mega.toto[0] && super.titi[2] == 0x1337));
+
+	// mismatched brackets
+	dire::Reflectable::PropertyAccessor accessor = superC.GetProperty("aVector[error");
+	REQUIRE((!accessor.IsValid() && *accessor.GetError() == "Syntax error: Mismatched bracket or empty brackets."));
+
+	// We don't bother checking for the right bracket if there's no left bracket so it's going to end up in generic syntax error but that's ok.
+	accessor = superC.GetProperty("aVector]error");
+	REQUIRE((!accessor.IsValid() && *accessor.GetError() == "Syntax error"));
+
+	// empty brackets
+	accessor = superC.GetProperty("aVector[]");
+	REQUIRE((!accessor.IsValid() && *accessor.GetError() == "Syntax error: Mismatched bracket or empty brackets."));
 }
 
 TEST_CASE("GetProperty Map", "[Property]")
@@ -130,6 +150,24 @@ TEST_CASE("GetProperty Map", "[Property]")
 	aD.aMapInMap[0][true] = 9999;
 	mapint = aD.GetProperty<int>("aMapInMap[0][true]");
 	REQUIRE(mapint == &aD.aMapInMap[0][true]);
+
+	// enum key
+	enumTestType enums;
+	enums.allowedQueens[Queens::Judith] = true;
+	const bool* allowed = enums.GetProperty<bool>("allowedQueens[Judith]");
+	REQUIRE(allowed == &enums.allowedQueens[Queens::Judith]);
+
+	// mismatched brackets
+	dire::Reflectable::PropertyAccessor accessor = aD.GetProperty("aMapInMap[error");
+	REQUIRE((!accessor.IsValid() && *accessor.GetError() == "Syntax error: Mismatched bracket or empty brackets."));
+
+	// We don't bother checking for the right bracket if there's no left bracket so it's going to end up in generic syntax error but that's ok.
+	accessor = aD.GetProperty("aMapInMap]error");
+	REQUIRE((!accessor.IsValid() && *accessor.GetError() == "Syntax error"));
+
+	// empty brackets
+	accessor = aD.GetProperty("aMapInMap[]");
+	REQUIRE((!accessor.IsValid() && *accessor.GetError() == "Syntax error: Mismatched bracket or empty brackets."));
 }
 
 TEST_CASE("SetProperty", "[Property]")

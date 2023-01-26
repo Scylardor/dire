@@ -27,7 +27,7 @@ namespace DIRE_NS
 		virtual size_t					Size(const void* pArray) const = 0;
 		virtual DataStructureHandler	ElementHandler() const = 0;
 		virtual ReflectableID			ElementReflectableID() const = 0;
-		virtual Type					ElementType() const = 0;
+		virtual MetaType				ElementType() const = 0;
 		virtual size_t					ElementSize() const = 0;
 	};
 
@@ -170,9 +170,9 @@ namespace DIRE_NS
 			return GetElementReflectableID<ElementValueType>();
 		}
 
-		virtual Type					ElementType() const override
+		virtual MetaType				ElementType() const override
 		{
-			return Type(FromActualTypeToEnumType<ElementValueType>::EnumType);
+			return MetaType(FromActualTypeToEnumType<ElementValueType>::EnumType);
 		}
 
 		virtual size_t					ElementSize() const override
@@ -303,9 +303,9 @@ namespace DIRE_NS
 			return GetElementReflectableID<ElementValueType>();
 		}
 
-		virtual Type					ElementType() const override
+		virtual MetaType				ElementType() const override
 		{
-			return Type(FromActualTypeToEnumType<ElementValueType>::EnumType);
+			return MetaType(FromActualTypeToEnumType<ElementValueType>::EnumType);
 		}
 
 		virtual size_t					ElementSize() const override

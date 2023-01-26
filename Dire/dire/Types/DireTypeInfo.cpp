@@ -16,7 +16,8 @@ void DIRE_NS::TypeInfo::ClonePropertiesOf(Reflectable& pNewClone, const Reflecta
 {
 	for (const PropertyTypeInfo& prop : Properties)
 	{
-		auto* propPtr = pCloned.GetProperty<const void *>(prop.GetName());
+		Reflectable::PropertyAccessor accessor = pCloned.GetProperty(prop.GetName());
+		const void* propPtr = accessor.GetPointer();
 		if (propPtr != nullptr)
 		{
 			auto actualOffset = ((const ::std::byte *)propPtr - (const ::std::byte *)&pCloned);

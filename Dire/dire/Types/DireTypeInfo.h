@@ -21,7 +21,7 @@ namespace DIRE_NS
 
 	public:
 		Dire_EXPORT PropertyTypeInfo(const char * pName, const std::ptrdiff_t pOffset, const size_t pSize, const CopyConstructorPtr pCopyCtor = nullptr) :
-			myName(pName), myMetatype(Type::Unknown), myOffset(pOffset), mySize(pSize), myCopyCtor(pCopyCtor)
+			myName(pName), myMetatype(MetaType::Unknown), myOffset(pOffset), mySize(pSize), myCopyCtor(pCopyCtor)
 		{}
 
 		Dire_EXPORT [[nodiscard]] const IArrayDataStructureHandler* GetArrayHandler() const
@@ -41,7 +41,7 @@ namespace DIRE_NS
 
 		[[nodiscard]] const DIRE_STRING_VIEW& GetName() const { return myName; }
 
-		[[nodiscard]] Type		GetMetatype() const { return myMetatype; }
+		[[nodiscard]] MetaType		GetMetatype() const { return myMetatype; }
 
 		[[nodiscard]] size_t	GetOffset() const { return myOffset; }
 
@@ -132,19 +132,19 @@ namespace DIRE_NS
 			}
 		}
 
-		void	SetType(const Type pType)
+		void	SetType(const MetaType pType)
 		{
 			myMetatype = pType;
 		}
 
 	private:
 
-		DIRE_STRING_VIEW myName;
-		Type			myMetatype;
-		std::ptrdiff_t	myOffset;
-		std::size_t		mySize;
+		DIRE_STRING_VIEW		myName;
+		MetaType				myMetatype;
+		std::ptrdiff_t			myOffset;
+		std::size_t				mySize;
 		DataStructureHandler	myDataStructurePropertyHandler; // Useful for array-like or associative data structures, will stay null for other types.
-		CopyConstructorPtr myCopyCtor = nullptr; // if null : this type is not copy-constructible
+		CopyConstructorPtr		myCopyCtor = nullptr; // if null : this type is not copy-constructible
 
 		// Storing the reflectable ID here could be considered a kind of hack.
 		// But given that it's an unsigned (by default), all other options would basically take more memory than "just" copying it everywhere!...
@@ -163,9 +163,9 @@ namespace DIRE_NS
 	class FunctionInfo : public IntrusiveListNode<FunctionInfo>, IFunctionTypeInfo
 	{
 	public:
-		using ParameterList = std::vector<Type, DIRE_ALLOCATOR<Type>>;
+		using ParameterList = std::vector<MetaType, DIRE_ALLOCATOR<MetaType>>;
 
-		FunctionInfo(const char* pName, Type pReturnType) :
+		FunctionInfo(const char* pName, MetaType pReturnType) :
 			Name(pName), ReturnType(pReturnType)
 		{}
 
@@ -196,12 +196,12 @@ namespace DIRE_NS
 		}
 
 		const DIRE_STRING& GetName() const { return Name; }
-		Type	GetReturnType() const { return ReturnType; }
+		MetaType	GetReturnType() const { return ReturnType; }
 		const ParameterList& GetParametersTypes() const { return Parameters; }
 
 	protected:
 
-		void	PushBackParameterType(Type pNewParamType)
+		void	PushBackParameterType(MetaType pNewParamType)
 		{
 			Parameters.push_back(pNewParamType);
 		}
@@ -209,7 +209,7 @@ namespace DIRE_NS
 	private:
 
 		DIRE_STRING		Name;
-		Type			ReturnType{ Type::Void };
+		MetaType		ReturnType{ MetaType::Void };
 		ParameterList	Parameters;
 
 	};

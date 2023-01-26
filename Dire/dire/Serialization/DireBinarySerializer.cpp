@@ -5,9 +5,9 @@
 #include "DireBinaryHeaders.h"
 
 #define BINARY_SERIALIZE_VALUE_CASE(TypeEnum) \
-case Type::TypeEnum:\
+case MetaType::TypeEnum:\
 {\
-	using ActualType = FromEnumTypeToActualType<Type::TypeEnum>::ActualType;\
+	using ActualType = FromEnumTypeToActualType<MetaType::TypeEnum>::ActualType;\
 	WriteAsBytes<ActualType>(*static_cast<const ActualType*>(pPropPtr)); \
 	break;\
 }
@@ -36,7 +36,7 @@ namespace DIRE_NS
 		return Result(std::move(mySerializedBuffer));
 	}
 
-	void BinaryReflectorSerializer::SerializeValue(Type pPropType, const void * pPropPtr, const DataStructureHandler * pHandler)
+	void BinaryReflectorSerializer::SerializeValue(MetaType pPropType, const void * pPropPtr, const DataStructureHandler * pHandler)
 	{
 		switch (pPropType.Value)
 		{
@@ -51,24 +51,24 @@ namespace DIRE_NS
 			BINARY_SERIALIZE_VALUE_CASE(Uint64)
 			BINARY_SERIALIZE_VALUE_CASE(Float)
 			BINARY_SERIALIZE_VALUE_CASE(Double)
-		case Type::Array:
+		case MetaType::Array:
 			if (pHandler != nullptr)
 			{
 				SerializeArrayValue(pPropPtr, pHandler->GetArrayHandler());
 			}
 			break;
-		case Type::Map:
+		case MetaType::Map:
 			if (pHandler != nullptr)
 			{
 				SerializeMapValue(pPropPtr, pHandler->GetMapHandler());
 			}
 			break;
-		case Type::Object:
+		case MetaType::Object:
 			SerializeCompoundValue(pPropPtr);
 			break;
-		case Type::Enum:
+		case MetaType::Enum:
 		{
-			Type underlyingType = pHandler->GetEnumHandler()->EnumMetaType();
+			MetaType underlyingType = pHandler->GetEnumHandler()->EnumMetaType();
 			SerializeValue(underlyingType, pPropPtr);
 		}
 		break;
@@ -83,9 +83,9 @@ namespace DIRE_NS
 		if (pArrayHandler == nullptr)
 			return;
 
-		Type elemType = pArrayHandler->ElementType();
+		MetaType elemType = pArrayHandler->ElementType();
 
-		if (elemType != Type::Unknown)
+		if (elemType != MetaType::Unknown)
 		{
 			size_t arraySize = pArrayHandler->Size(pPropPtr);
 			size_t elemSize = pArrayHandler->ElementSize();
@@ -105,8 +105,8 @@ namespace DIRE_NS
 		if (pPropPtr == nullptr || pMapHandler == nullptr)
 			return;
 
-		const Type keyType = pMapHandler->KeyMetaType();
-		const Type valueType = pMapHandler->ValueMetaType();
+		const MetaType keyType = pMapHandler->KeyMetaType();
+		const MetaType valueType = pMapHandler->ValueMetaType();
 		const size_t mapSize = pMapHandler->Size(pPropPtr);
 		const size_t keySize = pMapHandler->SizeofKey();
 		const size_t valueSize = pMapHandler->SizeofValue();
@@ -117,10 +117,10 @@ namespace DIRE_NS
 		{
 			auto* myself = static_cast<BinaryReflectorSerializer*>(pSerializer);
 
-			const Type keyType = pMapHandler.KeyMetaType();
+			const MetaType keyType = pMapHandler.KeyMetaType();
 			myself->SerializeValue(keyType, pKey, &pKeyHandler);
 
-			Type valueType = pMapHandler.ValueMetaType();
+			MetaType valueType = pMapHandler.ValueMetaType();
 			myself->SerializeValue(valueType, pVal, &pValueHandler);
 		});
 	}

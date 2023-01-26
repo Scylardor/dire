@@ -55,25 +55,8 @@ namespace DIRE_NS
 
 	class Reflectable
 	{
-		using ParseError = DIRE_STRING;
-
-		struct GetPropertyResult
-		{
-			GetPropertyResult() = default;
-			GetPropertyResult(const void* pAddr, const PropertyTypeInfo* pInfo, const ParseError& pError = "") :
-				Address(pAddr), TypeInfo(pInfo), Error(pError)
-			{}
-
-			GetPropertyResult(const ParseError& pError) :
-				Error(pError)
-			{}
-
-			const void* Address = nullptr;
-			const PropertyTypeInfo* TypeInfo = nullptr;
-			ParseError Error;
-		};
-
 	public:
+		virtual ~Reflectable() = default;
 
 		[[nodiscard]] virtual ReflectableID		GetReflectableClassID() const = 0;
 		[[nodiscard]] virtual const TypeInfo*	GetReflectableTypeInfo() const = 0;
@@ -154,11 +137,55 @@ namespace DIRE_NS
 			return reinterpret_cast<T*>(reinterpret_cast<std::byte*>(this) + pOffset);
 		}
 
+		using ParseError = DIRE_STRING;
+
+		template <typename T>
+		struct PropertyAccessor
+		{
+			PropertyAccessor(const T* pPropAddr) :
+				myValue(pPropAddr)
+			{}
+
+			PropertyAccessor(ParseError&& pError) :
+				myValue(std::move(pError))
+			{}
+
+			[[nodiscard]] bool	IsValid() const
+			{
+				return std::holds_alternative<const T*>(myValue);
+			}
+
+			[[nodiscard]] const T* GetPointer() const
+			{
+				auto ptr = std::get_if<const T*>(&myValue);
+				return ptr ? *ptr : nullptr;
+			}
+
+			[[nodiscard]] const ParseError* GetError() const
+			{
+				return std::get_if<ParseError>(&myValue);
+			}
+
+			operator const T* () const
+			{
+				return GetPointer();
+			}
+
+		private:
+			std::variant<const T*, ParseError>	myValue;
+
+		};
+
 		template <typename TProp = void>
-		[[nodiscard]] const TProp * GetProperty(DIRE_STRING_VIEW pName) const
+		[[nodiscard]] PropertyAccessor<TProp> GetProperty(DIRE_STRING_VIEW pName) const
 		{
 			GetPropertyResult result = GetPropertyImpl(pName);
-			return static_cast<const TProp*>(result.Address);
+			if (result.Error.empty())
+			{
+				return PropertyAccessor<TProp>((const TProp*)result.Address);
+			}
+
+			return PropertyAccessor<TProp>(std::move(result.Error));
 		}
 
 		/* Version that returns a reference for when you are 100% confident this property exists */
@@ -221,6 +248,25 @@ namespace DIRE_NS
 
 	private:
 
+		struct GetPropertyResult
+		{
+			GetPropertyResult() :
+				Error("Syntax error")
+			{}
+
+			GetPropertyResult(const void* pAddr, const PropertyTypeInfo* pInfo) :
+				Address(pAddr), TypeInfo(pInfo)
+			{}
+
+			GetPropertyResult(const ParseError& pError) :
+				Error(pError)
+			{}
+
+			const void* Address = nullptr;
+			const PropertyTypeInfo* TypeInfo = nullptr;
+			ParseError Error;
+		};
+
 		Dire_EXPORT [[nodiscard]] const GetPropertyResult GetPropertyImpl(DIRE_STRING_VIEW pFullPath) const;
 
 		[[nodiscard]] GetPropertyResult GetArrayProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, const std::byte * pPropPtr) const;
@@ -241,10 +287,7 @@ namespace DIRE_NS
 
 		[[nodiscard]] GetPropertyResult GetCompoundProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pFullPath, const std::byte * propertyAddr) const;
 	};
-
-
 }
-
 
 #define dire_reflectable(ObjectType, ...) \
 	ObjectType;\

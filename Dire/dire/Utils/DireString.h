@@ -73,7 +73,8 @@ namespace DIRE_NS
 	{
 		static T Convert(const DIRE_STRING_VIEW& pChars)
 		{
-			return T::GetValueFromSafeString(pChars.data());
+			T value = T::GetValueFromSafeString(pChars);
+			return value;
 		}
 	};
 

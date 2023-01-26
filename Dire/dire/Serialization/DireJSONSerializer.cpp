@@ -11,8 +11,8 @@ namespace DIRE_NS
 {
 
 #define JSON_SERIALIZE_VALUE_CASE(TypeEnum, JsonFunc) \
-case Type::TypeEnum:\
-	myJsonWriter.JsonFunc(*static_cast<const FromEnumTypeToActualType<Type::TypeEnum>::ActualType *>(pPropPtr));\
+case MetaType::TypeEnum:\
+	myJsonWriter.JsonFunc(*static_cast<const FromEnumTypeToActualType<MetaType::TypeEnum>::ActualType *>(pPropPtr));\
 	break;
 
 
@@ -33,8 +33,8 @@ case Type::TypeEnum:\
 
 		if (pArrayHandler != nullptr)
 		{
-			Type elemType = pArrayHandler->ElementType();
-			if (elemType != Type::Unknown)
+			MetaType elemType = pArrayHandler->ElementType();
+			if (elemType != MetaType::Unknown)
 			{
 				size_t arraySize = pArrayHandler->Size(pPropPtr);
 				DataStructureHandler elemHandler = pArrayHandler->ElementHandler();
@@ -64,7 +64,7 @@ case Type::TypeEnum:\
 					const DIRE_STRING keyStr = pMapHandler.KeyToString(pKey);
 					myself->myJsonWriter.String(keyStr.data(), (rapidjson::SizeType)keyStr.length());
 
-					Type valueType = pMapHandler.ValueMetaType();
+					MetaType valueType = pMapHandler.ValueMetaType();
 					myself->SerializeValue(valueType, pVal, &pValueHandler);
 				});
 		}
@@ -114,7 +114,7 @@ case Type::TypeEnum:\
 	}
 
 
-	void RapidJsonReflectorSerializer::SerializeValue(Type pPropType, const void* pPropPtr, const DataStructureHandler* pHandler)
+	void RapidJsonReflectorSerializer::SerializeValue(MetaType pPropType, const void* pPropPtr, const DataStructureHandler* pHandler)
 	{
 		switch (pPropType.Value)
 		{
@@ -130,22 +130,22 @@ case Type::TypeEnum:\
 			JSON_SERIALIZE_VALUE_CASE(Uint64, Uint64)
 			JSON_SERIALIZE_VALUE_CASE(Float, Double)
 			JSON_SERIALIZE_VALUE_CASE(Double, Double)
-		case Type::Array:
+		case MetaType::Array:
 			if (pHandler != nullptr)
 			{
 				SerializeArrayValue(pPropPtr, pHandler->GetArrayHandler());
 			}
 			break;
-		case Type::Map:
+		case MetaType::Map:
 			if (pHandler != nullptr)
 			{
 				SerializeMapValue(pPropPtr, pHandler->GetMapHandler());
 			}
 			break;
-		case Type::Object:
+		case MetaType::Object:
 			SerializeCompoundValue(pPropPtr);
 			break;
-		case Type::Enum:
+		case MetaType::Enum:
 		{
 			const char* enumStr = pHandler->GetEnumHandler()->EnumToString(pPropPtr);
 			myJsonWriter.String(enumStr);

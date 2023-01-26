@@ -144,7 +144,7 @@ TEST_CASE("Function Type Info", "[Functions]")
 		ostr << funcInfo.GetName() << ' ';
 		ostr << "Type: " << funcInfo.GetReturnType().GetString() << ' ';
 		ostr << "Parameters:";
-		for (const dire::Type paramType : funcInfo.GetParametersTypes())
+		for (const dire::MetaType paramType : funcInfo.GetParametersTypes())
 		{
 			ostr << ' ' << paramType.GetString();
 		}

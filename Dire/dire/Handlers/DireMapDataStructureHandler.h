@@ -23,8 +23,8 @@ namespace DIRE_NS
 		virtual size_t					Size(const void*) const = 0;
 		virtual DataStructureHandler	ValueDataHandler() const = 0;
 		virtual ReflectableID			ValueReflectableID() const = 0;
-		virtual Type					KeyMetaType() const = 0;
-		virtual Type					ValueMetaType() const = 0;
+		virtual MetaType				KeyMetaType() const = 0;
+		virtual MetaType				ValueMetaType() const = 0;
 		virtual size_t					SizeofKey() const = 0;
 		virtual size_t					SizeofValue() const = 0;
 		virtual DataStructureHandler	KeyDataHandler() const = 0;
@@ -205,12 +205,12 @@ namespace DIRE_NS
 			}
 		}
 
-		virtual Type					KeyMetaType() const override
+		virtual MetaType				KeyMetaType() const override
 		{
 			return FromActualTypeToEnumType<KeyType>::EnumType;
 		}
 
-		virtual Type					ValueMetaType() const override
+		virtual MetaType				ValueMetaType() const override
 		{
 			return FromActualTypeToEnumType<ValueType>::EnumType;
 		}

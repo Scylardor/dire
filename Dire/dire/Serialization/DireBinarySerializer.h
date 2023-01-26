@@ -58,7 +58,7 @@ namespace DIRE_NS
 			memcpy(&mySerializedBuffer[oldSize], pBytes, pNbBytes);
 		}
 
-		void	SerializeValue(Type pPropType, void const* pPropPtr, DataStructureHandler const* pHandler = nullptr);
+		void	SerializeValue(MetaType pPropType, void const* pPropPtr, DataStructureHandler const* pHandler = nullptr);
 
 		void	SerializeArrayValue(void const* pPropPtr, IArrayDataStructureHandler const* pArrayHandler);
 
