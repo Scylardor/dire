@@ -535,9 +535,8 @@ namespace DIRE_NS
 
 
 #define DIRE_DECLARE_TYPEINFO() \
-	struct DIRE_SelfTypeTag {}; \
-    constexpr auto DIRE_SelfTypeHelper() -> decltype(DIRE_NS::SelfHelpers::Writer<DIRE_SelfTypeTag, decltype(this)>{}); \
-    using Self = DIRE_NS::SelfHelpers::Read<DIRE_SelfTypeTag>;\
+	typedef auto DIRE_SelfDetector() -> std::remove_reference<decltype(*this)>::type;\
+    using Self = decltype(((DIRE_SelfDetector*)0)());\
 	inline static DIRE_NS::TypedTypeInfo<Self, false>	DIRE_TypeInfo{""};\
 	static DIRE_NS::TypeInfo const&	GetTypeInfo()\
 	{\

@@ -241,24 +241,29 @@ namespace DIRE_NS
 
 		[[nodiscard]] GetPropertyResult GetCompoundProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pFullPath, const std::byte * propertyAddr) const;
 	};
+
+
 }
+
 
 #define dire_reflectable(ObjectType, ...) \
 	ObjectType;\
-	template <typename T>\
-	struct DIRE_TypeInfoHelper;\
-	template <>\
-	struct DIRE_TypeInfoHelper<ObjectType>\
+	namespace DIRE_NS\
 	{\
-		using Super = DIRE_VA_MACRO(DIRE_FIRST_TYPE_OR_REFLECTABLE_, __VA_ARGS__);\
-	};\
+		template <typename T>\
+		struct SuperDetector;\
+		template <>\
+		struct DIRE_NS::SuperDetector<ObjectType>\
+		{\
+			using Super = DIRE_VA_MACRO(DIRE_FIRST_TYPE_OR_REFLECTABLE_, __VA_ARGS__);\
+		};\
+	}\
 	ObjectType : DIRE_VA_MACRO(DIRE_INHERITANCE_LIST_OR_REFLECTABLE, __VA_ARGS__)
 
 #define DIRE_REFLECTABLE_INFO() \
-	struct DIRE_SelfTypeTag {}; \
-	constexpr auto DIRE_SelfTypeHelper() -> decltype(DIRE_NS::SelfHelpers::Writer<DIRE_SelfTypeTag, decltype(this)>{}); \
-	using Self = DIRE_NS::SelfHelpers::Read<DIRE_SelfTypeTag>; \
-	using Super = DIRE_TypeInfoHelper<Self>::Super; \
+	typedef auto DIRE_SelfDetector() -> std::remove_reference<decltype(*this)>::type;  /* https://stackoverflow.com/a/21148117/1987466 */ \
+	using Self = decltype(((DIRE_SelfDetector*)0)());\
+	using Super = typename DIRE_NS::SuperDetector<Self>::Super; \
 	static const DIRE_STRING&	DIRE_GetFullyQualifiedName()\
 	{\
 		static const DIRE_STRING fullyQualifiedName = []{\
@@ -272,21 +277,21 @@ namespace DIRE_NS
 		}(); \
 		return fullyQualifiedName;\
 	}\
-	inline static DIRE_NS::TypedTypeInfo<Self, DIRE_DEFAULT_CONSTRUCTOR_INSTANTIATE>	DIRE_TypeInfo{ DIRE_GetFullyQualifiedName().c_str() }; \
+	inline static ::DIRE_NS::TypedTypeInfo<Self, DIRE_DEFAULT_CONSTRUCTOR_INSTANTIATE>	DIRE_TypeInfo{ DIRE_GetFullyQualifiedName().c_str() }; \
 	\
-	static const DIRE_NS::TypedTypeInfo<Self, DIRE_DEFAULT_CONSTRUCTOR_INSTANTIATE>& GetTypeInfo()\
+	static const ::DIRE_NS::TypedTypeInfo<Self, DIRE_DEFAULT_CONSTRUCTOR_INSTANTIATE>& GetTypeInfo()\
 	{\
 		return DIRE_TypeInfo; \
 	}\
-	static DIRE_NS::TypedTypeInfo<Self, DIRE_DEFAULT_CONSTRUCTOR_INSTANTIATE>& EditTypeInfo()\
+	static ::DIRE_NS::TypedTypeInfo<Self, DIRE_DEFAULT_CONSTRUCTOR_INSTANTIATE>& EditTypeInfo()\
 	{\
 		return DIRE_TypeInfo; \
 	}\
-	[[nodiscard]] virtual DIRE_NS::ReflectableID	GetReflectableClassID() const override\
+	[[nodiscard]] virtual ::DIRE_NS::ReflectableID	GetReflectableClassID() const override\
 	{\
 		return GetTypeInfo().GetID();\
 	}\
-	[[nodiscard]] virtual const DIRE_NS::TypeInfo* GetReflectableTypeInfo() const override\
+	[[nodiscard]] virtual const ::DIRE_NS::TypeInfo* GetReflectableTypeInfo() const override\
 	{\
 		return &GetTypeInfo();\
 	}

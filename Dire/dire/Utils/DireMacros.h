@@ -92,7 +92,7 @@
 #define DIRE_COMMA_ARGS_LSHIFT_COUNTER19(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19) DIRE_COMMA_ARGS_LSHIFT_COUNTER18(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18) DIRE_COMMA a19= 1 << (__COUNTER__ - COUNTER_BASE-OFFSET)
 #define DIRE_COMMA_ARGS_LSHIFT_COUNTER20(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20) DIRE_COMMA_ARGS_LSHIFT_COUNTER19(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19) DIRE_COMMA a20= 1 << (__COUNTER__ - COUNTER_BASE-OFFSET)
 
-#define DIRE_FIRST_TYPE_OR_REFLECTABLE_0() DIRE_NS::Reflectable
+#define DIRE_FIRST_TYPE_OR_REFLECTABLE_0() ::DIRE_NS::Reflectable
 #define DIRE_FIRST_TYPE_OR_REFLECTABLE_1(a, ...) a
 #define DIRE_FIRST_TYPE_OR_REFLECTABLE_2(a, ...) a
 #define DIRE_FIRST_TYPE_OR_REFLECTABLE_3(a, ...) a
@@ -106,7 +106,7 @@
 
 // If one day, you wanna use IF_ELSE instead, read here http://jhnet.co.uk/articles/cpp_magic
 // Important to use VA_MACRO here otherwise MSVC will expand whole va_args in a single argument
-#define DIRE_INHERITANCE_LIST_OR_REFLECTABLE0(...) DIRE_NS::Reflectable
+#define DIRE_INHERITANCE_LIST_OR_REFLECTABLE0(...) ::DIRE_NS::Reflectable
 #define DIRE_INHERITANCE_LIST_OR_REFLECTABLE1(...) DIRE_VA_MACRO(DIRE_COMMA_ARGS, __VA_ARGS__)
 #define DIRE_INHERITANCE_LIST_OR_REFLECTABLE2(...) DIRE_VA_MACRO(DIRE_COMMA_ARGS, __VA_ARGS__)
 #define DIRE_INHERITANCE_LIST_OR_REFLECTABLE3(...) DIRE_VA_MACRO(DIRE_COMMA_ARGS, __VA_ARGS__)
