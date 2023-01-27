@@ -63,8 +63,8 @@ namespace DIRE_NS
 			{
 				return DataStructureHandler(&TypedEnumDataStructureHandler<ElementValueType>::GetInstance());
 			}
-
-			return {};
+			else
+				return {};
 		}
 	};
 
@@ -265,8 +265,8 @@ namespace DIRE_NS
 				(*thisArray)[pIndex] = ElementValueType();
 				return true;
 			}
-
-			return false;
+			else
+				return false;
 		}
 
 		virtual void					Clear(void* pArray) const override

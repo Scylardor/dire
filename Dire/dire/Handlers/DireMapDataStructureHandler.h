@@ -189,8 +189,8 @@ namespace DIRE_NS
 			{
 				return DataStructureHandler(&TypedEnumDataStructureHandler<ValueType>::GetInstance());
 			}
-
-			return {};
+			else
+				return {};
 		}
 
 		virtual ReflectableID			ValueReflectableID() const override
@@ -239,8 +239,8 @@ namespace DIRE_NS
 			{
 				return DataStructureHandler(&TypedEnumDataStructureHandler<KeyType>::GetInstance());
 			}
-
-			return {};
+			else
+				return {};
 		}
 
 #ifdef DIRE_SERIALIZATION_ENABLED

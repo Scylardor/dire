@@ -21,6 +21,13 @@ if(${UPPER_PROJECT_NAME}_TESTS_ENABLED)
 	# Alias TARGET
 	add_executable(${PROJECT_NAME}::Tests ALIAS ${PROJECT_NAME}_UnitTests)
 
+# Add more flags than default CMake
+target_compile_options(${PROJECT_NAME}_UnitTests PRIVATE
+	$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
+		-Wall -Wextra -Werror -pedantic-errors -Wconversion -Wsign-conversion>
+	$<$<CXX_COMPILER_ID:MSVC>:
+		/WX /W4>)
+
 	target_link_libraries(${PROJECT_NAME}_UnitTests PRIVATE ${PROJECT_NAME})
 
 	set(UNIT_TESTS_DEFINE ${UPPER_PROJECT_NAME}_UNIT_TESTS)

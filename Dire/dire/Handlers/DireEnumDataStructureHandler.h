@@ -17,6 +17,8 @@ namespace DIRE_NS
 	template <class T>
 	class TypedEnumDataStructureHandler final : public IEnumDataStructureHandler
 	{
+		static_assert(std::is_base_of_v<Enum, T>);
+
 	public:
 		virtual const char* EnumToString(const void* pVal) const override
 		{

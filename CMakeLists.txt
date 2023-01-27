@@ -103,6 +103,13 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 	VERSION ${PROJECT_VERSION}
 	SOVERSION ${PROJECT_VERSION_MAJOR})
 
+# Add more flags than default CMake
+target_compile_options(${PROJECT_NAME} PRIVATE
+	$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
+		-Wall -Wextra -Werror -pedantic-errors -Wconversion -Wsign-conversion>
+	$<$<CXX_COMPILER_ID:MSVC>:
+		/WX /W4>)
+
 # On Windows, set a different name for the import library to not be confused with a static build of the library
 # (both have .lib extension)
 if (CMAKE_IMPORT_LIBRARY_SUFFIX AND ${${UPPER_PROJECT_NAME}_BUILD_SHARED_LIB})
