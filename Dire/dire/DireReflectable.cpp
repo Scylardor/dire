@@ -2,7 +2,7 @@
 
 namespace DIRE_NS
 {
-	const Reflectable::GetPropertyResult Reflectable::GetPropertyImpl(DIRE_STRING_VIEW pFullPath) const
+	Reflectable::GetPropertyResult Reflectable::GetPropertyImpl(DIRE_STRING_VIEW pFullPath) const
 	{
 		const TypeInfo* thisTypeInfo = GetReflectableTypeInfo();
 
@@ -433,7 +433,7 @@ namespace DIRE_NS
 			}
 			pKey = pRemainingPath.substr(1, rightBracketPos - 1);
 			pRemainingPath.remove_prefix(rightBracketPos + 1);
-			
+
 			DataStructureHandler elementHandler = pMapHandler->ValueDataHandler();
 			if (pMapHandler->ValueMetaType() == MetaType::Array)
 			{
@@ -446,7 +446,7 @@ namespace DIRE_NS
 		return {};
 	}
 
-	[[nodiscard]] Reflectable::GetPropertyResult Reflectable::GetCompoundProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pFullPath, std::byte const* propertyAddr) const
+	[[nodiscard]] Reflectable::GetPropertyResult Reflectable::GetCompoundProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pFullPath, const std::byte * propertyAddr) const
 	{
 		// First, find our compound property
 		const PropertyTypeInfo * thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
@@ -504,7 +504,7 @@ namespace DIRE_NS
 		return GetCompoundProperty(pTypeInfoOwner, pName, pFullPath, propertyAddr);
 	}
 
-	Reflectable::GetPropertyResult Reflectable::GetArrayMapProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey, std::byte const* pPropPtr) const
+	Reflectable::GetPropertyResult Reflectable::GetArrayMapProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, DIRE_STRING_VIEW pKey, const std::byte * pPropPtr) const
 	{
 		// First, find our array property
 		const PropertyTypeInfo * thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
@@ -522,7 +522,7 @@ namespace DIRE_NS
 		return RecurseArrayMapProperty(thisProp, pPropPtr, pRemainingPath, pKey);
 	}
 
-	[[nodiscard]] Reflectable::GetPropertyResult Reflectable::GetArrayProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, std::byte const* pPropPtr) const
+	[[nodiscard]] Reflectable::GetPropertyResult Reflectable::GetArrayProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, const std::byte * pPropPtr) const
 	{
 		// First, find our array property
 		const PropertyTypeInfo * thisProp = pTypeInfoOwner->FindPropertyInHierarchy(pName);
@@ -541,10 +541,10 @@ namespace DIRE_NS
 		return RecurseFindArrayProperty(arrayHandler, pName, pRemainingPath, pArrayIdx, pPropPtr);
 	}
 
-	FunctionInfo const* Reflectable::GetFunction(DIRE_STRING_VIEW pMemberFuncName) const
+	const FunctionInfo * Reflectable::GetFunction(DIRE_STRING_VIEW pMemberFuncName) const
 	{
 		const TypeInfo * thisTypeInfo = GetReflectableTypeInfo();
-		for (FunctionInfo const& aFuncInfo : thisTypeInfo->GetFunctionList())
+		for (const FunctionInfo & aFuncInfo : thisTypeInfo->GetFunctionList())
 		{
 			if (aFuncInfo.GetName() == pMemberFuncName)
 			{

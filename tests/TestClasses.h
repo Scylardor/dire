@@ -91,6 +91,12 @@ dire_reflectable(struct MegaCompound)
 	DIRE_ARRAY_PROPERTY(SuperCompound, toto, [3])
 
 	MegaCompound() = default;
+
+	bool operator==(const MegaCompound& other)
+	{
+		return compint == other.compint && compleet.leet == other.compleet.leet && compleet.copyable.aUselessProp == other.compleet.copyable.aUselessProp
+			&& memcmp(&toto, &other.toto, sizeof(toto)) == 0;
+	}
 };
 
 dire_reflectable(struct UltraCompound)
@@ -258,4 +264,51 @@ dire_reflectable(struct metadatas)
 	DIRE_PROPERTY(std::string, customName, DIRE_NS::Metadata <DIRE_NS::DisplayName<"MyString">>(), "aString");
 
 #endif
+};
+
+class noncopyable
+{
+public:
+	noncopyable() = default;
+	noncopyable(const noncopyable&) = delete;
+	noncopyable& operator=(const noncopyable&) = delete;
+};
+
+class noncopyable_int : public noncopyable
+{
+	const int theAnswer = 42;
+};
+
+class emptyObject
+{};
+
+
+dire_reflectable(struct Test)
+{
+	DIRE_REFLECTABLE_INFO()
+
+	DIRE_FUNCTION(int, namedParamTest, (int aTest))
+
+	DIRE_FUNCTION(int, anonymousParamTest, bool);
+
+	DIRE_FUNCTION(int, noArguments);
+
+	DIRE_FUNCTION(void, nothing);
+
+	DIRE_FUNCTION(short, multipleArguments, float bibi, int toto);
+
+	DIRE_FUNCTION(void, templateArguments1, (std::vector<float>)&, int toto);
+	DIRE_FUNCTION(void, templateArguments2, (std::map<int, bool>)&, int toto);
+
+	void separateDeclarationTest(float& floatRef);
+	DIRE_FUNCTION_TYPEINFO(separateDeclarationTest);
+
+	DIRE_FUNCTION(void, refParam, int&);
+
+	DIRE_FUNCTION(void, noncopyableRefParam, noncopyable&);
+
+	DIRE_FUNCTION(void, passArrayByValue, std::vector<bool>);
+
+	DIRE_FUNCTION(void, passObjectByValue, emptyObject);
+
 };

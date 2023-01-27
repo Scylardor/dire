@@ -195,9 +195,9 @@ namespace DIRE_NS
 			}
 		}
 
-		const DIRE_STRING& GetName() const { return Name; }
-		MetaType	GetReturnType() const { return ReturnType; }
-		const ParameterList& GetParametersTypes() const { return Parameters; }
+		const DIRE_STRING&		GetName() const { return Name; }
+		MetaType				GetReturnType() const { return ReturnType; }
+		const ParameterList&	GetParametersTypes() const { return Parameters; }
 
 	protected:
 
@@ -211,7 +211,6 @@ namespace DIRE_NS
 		DIRE_STRING		Name;
 		MetaType		ReturnType{ MetaType::Void };
 		ParameterList	Parameters;
-
 	};
 
 	template <typename Ty >

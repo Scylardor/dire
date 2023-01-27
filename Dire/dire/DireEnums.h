@@ -113,7 +113,8 @@ namespace DIRE_NS
 		}\
 	private:\
 		inline static std::pair<const char*, Values> nameEnumPairs[]{DIRE_VA_MACRO(DIRE_BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)}; \
-	};
+	};\
+	static_assert(sizeof(EnumName) == sizeof(UnderlyingType));
 	//std::ostream& operator<<(std::ostream& pOs, const EnumName& pEnum)\
 	//{\
 	//	pOs << pEnum.GetString();\
@@ -397,7 +398,8 @@ namespace DIRE_NS
 			return oredValues;\
 		}\
 		inline static std::pair<const char*, Values> nameEnumPairs[] {DIRE_VA_MACRO(DIRE_BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)};\
-	};
+	};\
+	static_assert(sizeof(EnumName) == sizeof(UnderlyingType));
 	//std::ostream& operator<<(std::ostream& pOs, const EnumName& pEnum)\
 	//{\
 	//	pOs << pEnum.GetString();\

@@ -4,51 +4,11 @@
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
 #include "Dire/Dire.h"
 
+#include "TestClasses.h"
+
 #include <map>
 #include <sstream>
 
-class noncopyable
-{
-public:
-	noncopyable() = default;
-	noncopyable(const noncopyable &) = delete;
-	noncopyable& operator=(const noncopyable &) = delete;
-};
-
-class noncopyable_int : public noncopyable
-{
-	const int theAnswer = 42;
-};
-
-class emptyObject
-{};
-
-struct Test
-{
-	DIRE_DECLARE_TYPEINFO()
-
-	DIRE_FUNCTION(int, namedParamTest, (int aTest))
-
-	DIRE_FUNCTION(int, anonymousParamTest, bool);
-
-	DIRE_FUNCTION(int, noArguments);
-
-	DIRE_FUNCTION(short, multipleArguments, float bibi, int toto);
-
-	DIRE_FUNCTION(void, templateArguments1, (std::vector<float>)&, int toto);
-	DIRE_FUNCTION(void, templateArguments2, (std::map<int, bool>)&, int toto);
-
-	void separateDeclarationTest(float & floatRef);
-	DIRE_FUNCTION_TYPEINFO(separateDeclarationTest);
-
-	DIRE_FUNCTION(void, refParam, int&);
-
-	DIRE_FUNCTION(void, noncopyableRefParam, noncopyable&);
-
-	DIRE_FUNCTION(void, passArrayByValue, std::vector<bool>);
-
-	DIRE_FUNCTION(void, passObjectByValue, emptyObject);
-};
 
 
 void Test::refParam(int& test)
@@ -69,10 +29,16 @@ void Test::passObjectByValue(emptyObject /*unused*/)
 {
 }
 
+
 int Test::noArguments()
 {
 	return 42;
 }
+
+void Test::nothing()
+{
+}
+
 
 int Test::namedParamTest(int /*aTest*/)
 {
@@ -151,9 +117,10 @@ TEST_CASE("Function Type Info", "[Functions]")
 		ostr << '\n';
 	}
 	auto result = ostr.str();
-	REQUIRE(result == "namedParamTest Type: Int Parameters: Int\n\
+	REQUIRE(result ==  "namedParamTest Type: Int Parameters: Int\n\
 anonymousParamTest Type: Int Parameters: Bool\n\
 noArguments Type: Int Parameters:\n\
+nothing Type: Void Parameters:\n\
 multipleArguments Type: Short Parameters: Float Int\n\
 templateArguments1 Type: Void Parameters: Reference Int\n\
 templateArguments2 Type: Void Parameters: Reference Int\n\
@@ -161,12 +128,34 @@ separateDeclarationTest Type: Void Parameters: Reference\n\
 refParam Type: Void Parameters: Reference\n\
 noncopyableRefParam Type: Void Parameters: Reference\n\
 passArrayByValue Type: Void Parameters: Array\n\
-passObjectByValue Type: Void Parameters: Object\n");
+passObjectByValue Type: Void Parameters: Object\n\
+");
 }
 
 TEST_CASE("Reflectable Function Invoke Interface", "[Functions]")
 {
-	// TODO
-	//aTest.TypedInvokeFunction<void, float>("zdzdzdz", 3.f);
-	//funcInfo->TypedInvokeWithArgs<void>(&aTest, 3.f);
+	Test aTest;
+
+	// bad name (does nothing)
+	const dire::FunctionInfo* funcInfo = aTest.GetFunction("zdzdzdz");
+	REQUIRE(funcInfo == nullptr);
+	aTest.TypedInvokeFunction<void>("zdzdzdz", 3.f);
+
+	// no arguments
+	int result = aTest.TypedInvokeFunction<int>("noArguments");
+	REQUIRE(result == 42);
+
+	// arguments, void return
+	result = 1337;
+	aTest.TypedInvokeFunction<void>("refParam", result);
+	REQUIRE(result == 42);
+
+	// no arguments, void return
+	aTest.TypedInvokeFunction<void>("nothing");
+
+	// multiple arguments
+	short sres = aTest.TypedInvokeFunction<short>("multipleArguments", 3.f, 1);
+	REQUIRE(sres == 4);
+
+
 }

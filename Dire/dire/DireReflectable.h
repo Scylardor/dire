@@ -217,12 +217,12 @@ namespace DIRE_NS
 
 		Dire_EXPORT [[nodiscard]] bool EraseProperty(DIRE_STRING_VIEW pName);
 
-		Dire_EXPORT [[nodiscard]] FunctionInfo const* GetFunction(DIRE_STRING_VIEW pMemberFuncName) const;
+		Dire_EXPORT [[nodiscard]] const FunctionInfo * GetFunction(DIRE_STRING_VIEW pMemberFuncName) const;
 
 		template <typename... Args>
 		std::any	InvokeFunction(DIRE_STRING_VIEW pMemberFuncName, Args&&... pFuncArgs)
 		{
-			FunctionInfo const* theFunction = GetFunction(pMemberFuncName);
+			const FunctionInfo * theFunction = GetFunction(pMemberFuncName);
 			if (theFunction == nullptr)
 			{
 				return {};
@@ -267,7 +267,7 @@ namespace DIRE_NS
 			ParseError Error;
 		};
 
-		Dire_EXPORT [[nodiscard]] const GetPropertyResult GetPropertyImpl(DIRE_STRING_VIEW pFullPath) const;
+		Dire_EXPORT [[nodiscard]] GetPropertyResult GetPropertyImpl(DIRE_STRING_VIEW pFullPath) const;
 
 		[[nodiscard]] GetPropertyResult GetArrayProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, const std::byte * pPropPtr) const;
 
