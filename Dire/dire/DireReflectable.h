@@ -104,9 +104,9 @@ namespace DIRE_NS
 			if constexpr (sizeof...(Args) == 0)
 			{
 				return  TypeInfoDatabase::GetSingleton().TryInstantiate(GetReflectableClassID(), {});
-
 			}
-			return TypeInfoDatabase::GetSingleton().TryInstantiate(GetReflectableClassID(), {std::tuple<Args...>(std::forward<Args>(pArgs)...)});
+			else
+				return TypeInfoDatabase::GetSingleton().TryInstantiate(GetReflectableClassID(), {std::tuple<Args...>(std::forward<Args>(pArgs)...)});
 		}
 
 		void	CloneProperties(Reflectable const* pCloned, const TypeInfo * pClonedTypeInfo, Reflectable* pClone)

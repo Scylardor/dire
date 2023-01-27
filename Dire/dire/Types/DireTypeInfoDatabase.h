@@ -82,7 +82,8 @@ namespace DIRE_NS
 			static_assert(std::is_base_of_v<Reflectable, T>, "ClassInstantiator is only meant to be used as a member of Reflectable-derived classes.");
 			if constexpr (sizeof...(Args) == 0)
 				return static_cast<T*>(TryInstantiate(T::GetTypeInfo().GetID(), {}));
-			return static_cast<T*>(TryInstantiate(T::GetTypeInfo().GetID(), { std::tuple<Args...>(std::forward<Args>(pArgs)...) }));
+			else
+				return static_cast<T*>(TryInstantiate(T::GetTypeInfo().GetID(), { std::tuple<Args...>(std::forward<Args>(pArgs)...) }));
 		}
 
 		Dire_EXPORT DIRE_STRING	BinaryExport() const;

@@ -172,6 +172,23 @@ TEST_CASE("JSON Serialize enumerations", "[Serialization]")
 	REQUIRE(enums == deserializedEnums);
 }
 
+TEST_CASE("JSON Serialize Metadatas", "[Serialization]")
+{
+	dire::RapidJsonReflectorSerializer serializer;
+	std::string serialized;
+
+	metadatas testMetadatas;
+
+	serialized = serializer.Serialize(testMetadatas).AsString();
+#if DIRE_HAS_CPP20
+	REQUIRE(serialized ==
+		"{\"aMap\":{},\"xp\":42,\"xp_metadata\":{\"IValueRange\":{\"Min\":1,\"Max\":10}},\"isTransient\":true,\"isTransient_metadata\":{\"Transient\":{}},\"shouldNeverBeIgnored\":{\"aTestFace\":0,\"bestKing\":\"Alexandre\",\"worstKings\":[\"Philippe\",\"Philippe\"],\"playableKings\":[],\"allowedQueens\":{},\"pointsPerJack\":{}},\"shouldNeverBeIgnored_metadata\":{},\"multiMetadata\":0,\"multiMetadata_metadata\":{\"IValueRange\":{\"Min\":1,\"Max\":10},\"Transient\":{}},\"rangedFloat\":0.0,\"rangedFloat_metadata\":{\"FValueRange\":{\"Min\":0.0,\"Max\":1.0}},\"customName\":[97,83,116,114,105,110,103],\"customName_metadata\":{\"DisplayName\":{\"Name\":\"MyString\"}}}");
+#else
+	REQUIRE(serialized ==
+		"{\"aMap\":{},\"xp\":42,\"xp_metadata\":{\"IValueRange\":{\"Min\":1,\"Max\":10}},\"isTransient\":true,\"isTransient_metadata\":{\"Transient\":{}},\"shouldNeverBeIgnored\":{\"aTestFace\":0,\"bestKing\":\"Alexandre\",\"worstKings\":[\"Philippe\",\"Philippe\"],\"playableKings\":[],\"allowedQueens\":{},\"pointsPerJack\":{}},\"shouldNeverBeIgnored_metadata\":{},\"multiMetadata\":0,\"multiMetadata_metadata\":{\"IValueRange\":{\"Min\":1,\"Max\":10},\"Transient\":{}}}");
+#endif
+}
+
 #	endif // DIRE_SERIALIZATION_RAPIDJSON_ENABLED
 
 #	ifdef DIRE_SERIALIZATION_BINARY_ENABLED

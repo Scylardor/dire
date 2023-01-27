@@ -75,21 +75,21 @@ namespace DIRE_NS
 	struct Serializable : IMetadataAttribute
 	{
 #ifdef DIRE_SERIALIZATION_ENABLED
-		Dire_EXPORT static void	Serialize(ISerializer&) {}
+		static void	Serialize(ISerializer&) {}
 #endif
 	};
 
 	struct NotSerializable : IMetadataAttribute
 	{
 #ifdef DIRE_SERIALIZATION_ENABLED
-		Dire_EXPORT static void	Serialize(ISerializer&) {}
+		static void	Serialize(ISerializer&) {}
 #endif
 	};
 
 	struct Transient : IMetadataAttribute
 	{
 #ifdef DIRE_SERIALIZATION_ENABLED
-		Dire_EXPORT static void	Serialize(ISerializer& pSerializer)
+		static void	Serialize(ISerializer& pSerializer)
 		{
 			pSerializer.SerializeValuesForObject("Transient", [](ISerializer& /*pSerializer*/){}); // nothing to do for a "boolean" attribute
 		}
@@ -97,7 +97,7 @@ namespace DIRE_NS
 	};
 
 // We need C++20 (and later) for complicated non-type template parameters like floats and string literals.
-#if (defined(_MSC_VER) && _MSVC_LANG >= 202002L) || __cplusplus >= 202002L // MSVC doesn't use __cplusplus unless you use /Zc:__cplusplus :/
+#if DIRE_HAS_CPP20
 	// inspired by https://vector-of-bool.github.io/2021/10/22/string-templates.html
 	template<unsigned N>
 	struct Dire_EXPORT FixedString
@@ -123,7 +123,7 @@ namespace DIRE_NS
 	struct DisplayName : IMetadataAttribute
 	{
 # ifdef DIRE_SERIALIZATION_ENABLED
-		Dire_EXPORT static void	Serialize(ISerializer& pSerializer)
+		static void	Serialize(ISerializer& pSerializer)
 		{
 			pSerializer.SerializeValuesForObject("DisplayName", [](ISerializer& pSerializer)
 			{
@@ -143,7 +143,7 @@ namespace DIRE_NS
 		static_assert(Min <= Max, "Min and Max values are inverted!");
 
 # ifdef DIRE_SERIALIZATION_ENABLED
-		Dire_EXPORT static void	Serialize(ISerializer& pSerializer)
+		static void	Serialize(ISerializer& pSerializer)
 		{
 			pSerializer.SerializeValuesForObject("FValueRange", [](ISerializer& pSerializer)
 			{
@@ -156,7 +156,7 @@ namespace DIRE_NS
 # endif
 	};
 
-#endif
+#endif // DIRE_HAS_CPP20
 
 	template <int32_t Min, int32_t Max>
 	struct IValueRange : IMetadataAttribute
@@ -164,7 +164,7 @@ namespace DIRE_NS
 		static_assert(Min <= Max, "Min and Max values are inverted!");
 
 #ifdef DIRE_SERIALIZATION_ENABLED
-		Dire_EXPORT static void	Serialize(ISerializer& pSerializer)
+		static void	Serialize(ISerializer& pSerializer)
 		{
 			pSerializer.SerializeValuesForObject("IValueRange", [](ISerializer& pSerializer)
 			{

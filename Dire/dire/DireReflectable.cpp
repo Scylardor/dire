@@ -214,7 +214,7 @@ namespace DIRE_NS
 		// Find out the type of handler we are interested in
 		const void * value = nullptr;
 		const bool propIsAnArray = pProperty->GetMetatype() == MetaType::Array;
-		DIRE_ASSERT(propIsAnArray || pProperty->GetMetatype() == Type::Map);
+		DIRE_ASSERT(propIsAnArray || pProperty->GetMetatype() == MetaType::Map);
 
 		if (propIsAnArray)
 		{

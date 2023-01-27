@@ -12,6 +12,8 @@
 	#include <cassert>
 #endif
 
+#cmakedefine01 DIRE_HAS_CPP20
+
 #define DIRE_ASSERT @DIRE_ASSERT@
 
 #cmakedefine DIRE_USE_STANDARD_STRING

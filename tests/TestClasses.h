@@ -233,3 +233,29 @@ dire_reflectable(struct enumTestType)
 			&& playableKings == pRhs.playableKings && allowedQueens == pRhs.allowedQueens && pointsPerJack == pRhs.pointsPerJack;
 	}
 };
+
+
+dire_reflectable(struct metadatas)
+{
+	DIRE_REFLECTABLE_INFO()
+
+	DIRE_PROPERTY((std::map<int, bool>), aMap);
+
+	DIRE_PROPERTY(int, xp, DIRE_NS::Metadata<DIRE_NS::IValueRange<1, 10>>(), 42)
+
+	DIRE_PROPERTY(bool, isTransient, DIRE_NS::Metadata<DIRE_NS::Transient>(), true)
+
+	DIRE_PROPERTY(float, shouldBeIgnored, DIRE_NS::Metadata<DIRE_NS::NotSerializable>(), 4.f)
+
+	DIRE_PROPERTY(enumTestType, shouldNeverBeIgnored, DIRE_NS::Metadata<DIRE_NS::Serializable>())
+
+	DIRE_PROPERTY(int, multiMetadata, DIRE_NS::Metadata<DIRE_NS::IValueRange<1, 10>, DIRE_NS::Transient>())
+
+#if DIRE_HAS_CPP20
+
+	DIRE_PROPERTY(float, rangedFloat, DIRE_NS::Metadata <DIRE_NS::FValueRange<0.f, 1.f>>());
+
+	DIRE_PROPERTY(std::string, customName, DIRE_NS::Metadata <DIRE_NS::DisplayName<"MyString">>(), "aString");
+
+#endif
+};

@@ -119,6 +119,10 @@ endif()
 # specify the C++ standard
 target_compile_features(${PROJECT_NAME} PUBLIC ${${UPPER_PROJECT_NAME}_CPP_STANDARD})
 
+if(${${UPPER_PROJECT_NAME}_CPP_STANDARD} STREQUAL "cxx_std_20")
+	set(DIRE_HAS_CPP20 TRUE)
+endif()
+
 # Defines (Warning: do this before configure_file or it won't be setup correctly!)
 if(${${UPPER_PROJECT_NAME}_ASSERT} STREQUAL "assert")
 	set(${UPPER_PROJECT_NAME}_USE_STANDARD_ASSERT TRUE)
