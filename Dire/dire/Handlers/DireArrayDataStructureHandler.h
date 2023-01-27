@@ -36,42 +36,16 @@ namespace DIRE_NS
 	{
 	protected:
 		template <typename ElementValueType>
-		static ReflectableID			GetElementReflectableID()
-		{
-			if constexpr (std::is_base_of_v<Reflectable, ElementValueType>)
-			{
-				return ElementValueType::GetTypeInfo().GetID();
-			}
-			else
-			{
-				return DIRE_NS::INVALID_REFLECTABLE_ID;
-			}
-		}
+		static ReflectableID	GetElementReflectableID();
 
 		template <typename ElementValueType>
-		static DataStructureHandler	GetTypedElementHandler()
-		{
-			if constexpr (HasMapSemantics_v<ElementValueType>)
-			{
-				return DataStructureHandler(&TypedMapDataStructureHandler<ElementValueType>::GetInstance());
-			}
-			else if constexpr (HasArraySemantics_v<ElementValueType>)
-			{
-				return DataStructureHandler(&TypedArrayDataStructureHandler<ElementValueType>::GetInstance());
-			}
-			else if constexpr (std::is_base_of_v<Enum, ElementValueType>)
-			{
-				return DataStructureHandler(&TypedEnumDataStructureHandler<ElementValueType>::GetInstance());
-			}
-			else
-				return {};
-		}
+		static DataStructureHandler	GetTypedElementHandler();
 	};
 
 
 	// Base class for reflectable properties that have brackets operator to be able to make operations on the underlying array
 	template <typename T>
-	class Dire_EXPORT TypedArrayDataStructureHandler<T,
+	class TypedArrayDataStructureHandler<T,
 		typename std::enable_if_t<HasArraySemantics_v<T> && !std::is_array_v<T>>> final : public AbstractArrayDataStructureHandler
 	{
 		using RawElementType = decltype(std::declval<T>()[0]);
@@ -89,76 +63,20 @@ namespace DIRE_NS
 			"In order to use Array-style reflection indexing, your type has to implement the following member functions with the same signature-style as std::vector:"
 			" operator[], begin, insert(iterator, value), erase, clear, size, resize.");
 
-		virtual const void* Read(const void* pArray, size_t pIndex) const override
-		{
-			if (pArray == nullptr)
-			{
-				return nullptr;
-			}
+		virtual const void* Read(const void* pArray, size_t pIndex) const override;
 
-			if (pIndex >= Size(pArray))
-			{
-				Create(const_cast<void*>(pArray), pIndex, nullptr);
-			}
-
-			T const* thisArray = static_cast<T const*>(pArray);
-			return &(*thisArray)[pIndex];
-		}
-
-		virtual void					Update(void* pArray, size_t pIndex, const void* pUpdateValue) const override
-		{
-			if (pArray == nullptr)
-			{
-				return;
-			}
-
-			T* thisArray = static_cast<T*>(pArray);
-			if (pIndex >= Size(pArray))
-			{
-				thisArray->resize(pIndex + 1);
-			}
-
-			ElementValueType const* actualData = static_cast<ElementValueType const*>(pUpdateValue);
-			(*thisArray)[pIndex] = actualData ? *actualData : ElementValueType();
-		}
+		virtual void					Update(void* pArray, size_t pIndex, const void* pUpdateValue) const override;
 
 		virtual void					Create(void* pArray, size_t pIndex, const void* pCreateValue) const override
 		{
 			return Update(pArray, pIndex, pCreateValue);
 		}
 
-		virtual bool					Erase(void* pArray, size_t pIndex) const override
-		{
-			T* thisArray = static_cast<T*>(pArray);
+		virtual bool					Erase(void* pArray, size_t pIndex) const override;
 
-			if (thisArray != nullptr && thisArray->size() > pIndex)
-			{
-				thisArray->erase(thisArray->begin() + pIndex);
-				return true;
-			}
+		virtual void					Clear(void* pArray) const override;
 
-			return false;
-		}
-
-		virtual void					Clear(void* pArray) const override
-		{
-			if (pArray != nullptr)
-			{
-				T* thisArray = static_cast<T*>(pArray);
-				thisArray->clear();
-			}
-		}
-
-		virtual size_t					Size(const void* pArray) const override
-		{
-			if (pArray != nullptr)
-			{
-				T const* thisArray = static_cast<T const*>(pArray);
-				return thisArray->size();
-			}
-
-			return 0;
-		}
+		virtual size_t					Size(const void* pArray) const override;
 
 		virtual DataStructureHandler	ElementHandler() const override
 		{
@@ -202,93 +120,17 @@ namespace DIRE_NS
 
 		TypedArrayDataStructureHandler() = default;
 
-		virtual const void*		Read(const void* pArray, size_t pIndex) const override
-		{
-			if (pArray == nullptr)
-			{
-				return nullptr;
-			}
+		virtual const void*	Read(const void* pArray, size_t pIndex) const override;
 
-			IndexCheck(pIndex);
+		virtual void		Update(void* pArray, size_t pIndex, const void* pUpdateValue) const override;
 
-			T const* thisArray = static_cast<T const*>(pArray);
-			return &(*thisArray)[pIndex];
-		}
+		virtual void		Create(void* pArray, size_t pIndex, const void* pCreateValue) const override;
 
-		virtual void					Update(void* pArray, size_t pIndex, const void* pUpdateValue) const override
-		{
-			if (pArray == nullptr || pUpdateValue == nullptr)
-			{
-				return;
-			}
+		virtual bool		Erase(void* pArray, size_t pIndex) const override;
 
-			IndexCheck(pIndex);
+		virtual void		Clear(void* pArray) const override;
 
-			// Check if the element is assignable to make arrays of arrays work
-			if constexpr (std::is_assignable_v<ElementValueType&, ElementValueType>)
-			{
-				T* thisArray = static_cast<T*>(pArray);
-				ElementValueType const* actualData = static_cast<ElementValueType const*>(pUpdateValue);
-				(*thisArray)[pIndex] = *actualData;
-			}
-		}
-
-		virtual void					Create(void* pArray, size_t pIndex, const void* pCreateValue) const override
-		{
-			if (pArray == nullptr)
-			{
-				return;
-			}
-
-			IndexCheck(pIndex);
-
-			// Check if the element is assignable to make arrays of arrays work
-			if constexpr (std::is_assignable_v<ElementValueType&, ElementValueType>)
-			{
-				T* thisArray = static_cast<T*>(pArray);
-				ElementValueType const* actualInitData = (pCreateValue ? static_cast<ElementValueType const*>(pCreateValue) : nullptr);
-				(*thisArray)[pIndex] = actualInitData ? *actualInitData : ElementValueType();
-			}
-		}
-
-		virtual bool					Erase(void* pArray, size_t pIndex) const override
-		{
-			if (pArray == nullptr || pIndex >= ARRAY_SIZE)
-			{
-				return false;
-			}
-
-			// Check if the element is assignable to make arrays of arrays work
-			if constexpr (std::is_assignable_v<ElementValueType&, ElementValueType>)
-			{
-				T* thisArray = static_cast<T*>(pArray);
-				(*thisArray)[pIndex] = ElementValueType();
-				return true;
-			}
-			else
-				return false;
-		}
-
-		virtual void					Clear(void* pArray) const override
-		{
-			if (pArray == nullptr)
-			{
-				return;
-			}
-
-			// I don't know if we can do something smarter in this case...
-			// Check if the element is assignable to make arrays of arrays work
-			if constexpr (std::is_assignable_v<ElementValueType&, ElementValueType>)
-			{
-				T* thisArray = static_cast<T*>(pArray);
-				for (auto i = 0u; i < ARRAY_SIZE; ++i)
-				{
-					(*thisArray)[i] = ElementValueType();
-				}
-			}
-		}
-
-		virtual size_t					Size(const void* /*pArray*/) const override
+		virtual size_t		Size(const void* /*pArray*/) const override
 		{
 			return ARRAY_SIZE;
 		}
@@ -313,21 +155,16 @@ namespace DIRE_NS
 			return sizeof(ElementValueType);
 		}
 
-		static TypedArrayDataStructureHandler const& GetInstance()
+		static const TypedArrayDataStructureHandler & GetInstance()
 		{
 			static TypedArrayDataStructureHandler instance{};
 			return instance;
 		}
 
 	private:
-		static void	IndexCheck(size_t pIndex)
-		{
-			if (ARRAY_SIZE <= pIndex)
-			{
-				char buffer[256]{ 0 };
-				std::snprintf(buffer, sizeof(buffer), "Static Array handler was used with an index out of range (index: %llu vs. array size: %llu)", pIndex, ARRAY_SIZE);
-				throw std::out_of_range(buffer);
-			}
-		}
+		static void	IndexCheck(size_t pIndex);
 	};
+
 }
+
+#include "DireArrayDataStructureHandler.inl"

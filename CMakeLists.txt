@@ -37,18 +37,14 @@ set(DIRE_GENERATED_INCLUDES_DIR generated-includes/Dire)
 set(${PROJECT_NAME}_SOURCES
 	${DIRE_SOURCE_DIR}/Dire.h
 	${DIRE_SOURCE_DIR}/DireEnums.h
-	${DIRE_SOURCE_DIR}/DireEnums.inl
 	${DIRE_SOURCE_DIR}/DireReflectable.h
 	${DIRE_SOURCE_DIR}/DireReflectable.cpp
 	${DIRE_SOURCE_DIR}/DireProperty.h
-	${DIRE_SOURCE_DIR}/DireProperty.inl
 	${DIRE_SOURCE_DIR}/DirePropertyMetadata.h
-	${DIRE_SOURCE_DIR}/DirePropertyMetadata.inl
 	${DIRE_SOURCE_DIR}/DireSubclass.h
 	${DIRE_SOURCE_DIR}/DireReflectableID.h
 	${DIRE_SOURCE_DIR}/DireDefines.h.in
 	${DIRE_SOURCE_DIR}/Handlers/DireTypeHandlers.h
-	${DIRE_SOURCE_DIR}/Handlers/DireTypeHandlers.inl
 	${DIRE_SOURCE_DIR}/Handlers/DireArrayDataStructureHandler.h
 	${DIRE_SOURCE_DIR}/Handlers/DireArrayDataStructureHandler.inl
 	${DIRE_SOURCE_DIR}/Handlers/DireMapDataStructureHandler.h
@@ -76,7 +72,6 @@ set(${PROJECT_NAME}_SOURCES
 	${DIRE_SOURCE_DIR}/Utils/DireIntrusiveList.h
 	${DIRE_SOURCE_DIR}/Utils/DireIntrusiveList.inl
 	${DIRE_SOURCE_DIR}/Utils/DireString.h
-	${DIRE_SOURCE_DIR}/Utils/DireString.inl
 	${CMAKE_CURRENT_BINARY_DIR}/${DIRE_GENERATED_INCLUDES_DIR}/DireDefines.h
 	${CMAKE_CURRENT_BINARY_DIR}/${DIRE_GENERATED_INCLUDES_DIR}/Dire_Export.h
 )

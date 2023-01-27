@@ -47,7 +47,7 @@ namespace DIRE_NS
 
 	// Base class for reflectable properties that have brackets operator to be able to make operations on the underlying array
 	template <typename T>
-	class Dire_EXPORT TypedMapDataStructureHandler<T,
+	class TypedMapDataStructureHandler<T,
 		typename std::enable_if_t<HasMapSemantics_v<T>>> final : public IMapDataStructureHandler
 	{
 		using KeyType = typename T::key_type;
@@ -60,150 +60,23 @@ namespace DIRE_NS
 			"a key_type typedef, a mapped_type typedef, operator[], begin, end, find, an std::pair-like iterator type, erase, clear, size.");
 
 	public:
-		virtual const void* Read(const void* pMap, const DIRE_STRING_VIEW& pKey) const override
-		{
-			const T* thisMap = static_cast<const T*>(pMap);
-			if (thisMap == nullptr)
-			{
-				return nullptr;
-			}
-			const ConvertResult<KeyType> key = DIRE_NS::FromCharsConverter<KeyType>::Convert(pKey);
-			if (key.HasError())
-				return nullptr;
+		virtual const void* Read(const void* pMap, const DIRE_STRING_VIEW& pKey) const override;
 
-			auto it = thisMap->find(key.GetValue());
-			if (it == thisMap->end())
-			{
-				return nullptr;
-			}
-			return &it->second;
-		}
+		virtual void		Update(void* pMap, const DIRE_STRING_VIEW& pKey, const void* pNewData) const override;
 
-		virtual void					Update(void* pMap, const DIRE_STRING_VIEW& pKey, const void* pNewData) const override
-		{
-			if (pMap == nullptr)
-			{
-				return;
-			}
+		virtual void*		Create(void* pMap, const DIRE_STRING_VIEW& pKey, const void* pInitData) const override;
 
-			ValueType* valuePtr = const_cast<ValueType*>((const ValueType*)Read(pMap, pKey));
-			if (valuePtr == nullptr) // key not found
-			{
-				return;
-			}
+		virtual void*		BinaryCreate(void* pMap, void const* pKey, const void* pInitData) const override;
 
-			auto* newValue = static_cast<const ValueType*>(pNewData);
-			(*valuePtr) = *newValue;
-		}
+		virtual bool		Erase(void* pMap, const DIRE_STRING_VIEW& pKey) const override;
 
-		virtual void* Create(void* pMap, const DIRE_STRING_VIEW& pKey, const void* pInitData) const override
-		{
-			if (pMap == nullptr)
-			{
-				return nullptr;
-			}
+		virtual void		Clear(void* pMap) const override;
 
-			T* thisMap = static_cast<T*>(pMap);
-			const ConvertResult<KeyType> key = DIRE_NS::FromCharsConverter<KeyType>::Convert(pKey);
-			if (key.HasError())
-				return nullptr;
+		virtual size_t		Size(const void* pMap) const override;
 
-			if (pInitData == nullptr)
-			{
-				auto [it, inserted] = thisMap->insert({ key.GetValue(), ValueType() });
-				return &it->second;
-			}
+		virtual DataStructureHandler	ValueDataHandler() const override;
 
-			const ValueType& initValue = *static_cast<const ValueType*>(pInitData);
-			auto [it, inserted] = thisMap->insert({ key.GetValue(), initValue });
-			return &it->second;
-		}
-
-		virtual void* BinaryCreate(void* pMap, void const* pKey, const void* pInitData) const override
-		{
-			if (pMap == nullptr)
-			{
-				return nullptr;
-			}
-
-			T* thisMap = static_cast<T*>(pMap);
-			KeyType const& key = *static_cast<const KeyType*>(pKey);
-
-			if (pInitData == nullptr)
-			{
-				auto [it, inserted] = thisMap->insert({ key, ValueType() });
-				return &it->second;
-			}
-
-			ValueType const& initValue = *static_cast<ValueType const*>(pInitData);
-			auto [it, inserted] = thisMap->insert({ key, initValue });
-			return &it->second;
-		}
-
-		virtual bool					Erase(void* pMap, const DIRE_STRING_VIEW& pKey) const override
-		{
-			if (pMap != nullptr)
-			{
-				T* thisMap = static_cast<T*>(pMap);
-				const ConvertResult<KeyType> key = FromCharsConverter<KeyType>::Convert(pKey);
-				if (key.HasError())
-					return false;
-
-				return thisMap->erase(key.GetValue());
-			}
-
-			return false;
-		}
-
-		virtual void					Clear(void* pMap) const override
-		{
-			if (pMap != nullptr)
-			{
-				T* thisMap = static_cast<T*>(pMap);
-				thisMap->clear();
-			}
-		}
-
-		virtual size_t					Size(const void* pMap) const override
-		{
-			if (pMap != nullptr)
-			{
-				const T* thisMap = static_cast<const T*>(pMap);
-				return thisMap->size();
-			}
-
-			return 0;
-		}
-
-		virtual DataStructureHandler	ValueDataHandler() const override
-		{
-			if constexpr (HasMapSemantics_v<ValueType>)
-			{
-				return DataStructureHandler(&TypedMapDataStructureHandler<ValueType>::GetInstance());
-			}
-			else if constexpr (HasArraySemantics_v<ValueType>)
-			{
-				return DataStructureHandler(&TypedArrayDataStructureHandler<ValueType>::GetInstance());
-			}
-			else if constexpr (std::is_base_of_v<Enum, ValueType>)
-			{
-				return DataStructureHandler(&TypedEnumDataStructureHandler<ValueType>::GetInstance());
-			}
-			else
-				return {};
-		}
-
-		virtual ReflectableID			ValueReflectableID() const override
-		{
-			if constexpr (std::is_base_of_v<Reflectable, ValueType>)
-			{
-				return ValueType::GetTypeInfo().GetID();
-			}
-			else
-			{
-				return DIRE_NS::INVALID_REFLECTABLE_ID;
-			}
-		}
+		virtual ReflectableID			ValueReflectableID() const override;
 
 		virtual MetaType				KeyMetaType() const override
 		{
@@ -225,23 +98,7 @@ namespace DIRE_NS
 			return sizeof(ValueType);
 		}
 
-		virtual DataStructureHandler	KeyDataHandler() const override
-		{
-			if constexpr (HasMapSemantics_v<KeyType>)
-			{
-				return DataStructureHandler(&TypedMapDataStructureHandler<KeyType>::GetInstance());
-			}
-			else if constexpr (HasArraySemantics_v<KeyType>)
-			{
-				return DataStructureHandler(&TypedArrayDataStructureHandler<KeyType>::GetInstance());
-			}
-			else if constexpr (std::is_base_of_v<Enum, KeyType>)
-			{
-				return DataStructureHandler(&TypedEnumDataStructureHandler<KeyType>::GetInstance());
-			}
-			else
-				return {};
-		}
+		virtual DataStructureHandler	KeyDataHandler() const override;
 
 #ifdef DIRE_SERIALIZATION_ENABLED
 		virtual void		SerializeForEachPair(OpaqueMapType pMap, OpaqueSerializerType pSerializer, KeyValuePairSerializeFptr pForEachPairCallback) const override
@@ -270,5 +127,6 @@ namespace DIRE_NS
 			return instance;
 		}
 	};
-
 }
+
+#include "DireMapDataStructureHandler.inl"
