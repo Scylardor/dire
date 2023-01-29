@@ -1,11 +1,11 @@
 #pragma once
-#include <any>
-#include <cstddef> // std::byte
-
 #include "Types/DireTypeInfo.h"
 #include "Handlers/DireArrayDataStructureHandler.h"
 #include "Utils/DireMacros.h"
 #include "Utils/DireString.h"
+#include "DireReflectableID.h"
+
+#include <any>
 
 namespace DIRE_NS
 {
@@ -182,7 +182,7 @@ namespace DIRE_NS
 			GetPropertyResult result = GetPropertyImpl(pName);
 			if (result.Error.empty())
 			{
-				return PropertyAccessor<TProp>((const TProp*)result.Address);
+				return PropertyAccessor<TProp>(static_cast<const TProp*>(result.Address));
 			}
 
 			return PropertyAccessor<TProp>(std::move(result.Error));
@@ -190,9 +190,9 @@ namespace DIRE_NS
 
 		/* Version that returns a reference for when you are 100% confident this property exists */
 		template <typename TProp>
-		[[nodiscard]] TProp const& GetSafeProperty(DIRE_STRING_VIEW pName) const
+		[[nodiscard]] const TProp & GetSafeProperty(DIRE_STRING_VIEW pName) const
 		{
-			TProp const* propPtr = GetProperty<TProp>(pName);
+			const TProp * propPtr = GetProperty<TProp>(pName);
 			if (propPtr != nullptr)
 			{
 				return *propPtr;
@@ -215,9 +215,9 @@ namespace DIRE_NS
 			return true;
 		}
 
-		Dire_EXPORT [[nodiscard]] bool EraseProperty(DIRE_STRING_VIEW pName);
+		[[nodiscard]] Dire_EXPORT bool EraseProperty(DIRE_STRING_VIEW pName);
 
-		Dire_EXPORT [[nodiscard]] const FunctionInfo * GetFunction(DIRE_STRING_VIEW pMemberFuncName) const;
+		[[nodiscard]] Dire_EXPORT const FunctionInfo * GetFunction(DIRE_STRING_VIEW pMemberFuncName) const;
 
 		template <typename... Args>
 		std::any	InvokeFunction(DIRE_STRING_VIEW pMemberFuncName, Args&&... pFuncArgs)
@@ -267,7 +267,7 @@ namespace DIRE_NS
 			ParseError Error;
 		};
 
-		Dire_EXPORT [[nodiscard]] GetPropertyResult GetPropertyImpl(DIRE_STRING_VIEW pFullPath) const;
+		[[nodiscard]] Dire_EXPORT GetPropertyResult GetPropertyImpl(DIRE_STRING_VIEW pFullPath) const;
 
 		[[nodiscard]] GetPropertyResult GetArrayProperty(const TypeInfo * pTypeInfoOwner, DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath, int pArrayIdx, const std::byte * pPropPtr) const;
 
@@ -296,16 +296,17 @@ namespace DIRE_NS
 		template <typename T>\
 		struct SuperDetector;\
 		template <>\
-		struct DIRE_NS::SuperDetector<ObjectType>\
+		struct SuperDetector<ObjectType>\
 		{\
 			using Super = DIRE_VA_MACRO(DIRE_FIRST_TYPE_OR_REFLECTABLE_, __VA_ARGS__);\
 		};\
 	}\
-	ObjectType : DIRE_VA_MACRO(DIRE_INHERITANCE_LIST_OR_REFLECTABLE, __VA_ARGS__)
+	ObjectType : DIRE_VA_MACRO(DIRE_INHERITANCE_LIST, __VA_ARGS__)
 
 #define DIRE_REFLECTABLE_INFO() \
-	typedef auto DIRE_SelfDetector() -> std::remove_reference<decltype(*this)>::type;  /* https://stackoverflow.com/a/21148117/1987466 */ \
-	using Self = decltype(((DIRE_SelfDetector*)0)());\
+	struct DIRE_SelfTypeTag{}; \
+    constexpr auto DIRE_SelfTypeHelper() -> decltype(::DIRE_NS::SelfType::Writer<DIRE_SelfTypeTag, decltype(this)>{}, void()) {} \
+    using Self = ::DIRE_NS::SelfType::Read<DIRE_SelfTypeTag>;\
 	using Super = typename DIRE_NS::SuperDetector<Self>::Super; \
 	static const DIRE_STRING&	DIRE_GetFullyQualifiedName()\
 	{\
@@ -315,7 +316,12 @@ namespace DIRE_NS
 			found = funcName.rfind("::", found-1);\
 			found = funcName.rfind("::", found-1);\
 			if (found != DIRE_STRING::npos)\
+			{\
 				funcName = funcName.substr(0, found);\
+				auto startIdx = funcName.find(' ');\
+				if (startIdx != funcName.npos)\
+					funcName = funcName.substr(startIdx+1, found - startIdx);\
+			}\
 			return funcName;\
 		}(); \
 		return fullyQualifiedName;\

@@ -1,6 +1,6 @@
 
 #include "catch2/catch_test_macros.hpp"
-#include "dire/Types/DireTypeInfo.h"
+#include "Dire/Types/DireTypeInfo.h"
 #include "Dire/Types/DireTypeInfoDatabase.h"
 
 #include <iomanip>
@@ -10,13 +10,13 @@
 
 
 /* Utility function to print the output of binary generators */
-auto writeBinaryString = [](const std::string& binarized)
-{
-	std::cout << "\"";
-	for (int i = 0; i < binarized.size(); ++i)
-		std::cout << "\\x" << std::hex << std::setfill('0') << std::setw(2) << unsigned(binarized[i]);
-	std::cout << "\"" << std::endl;
-};
+//auto writeBinaryString = [](const std::string& binarized)
+//{
+//	std::cout << "\"";
+//	for (int i = 0; i < binarized.size(); ++i)
+//		std::cout << "\\x" << std::hex << std::setfill('0') << std::setw(2) << unsigned(binarized[i]);
+//	std::cout << "\"" << std::endl;
+//};
 
 TEST_CASE("Binary Export", "[TypeInfoDatabase]")
 {

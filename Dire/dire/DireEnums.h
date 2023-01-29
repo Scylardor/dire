@@ -5,6 +5,8 @@
 
 #include <type_traits> // enable_if
 
+#include <cstring> // strcmp
+
 namespace DIRE_NS
 {
 
@@ -26,6 +28,9 @@ namespace DIRE_NS
 		};\
 		Values Value{};\
 		EnumName() = default;\
+		EnumName(const EnumName& pOther) :\
+			Value(pOther.Value)\
+			{}\
 		EnumName(Values pInitVal) :\
 			Value(pInitVal)\
 		{}\
@@ -70,12 +75,12 @@ namespace DIRE_NS
 		/* This one assumes that the parameter value is guaranteed to be within bounds and thus doesn't even bounds check. */\
 		static const char *	GetStringFromSafeEnum(Values enumValue) \
 		{ \
-			return nameEnumPairs[(int)enumValue].first; \
+			return nameEnumPairs[int(enumValue)].first; \
 		}\
 		/* We have the guarantee that linear enums values start from 0 and increase 1 by 1 so we can make this function O(1).*/ \
 		static const char *	GetStringFromEnum(Values enumValue) \
 		{ \
-			if( (int)enumValue >= DIRE_NARGS(__VA_ARGS__))\
+			if( int(enumValue) >= DIRE_NARGS(__VA_ARGS__))\
 			{\
 				return nullptr;\
 			}\
@@ -115,11 +120,6 @@ namespace DIRE_NS
 		inline static std::pair<const char*, Values> nameEnumPairs[]{DIRE_VA_MACRO(DIRE_BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)}; \
 	};\
 	static_assert(sizeof(EnumName) == sizeof(UnderlyingType));
-	//std::ostream& operator<<(std::ostream& pOs, const EnumName& pEnum)\
-	//{\
-	//	pOs << pEnum.GetString();\
-	//	return pOs;\
-	//}
 
 namespace DIRE_NS
 {
@@ -138,11 +138,11 @@ namespace DIRE_NS
 		unsigned long firstSetBitIndex = 0;
 		if constexpr (sizeof(T) > sizeof(unsigned long))
 		{
-			_BitScanForward64(&firstSetBitIndex, (unsigned __int64)value);
+			_BitScanForward64(&firstSetBitIndex, static_cast<uint64_t>(value));
 		}
 		else
 		{
-			_BitScanForward(&firstSetBitIndex, (unsigned long)value);
+			_BitScanForward(&firstSetBitIndex, static_cast<uint32_t>(value));
 		}
 
 		return firstSetBitIndex;
@@ -400,11 +400,6 @@ namespace DIRE_NS
 		inline static std::pair<const char*, Values> nameEnumPairs[] {DIRE_VA_MACRO(DIRE_BRACES_STRINGIZE_COMMA_VALUE, __VA_ARGS__)};\
 	};\
 	static_assert(sizeof(EnumName) == sizeof(UnderlyingType));
-	//std::ostream& operator<<(std::ostream& pOs, const EnumName& pEnum)\
-	//{\
-	//	pOs << pEnum.GetString();\
-	//	return pOs;\
-	//}
 
 
 #define DIRE_ENUM(EnumName, ...) DIRE_SEQUENTIAL_ENUM(EnumName, int, __VA_ARGS__)

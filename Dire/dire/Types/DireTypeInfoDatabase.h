@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dire/Utils/DireSingleton.h"
+#include "DireDefines.h"
 
 #include <vector>
 #include <unordered_map>
@@ -25,26 +25,9 @@ namespace DIRE_NS
 
 		ReflectableFactory() = default;
 
-		Dire_EXPORT void	RegisterInstantiator(ReflectableID pID, InstantiateFunction pFunc)
-		{
-			// Replace the existing one, if any.
-			auto [it, inserted] = myInstantiators.try_emplace(pID, pFunc);
-			if (!inserted)
-			{
-				it->second = pFunc;
-			}
-		}
+		Dire_EXPORT void	RegisterInstantiator(ReflectableID pID, InstantiateFunction pFunc);
 
-		Dire_EXPORT InstantiateFunction	GetInstantiator(ReflectableID pID) const
-		{
-			auto it = myInstantiators.find(pID);
-			if (it == myInstantiators.end())
-			{
-				return nullptr;
-			}
-
-			return it->second;
-		}
+		Dire_EXPORT InstantiateFunction	GetInstantiator(ReflectableID pID) const;
 
 	private:
 		using InstantiatorsHashTable =
@@ -55,26 +38,26 @@ namespace DIRE_NS
 	};
 
 
-	class TypeInfoDatabase : public Singleton<TypeInfoDatabase>
+	class TypeInfoDatabase
 	{
 		inline static const unsigned DATABASE_VERSION = 0;
 
 	public:
-		Dire_EXPORT [[nodiscard]] size_t	GetTypeInfoCount() const
-		{
-			return myReflectableTypeInfos.size();
-		}
 
-		Dire_EXPORT [[nodiscard]] const TypeInfo * GetTypeInfo(ReflectableID classID) const;
+		// Important for DLL builds, because otherwise, the client program will use its own singleton in client code,
+		// and DIRE uses its own singleton in DIRE code, which creates inconsistencies.
+		Dire_EXPORT static const TypeInfoDatabase&	GetSingleton();
+		Dire_EXPORT static TypeInfoDatabase&		EditSingleton();
 
-		Dire_EXPORT [[nodiscard]] TypeInfo* EditTypeInfo(ReflectableID classID);
+		[[nodiscard]] Dire_EXPORT size_t	GetTypeInfoCount() const;
 
-		Dire_EXPORT void	RegisterInstantiateFunction(ReflectableID pClassID, ReflectableFactory::InstantiateFunction pInstantiateFunction)
-		{
-			myInstantiateFactory.RegisterInstantiator(pClassID, pInstantiateFunction);
-		}
+		[[nodiscard]] Dire_EXPORT const TypeInfo * GetTypeInfo(ReflectableID classID) const;
 
-		Dire_EXPORT  [[nodiscard]] Reflectable* TryInstantiate(ReflectableID pClassID, std::any const& pAnyParameterPack) const;
+		[[nodiscard]] Dire_EXPORT TypeInfo* EditTypeInfo(ReflectableID classID);
+
+		Dire_EXPORT void	RegisterInstantiateFunction(ReflectableID pClassID, ReflectableFactory::InstantiateFunction pInstantiateFunction);
+
+		[[nodiscard]] Dire_EXPORT Reflectable* TryInstantiate(ReflectableID pClassID, std::any const& pAnyParameterPack) const;
 
 		template <typename T, typename... Args>
 		[[nodiscard]] T* InstantiateClass(Args &&... pArgs) const
@@ -93,7 +76,7 @@ namespace DIRE_NS
 		Dire_EXPORT bool	ImportFromBinaryFile(DIRE_STRING_VIEW pReadSettingsFile);
 
 	// Allow unit tests to build a database that is not the program's singleton.
-#if !DIRE_UNIT_TESTS
+#if !DIRE_TESTS_ENABLED
 	protected:
 		TypeInfoDatabase() = default;
 		friend Singleton<TypeInfoDatabase>;
@@ -105,16 +88,11 @@ namespace DIRE_NS
 		[[nodiscard]] ReflectableID	RegisterTypeInfo(TypeInfo* pTypeInfo)
 		{
 			myReflectableTypeInfos.push_back(pTypeInfo);
-			return (ReflectableID)GetTypeInfoCount() - 1;
+			return ReflectableID(GetTypeInfoCount()) - 1;
 		}
 
 		std::vector<TypeInfo*, DIRE_ALLOCATOR<TypeInfo*>>	myReflectableTypeInfos;
 		ReflectableFactory		myInstantiateFactory;
 	};
 
-	// Important for DLL builds, because otherwise, the client program will use its own singleton in client code,
-	// and DIRE uses its own singleton in DIRE code, which creates inconsistencies.
-
-	extern template Dire_EXPORT const TypeInfoDatabase& Singleton<TypeInfoDatabase>::GetSingleton();
-	extern template Dire_EXPORT TypeInfoDatabase& Singleton<TypeInfoDatabase>::EditSingleton();
 }

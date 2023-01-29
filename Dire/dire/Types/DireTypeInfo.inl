@@ -1,4 +1,7 @@
 #pragma once
+#include "dire/Handlers/DireArrayDataStructureHandler.h"
+#include "dire/Handlers/DireEnumDataStructureHandler.h"
+#include "dire/Handlers/DireMapDataStructureHandler.h"
 
 
 namespace DIRE_NS
@@ -203,5 +206,4 @@ namespace DIRE_NS
 			RecursiveRegisterParentClasses<typename TParent::Super>();
 		}
 	}
-
 }

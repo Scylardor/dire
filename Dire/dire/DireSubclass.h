@@ -23,11 +23,11 @@ namespace DIRE_NS
 			SubClassID = pNewID;
 		}
 
-		template <typename T>
+		template <typename U>
 		void	SetClass()
 		{
-			static_assert(std::is_base_of_v<Reflectable, T>, "Subclass can only store IDs of Reflectable-derived classes.");
-			SubClassID = T::GetTypeInfo().GetID();
+			static_assert(std::is_base_of_v<Reflectable, U>, "Subclass can only store IDs of Reflectable-derived classes.");
+			SubClassID = U::GetTypeInfo().GetID();
 		}
 
 		ReflectableID	GetClassID() const

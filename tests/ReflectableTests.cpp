@@ -99,8 +99,29 @@ TEST_CASE("IsA", "[Reflectable]")
 	REQUIRE((!notPartOfTheFamily.IsA<a>() && !notPartOfTheFamily.IsA<b>() && !notPartOfTheFamily.IsA<c>() && notPartOfTheFamily.IsA<SuperCompound>()));
 }
 
+static const DIRE_STRING fullyQualifiedName(DIRE_STRING str)
+{
+	DIRE_STRING funcName = str;
+	std::size_t found = funcName.rfind("::");
+	found = funcName.rfind("::", found - 1);
+	found = funcName.rfind("::", found - 1);
+	if (found != DIRE_STRING::npos)
+	{
+		funcName = funcName.substr(0, found);
+		auto startIdx = funcName.find(" ");
+		if (startIdx == funcName.npos)
+			startIdx = 0;
+		else
+			startIdx++;
+		funcName = funcName.substr(startIdx, found - startIdx);
+	}
+	return funcName;
+}
+
 TEST_CASE("TypeInfo Name", "[Reflectable]")
 {
+	std::string popo = fullyQualifiedName("a::DIRE_GetFullyQualifiedName::<lambda_e1a171e9c58522d753c864bf52b11d50>::operator ()");
+
 	REQUIRE(a::GetTypeInfo().GetName() == "a");
 	REQUIRE(b::GetTypeInfo().GetName() == "b");
 	REQUIRE(c::GetTypeInfo().GetName() == "c");

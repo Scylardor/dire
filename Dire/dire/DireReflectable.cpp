@@ -129,12 +129,12 @@ namespace DIRE_NS
 		DIRE_STRING_VIEW pName, DIRE_STRING_VIEW pRemainingPath,
 		int pArrayIdx, std::byte const* pPropPtr) const
 	{
-		if (pArrayHandler == nullptr)
+		if (pArrayHandler == nullptr || pArrayIdx < 0)
 		{
 			return {}; // not an array or index is out-of-bounds
 		}
 
-		pPropPtr = (std::byte const*)pArrayHandler->Read(pPropPtr, pArrayIdx);
+		pPropPtr = static_cast<std::byte const*>(pArrayHandler->Read(pPropPtr, size_t(pArrayIdx)));
 		if (pRemainingPath.empty()) // this was what we were looking for : return
 		{
 			return GetPropertyResult(pPropPtr, nullptr);
@@ -454,7 +454,7 @@ namespace DIRE_NS
 		{
 			DIRE_STRING errorMsg;
 			int toWrite = std::snprintf(nullptr, 0, "Property %s not found.", pName.data());
-			errorMsg.resize(toWrite + 1); // +1 for \0
+			errorMsg.resize(size_t(toWrite + 1)); // +1 for \0
 			std::snprintf(errorMsg.data(), errorMsg.size(), "Property %s not found.", pName.data());
 			return { errorMsg };
 		}
@@ -464,7 +464,7 @@ namespace DIRE_NS
 		pFullPath.remove_prefix(std::min(pName.size() + 1, pFullPath.size()));
 
 		// Now, add the offset of the compound to the total offset
-		propertyAddr += (int)thisProp->GetOffset();
+		propertyAddr += int(thisProp->GetOffset());
 
 		// Do we need to go deeper?
 		if (pFullPath.empty())
@@ -512,7 +512,7 @@ namespace DIRE_NS
 		{
 			DIRE_STRING errorMsg;
 			int toWrite = std::snprintf(nullptr, 0, "Property %s not found.", pName.data());
-			errorMsg.resize(toWrite + 1); // +1 for \0
+			errorMsg.resize(size_t(toWrite + 1)); // +1 for \0
 			std::snprintf(errorMsg.data(), errorMsg.size(), "Property %s not found.", pName.data());
 			return { errorMsg };
 		}
@@ -530,7 +530,7 @@ namespace DIRE_NS
 		{
 			DIRE_STRING errorMsg;
 			int toWrite = std::snprintf(nullptr, 0, "Property %s not found.", pName.data());
-			errorMsg.resize(toWrite + 1); // +1 for \0
+			errorMsg.resize(size_t(toWrite + 1)); // +1 for \0
 			std::snprintf(errorMsg.data(), errorMsg.size(), "Property %s not found.", pName.data());
 			return { errorMsg };
 		}

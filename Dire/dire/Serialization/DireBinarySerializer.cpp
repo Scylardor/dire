@@ -26,7 +26,7 @@ namespace DIRE_NS
 			const std::byte * propertyAddr = reflectableAddr + pProperty.GetOffset();
 
 			// Uniquely identify props by their offset. Not "change proof", will need a reconcile method it case something changed location (TODO)
-			WriteAsBytes<BinarySerializationHeaders::Property>(pProperty.GetMetatype(), (uint32_t)pProperty.GetOffset());
+			WriteAsBytes<BinarySerializationHeaders::Property>(pProperty.GetMetatype(), static_cast<uint32_t>(pProperty.GetOffset()));
 			this->SerializeValue(pProperty.GetMetatype(), propertyAddr, &pProperty.GetDataStructureHandler());
 
 			// Dont forget to count properties
@@ -92,7 +92,7 @@ namespace DIRE_NS
 			WriteAsBytes<BinarySerializationHeaders::Array>(elemType, elemSize, arraySize);
 			DataStructureHandler elemHandler = pArrayHandler->ElementHandler();
 
-			for (int iElem = 0; iElem < arraySize; ++iElem)
+			for (size_t iElem = 0; iElem < arraySize; ++iElem)
 			{
 				void const* elemVal = pArrayHandler->Read(pPropPtr, iElem);
 				SerializeValue(elemType, elemVal, &elemHandler);
@@ -112,16 +112,17 @@ namespace DIRE_NS
 		const size_t valueSize = pMapHandler->SizeofValue();
 		WriteAsBytes<BinarySerializationHeaders::Map>(keyType, keySize, valueType, valueSize, mapSize);
 
-		pMapHandler->SerializeForEachPair(pPropPtr, this, [](void* pSerializer, const void* pKey, const void* pVal, IMapDataStructureHandler const& pMapHandler,
-			DataStructureHandler const& pKeyHandler, DataStructureHandler const& pValueHandler)
+		pMapHandler->SerializeForEachPair(pPropPtr, this, [](void* pSerializer, const void* pKey, const void* pVal, const IMapDataStructureHandler& pMap,
+			const DataStructureHandler & pKeyHandler, const DataStructureHandler & pValueHandler)
 		{
 			auto* myself = static_cast<BinaryReflectorSerializer*>(pSerializer);
 
-			const MetaType keyType = pMapHandler.KeyMetaType();
-			myself->SerializeValue(keyType, pKey, &pKeyHandler);
+			// have to re-get them because the lambda cannot capture to pass the virtual interface...
+			const MetaType theKeyType = pMap.KeyMetaType();
+			myself->SerializeValue(theKeyType, pKey, &pKeyHandler);
 
-			MetaType valueType = pMapHandler.ValueMetaType();
-			myself->SerializeValue(valueType, pVal, &pValueHandler);
+			MetaType theValueType = pMap.ValueMetaType();
+			myself->SerializeValue(theValueType, pVal, &pValueHandler);
 		});
 	}
 
@@ -139,7 +140,7 @@ namespace DIRE_NS
 			const std::byte * propertyAddr = reflectableAddr + pProperty.GetOffset();
 
 			// Uniquely identify props by their offset. TODO: Not "change proof", will need a reconcile method it case something changed location
-			WriteAsBytes<BinarySerializationHeaders::Property>(pProperty.GetMetatype(), (uint32_t)pProperty.GetOffset());
+			WriteAsBytes<BinarySerializationHeaders::Property>(pProperty.GetMetatype(), static_cast<uint32_t>(pProperty.GetOffset()));
 			this->SerializeValue(pProperty.GetMetatype(), propertyAddr, &pProperty.GetDataStructureHandler());
 
 			// Dont forget to count properties

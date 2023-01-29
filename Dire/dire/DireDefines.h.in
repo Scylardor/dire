@@ -7,6 +7,10 @@
 
 #include "Dire_Export.h"
 
+#if defined(_MSC_VER) && !defined(__clang__) && !defined(__GNUG__) // Microsoft compilers
+	#define DIRE_IS_MSVC
+#endif
+
 #cmakedefine DIRE_USE_STANDARD_ASSERT
 #ifdef DIRE_USE_STANDARD_ASSERT
 	#include <cassert>
@@ -53,3 +57,5 @@
 /*
 	Serialization End
 */
+
+#cmakedefine01 DIRE_TESTS_ENABLED

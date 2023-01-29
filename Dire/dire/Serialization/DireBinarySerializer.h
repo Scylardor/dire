@@ -9,15 +9,25 @@
 
 #include <string.h> // memcpy
 
+/* Export the whole class with GCC, otherwise it won't export the vtable and user will fail linking */
+#ifdef __GNUG__
+#define DIRE_GNU_EXPORT Dire_EXPORT
+#else
+#define DIRE_GNU_EXPORT
+#endif
+
 namespace DIRE_NS
 {
-	class BinaryReflectorSerializer : public ISerializer
+	class DIRE_GNU_EXPORT BinaryReflectorSerializer : public ISerializer
 	{
 	public:
 
-		virtual Result	Dire_EXPORT Serialize(Reflectable const& serializedObject) override;
+		virtual Result	 Dire_EXPORT Serialize(Reflectable const& serializedObject) override;
 
-		virtual bool	Dire_EXPORT SerializesMetadata() const override { return false; }
+		virtual bool	SerializesMetadata() const override
+		{
+			return false;
+		}
 
 		virtual void	Dire_EXPORT SerializeString(DIRE_STRING_VIEW pSerializedString) override;
 		virtual void	Dire_EXPORT SerializeInt(int32_t pSerializedInt) override;
@@ -46,7 +56,7 @@ namespace DIRE_NS
 		Handle<T>	WriteAsBytes(Args&&... pArgs)
 		{
 			auto oldSize = mySerializedBuffer.size();
-			mySerializedBuffer.resize(mySerializedBuffer.size() + sizeof T);
+			mySerializedBuffer.resize(mySerializedBuffer.size() + sizeof(T));
 			new (&mySerializedBuffer[oldSize]) T(std::forward<Args>(pArgs)...);
 			return Handle<T>(mySerializedBuffer, oldSize);
 		}

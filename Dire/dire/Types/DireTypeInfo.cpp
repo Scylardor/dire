@@ -1,6 +1,7 @@
 #include "DireTypeInfo.h"
 #include "dire/DireReflectable.h"
 #include <cstddef> // byte
+#include <algorithm> // find_if
 
 bool dire::TypeInfo::IsParentOf(const dire::ReflectableID pChildClassID, bool pIncludingMyself) const
 {
@@ -106,14 +107,14 @@ void DIRE_NS::TypeInfo::ClonePropertiesOf(Reflectable& pNewClone, const Reflecta
 {
 	for (const PropertyTypeInfo& prop : Properties)
 	{
-		Reflectable::PropertyAccessor accessor = pCloned.GetProperty(prop.GetName());
+		Reflectable::PropertyAccessor<void> accessor = pCloned.GetProperty(prop.GetName());
 		const void* propPtr = accessor.GetPointer();
 		if (propPtr != nullptr)
 		{
-			auto actualOffset = ((const ::std::byte *)propPtr - (const ::std::byte *)&pCloned);
+			auto actualOffset = reinterpret_cast<const std::byte *>(propPtr) - reinterpret_cast<const std::byte*>(&pCloned);
 			if (prop.GetCopyConstructorFunction() != nullptr)
 			{
-				prop.GetCopyConstructorFunction()(&pNewClone, &pCloned, actualOffset);
+				prop.GetCopyConstructorFunction()(&pNewClone, &pCloned, size_t(actualOffset));
 			}
 		}
 	}

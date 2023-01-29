@@ -2,22 +2,10 @@
 #include "DireTypeInfo.h"
 
 #include <fstream>
+#include <algorithm> // find_if
 
 namespace DIRE_NS
 {
-	template <>
-	Dire_EXPORT TypeInfoDatabase& Singleton<TypeInfoDatabase>::EditSingleton()
-	{
-		static TypeInfoDatabase theSingleton; // Thread-safe since C++11!
-		return theSingleton;
-	}
-
-	template <>
-	Dire_EXPORT const TypeInfoDatabase& Singleton<TypeInfoDatabase>::GetSingleton()
-	{
-		return EditSingleton();
-	}
-
 	// This follows a very simple binary serialization process right now. It encodes:
 	// - the reflectable type ID
 	// - the typename string
@@ -27,6 +15,43 @@ namespace DIRE_NS
 		DIRE_STRING		TypeName;
 	};
 
+}
+
+DIRE_NS::TypeInfoDatabase& DIRE_NS::TypeInfoDatabase::EditSingleton()
+{
+	static DIRE_NS::TypeInfoDatabase theSingleton; // Thread-safe since C++11!
+	return theSingleton;
+}
+
+size_t DIRE_NS::TypeInfoDatabase::GetTypeInfoCount() const
+{
+	return myReflectableTypeInfos.size();
+}
+
+void dire::ReflectableFactory::RegisterInstantiator(ReflectableID pID, InstantiateFunction pFunc)
+{
+	// Replace the existing one, if any.
+	auto [it, inserted] = myInstantiators.try_emplace(pID, pFunc);
+	if (!inserted)
+	{
+		it->second = pFunc;
+	}
+}
+
+dire::ReflectableFactory::InstantiateFunction dire::ReflectableFactory::GetInstantiator(ReflectableID pID) const
+{
+	auto it = myInstantiators.find(pID);
+	if (it == myInstantiators.end())
+	{
+		return nullptr;
+	}
+
+	return it->second;
+}
+
+const DIRE_NS::TypeInfoDatabase& DIRE_NS::TypeInfoDatabase::GetSingleton()
+{
+	return EditSingleton();
 }
 
 const DIRE_NS::TypeInfo * DIRE_NS::TypeInfoDatabase::GetTypeInfo(ReflectableID classID) const
@@ -54,6 +79,11 @@ DIRE_NS::TypeInfo* DIRE_NS::TypeInfoDatabase::EditTypeInfo(ReflectableID classID
 	return const_cast<TypeInfo*>(typeInfo);
 }
 
+void DIRE_NS::TypeInfoDatabase::RegisterInstantiateFunction(ReflectableID pClassID, ReflectableFactory::InstantiateFunction pInstantiateFunction)
+{
+	myInstantiateFactory.RegisterInstantiator(pClassID, pInstantiateFunction);
+}
+
 DIRE_NS::Reflectable* DIRE_NS::TypeInfoDatabase::TryInstantiate(ReflectableID pClassID, std::any const& pAnyParameterPack) const
 {
 	ReflectableFactory::InstantiateFunction anInstantiateFunc = myInstantiateFactory.GetInstantiator(pClassID);
@@ -66,7 +96,7 @@ DIRE_NS::Reflectable* DIRE_NS::TypeInfoDatabase::TryInstantiate(ReflectableID pC
 	return newInstance;
 }
 
-size_t	BinaryWriteAtOffset(char* pDest, const void* pSrc, size_t pCount, size_t pWriteOffset)
+static size_t	BinaryWriteAtOffset(char* pDest, const void* pSrc, size_t pCount, size_t pWriteOffset)
 {
 	memcpy(pDest + pWriteOffset, pSrc, pCount);
 	return pWriteOffset + pCount;
@@ -80,21 +110,21 @@ DIRE_STRING	DIRE_NS::TypeInfoDatabase::BinaryExport() const
 	// - the reflectable type ID
 	// - the typename string
 	DIRE_STRING writeBuffer;
-	auto nbTypeInfos = (unsigned)myReflectableTypeInfos.size();
+	auto nbTypeInfos = unsigned(myReflectableTypeInfos.size());
 
-	const int estimatedNamesStorage = (sizeof(ReflectableID) + 64) * nbTypeInfos; // expect 64 chars or less for a typename (i.e. 63 + 1 \0)
+	const size_t estimatedNamesStorage = (sizeof(ReflectableID) + 64) * nbTypeInfos; // expect 64 chars or less for a typename (i.e. 63 + 1 \0)
 	writeBuffer.resize(sizeof(DATABASE_VERSION) + sizeof(nbTypeInfos) + estimatedNamesStorage);
 	size_t offset = 0;
 
-	offset = BinaryWriteAtOffset(writeBuffer.data(), (const char*)&DATABASE_VERSION, sizeof(DATABASE_VERSION), offset);
-	offset = BinaryWriteAtOffset(writeBuffer.data(), (const char*)&nbTypeInfos, sizeof(nbTypeInfos), offset);
+	offset = BinaryWriteAtOffset(writeBuffer.data(), &DATABASE_VERSION, sizeof(DATABASE_VERSION), offset);
+	offset = BinaryWriteAtOffset(writeBuffer.data(), &nbTypeInfos, sizeof(nbTypeInfos), offset);
 
 	for (const TypeInfo * typeInfo : myReflectableTypeInfos)
 	{
 		const ReflectableID typeID = typeInfo->GetID();
 
 		const DIRE_STRING_VIEW& typeName = typeInfo->GetName();
-		const auto nameLen = (unsigned)typeName.length();
+		const auto nameLen = unsigned(typeName.length());
 
 		const size_t remainingSpace = writeBuffer.size() - offset;
 		const size_t neededSpace = sizeof(typeID) + nameLen + 1;
@@ -102,7 +132,7 @@ DIRE_STRING	DIRE_NS::TypeInfoDatabase::BinaryExport() const
 		if (remainingSpace < neededSpace) // +1 for \0, if true, make it bigger
 			writeBuffer.resize(writeBuffer.size() + neededSpace);
 
-		offset = BinaryWriteAtOffset(writeBuffer.data(), (const char*)&typeID, sizeof(typeID), offset);
+		offset = BinaryWriteAtOffset(writeBuffer.data(), &typeID, sizeof(typeID), offset);
 
 		// A bit "unsafe" to copy typeName.length()+1 bytes, but here we know that the string view actually will point to a null-terminated string.
 		offset = BinaryWriteAtOffset(writeBuffer.data(), typeName.data(), typeName.length()+1, offset);
@@ -124,7 +154,7 @@ bool	DIRE_NS::TypeInfoDatabase::ExportToBinaryFile(DIRE_STRING_VIEW pWrittenSett
 		return false;
 	}
 
-	openFile.write(binaryBuffer.data(), binaryBuffer.size());
+	openFile.write(binaryBuffer.data(), std::streamsize(binaryBuffer.size()));
 
 	return true;
 }
@@ -136,9 +166,9 @@ DIRE_STRING	DIRE_NS::TypeInfoDatabase::BinaryImport(DIRE_STRING_VIEW pReadSettin
 	if (file.bad())
 		return {};
 	DIRE_STRING fileBuffer;
-	fileBuffer.resize(file.tellg());
+	fileBuffer.resize(size_t(file.tellg()));
 	file.seekg(ios::beg);
-	file.read(fileBuffer.data(), fileBuffer.size());
+	file.read(fileBuffer.data(), std::streamsize(fileBuffer.size()));
 
 	return fileBuffer;
 }
@@ -192,7 +222,7 @@ bool	DIRE_NS::TypeInfoDatabase::ImportFromBinaryFile(DIRE_STRING_VIEW pReadSetti
 	// To assign new IDs to new types not in the database
 	ReflectableID nextAvailableID = maxTypeInfoID + 1;
 
-	for (int iReg = 0; iReg < myReflectableTypeInfos.size(); ++iReg)
+	for (size_t iReg = 0; iReg < myReflectableTypeInfos.size(); ++iReg)
 	{
 		TypeInfo* registeredTypeInfo = myReflectableTypeInfos[iReg];
 

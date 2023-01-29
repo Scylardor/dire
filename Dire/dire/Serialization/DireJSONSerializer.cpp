@@ -39,7 +39,7 @@ case MetaType::TypeEnum:\
 				size_t arraySize = pArrayHandler->Size(pPropPtr);
 				DataStructureHandler elemHandler = pArrayHandler->ElementHandler();
 
-				for (int iElem = 0; iElem < arraySize; ++iElem)
+				for (size_t iElem = 0; iElem < arraySize; ++iElem)
 				{
 					const void * elemVal = pArrayHandler->Read(pPropPtr, iElem);
 					SerializeValue(elemType, elemVal, &elemHandler);
@@ -56,15 +56,15 @@ case MetaType::TypeEnum:\
 
 		if (pPropPtr != nullptr && pMapHandler != nullptr)
 		{
-			pMapHandler->SerializeForEachPair(pPropPtr, this, [](void* pSerializer, const void* pKey, const void* pVal, const IMapDataStructureHandler & pMapHandler,
+			pMapHandler->SerializeForEachPair(pPropPtr, this, [](void* pSerializer, const void* pKey, const void* pVal, const IMapDataStructureHandler & pMap,
 				const DataStructureHandler & /*pKeyHandler*/, const DataStructureHandler & pValueHandler)
 				{
 					auto* myself = static_cast<RapidJsonReflectorSerializer*>(pSerializer);
 
-					const DIRE_STRING keyStr = pMapHandler.KeyToString(pKey);
-					myself->myJsonWriter.String(keyStr.data(), (rapidjson::SizeType)keyStr.length());
+					const DIRE_STRING keyStr = pMap.KeyToString(pKey);
+					myself->myJsonWriter.String(keyStr.data(), rapidjson::SizeType(keyStr.length()));
 
-					MetaType valueType = pMapHandler.ValueMetaType();
+					MetaType valueType = pMap.ValueMetaType();
 					myself->SerializeValue(valueType, pVal, &pValueHandler);
 				});
 		}
@@ -93,13 +93,13 @@ case MetaType::TypeEnum:\
 			if (serializableState.IsSerializable == true)
 			{
 				void const* propPtr = pReflectable.GetProperty(pProperty.GetName());
-				myJsonWriter.String(pProperty.GetName().data(), (rapidjson::SizeType)pProperty.GetName().size());
+				myJsonWriter.String(pProperty.GetName().data(), rapidjson::SizeType(pProperty.GetName().size()));
 				this->SerializeValue(pProperty.GetMetatype(), propPtr, &pProperty.GetDataStructureHandler());
 
 				if (SerializesMetadata() && serializableState.HasAttributesToSerialize)
 				{
 					const DIRE_STRING metadataName = DIRE_STRING(pProperty.GetName()) + "_metadata";
-					myJsonWriter.String(metadataName.data(), (rapidjson::SizeType)metadataName.size());
+					myJsonWriter.String(metadataName.data(), rapidjson::SizeType(metadataName.size()));
 
 					myJsonWriter.StartObject();
 
@@ -128,8 +128,12 @@ case MetaType::TypeEnum:\
 			JSON_SERIALIZE_VALUE_CASE(Uint, Uint)
 			JSON_SERIALIZE_VALUE_CASE(Int64, Int64)
 			JSON_SERIALIZE_VALUE_CASE(Uint64, Uint64)
-			JSON_SERIALIZE_VALUE_CASE(Float, Double)
-			JSON_SERIALIZE_VALUE_CASE(Double, Double)
+			case MetaType::Float: // Have to handle them without the macro, otherwise have the warning that float implicitly converts to double
+				myJsonWriter.Double(double(*static_cast<const float*>(pPropPtr)));
+				break;
+			case MetaType::Double:
+				myJsonWriter.Double(*static_cast<const double*>(pPropPtr));
+				break;
 		case MetaType::Array:
 			if (pHandler != nullptr)
 			{

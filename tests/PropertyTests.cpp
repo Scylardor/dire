@@ -14,6 +14,7 @@ TEST_CASE("GetProperty Simple", "[Property]")
 {
 	c superC;
 
+
 	// direct property
 	const unsigned * compu = superC.GetProperty<unsigned>("ctoto");
 	REQUIRE(*compu == 0xdeadbeef);

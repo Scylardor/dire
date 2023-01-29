@@ -98,7 +98,9 @@ TEST_CASE("Invoke Functions", "[Functions]")
 	// ensure there's no extraneous copy attempted
 	// if params were not perfectly forwarded, it wouldn't compile.
 	noncopyable_int nocopy;
+	REQUIRE(nocopy.theAnswer == 42);
 	dire::Invoke("noncopyableRefParam", aTest, nocopy);
+	REQUIRE(nocopy.theAnswer == 42);
 }
 
 TEST_CASE("Function Type Info", "[Functions]")
@@ -110,7 +112,7 @@ TEST_CASE("Function Type Info", "[Functions]")
 		ostr << funcInfo.GetName() << ' ';
 		ostr << "Type: " << funcInfo.GetReturnType().GetString() << ' ';
 		ostr << "Parameters:";
-		for (const dire::MetaType paramType : funcInfo.GetParametersTypes())
+		for (const dire::MetaType& paramType : funcInfo.GetParametersTypes())
 		{
 			ostr << ' ' << paramType.GetString();
 		}

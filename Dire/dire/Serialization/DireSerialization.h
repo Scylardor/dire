@@ -5,8 +5,10 @@
 #include "dire/Utils/DireString.h"
 #include "dire/Types/DireTypeInfo.h"
 #include "dire/DireReflectableID.h"
+#include "dire/DireReflectable.h"
 #include <vector>
 #include <variant>
+
 
 namespace DIRE_NS
 {
@@ -19,16 +21,16 @@ namespace DIRE_NS
 	public:
 		struct Result
 		{
-			static_assert(sizeof(std::byte) == sizeof(char) == 1);
+			static_assert(sizeof(std::byte) == sizeof(char) && sizeof(char) == 1);
 			using ByteVector = std::vector<std::byte, DIRE_ALLOCATOR<std::byte>>;
 
-			Dire_EXPORT Result() = default;
+			Result() = default;
 
-			Dire_EXPORT Result(const char* pBuffer, size_t pBufferSize) :
-				Value(std::in_place_type_t<ByteVector>{}, (const std::byte*)pBuffer, (const std::byte*)pBuffer + pBufferSize)
+			Result(const char* pBuffer, size_t pBufferSize) :
+				Value(std::in_place_type_t<ByteVector>{}, reinterpret_cast<const std::byte*>(pBuffer), reinterpret_cast<const std::byte*>(pBuffer) + pBufferSize)
 			{}
 
-			Dire_EXPORT Result(const SerializationError& pError) :
+			Result(const SerializationError& pError) :
 				Value(pError)
 			{}
 
@@ -36,9 +38,9 @@ namespace DIRE_NS
 				Value(std::move(pMovedVec))
 			{}
 
-			Dire_EXPORT [[nodiscard]] DIRE_STRING AsString() const;
+			[[nodiscard]] DIRE_STRING AsString() const;
 
-			Dire_EXPORT operator DIRE_STRING() const { return AsString();}
+			operator DIRE_STRING() const { return AsString();}
 
 			const ByteVector& GetBytes() const { return std::get<ByteVector>(Value); }
 
@@ -50,7 +52,10 @@ namespace DIRE_NS
 			std::variant<ByteVector, SerializationError>	Value;
 		};
 
+		ISerializer() = default;
 		virtual ~ISerializer() = default;
+		ISerializer(const ISerializer&) = default;
+		ISerializer& operator=(const ISerializer&) = default;
 
 		virtual Result	Serialize(Reflectable const& serializedObject) = 0;
 
@@ -65,18 +70,18 @@ namespace DIRE_NS
 		virtual void	SerializeValuesForObject(DIRE_STRING_VIEW pObjectName, SerializedValueFiller pFillerFunction) = 0;
 	};
 
-	class IDeserializer
+	class Dire_EXPORT IDeserializer
 	{
 	public:
 		struct Result
 		{
-			Dire_EXPORT Result() = default;
+			Result() = default;
 
-			Dire_EXPORT Result(const SerializationError& pError) :
+			Result(const SerializationError& pError) :
 				Value(pError)
 			{}
 
-			Dire_EXPORT Result(Reflectable* pDeserializedReflectable) :
+			Result(Reflectable* pDeserializedReflectable) :
 				Value(pDeserializedReflectable)
 			{}
 
@@ -95,7 +100,10 @@ namespace DIRE_NS
 			std::variant<Reflectable*, SerializationError>	Value{nullptr};
 		};
 
-		Dire_EXPORT virtual ~IDeserializer() = default;
+		IDeserializer() = default;
+		virtual ~IDeserializer() = default;
+		IDeserializer(const IDeserializer&) = default;
+		IDeserializer& operator=(const IDeserializer&) = default;
 
 		template <typename T, typename... Args>
 		Result Deserialize(const char* pSerialized, Args&&... pArgs);
@@ -103,7 +111,7 @@ namespace DIRE_NS
 		template <typename... Args>
 		Result Deserialize(const char* pSerialized, ReflectableID pReflectableClassID, Args&&... pArgs);
 
-		Dire_EXPORT virtual Result	DeserializeInto(const char* pSerialized, Reflectable& pDeserializedObject) = 0;
+		virtual Result	DeserializeInto(const char* /*pSerialized*/, Reflectable& /*pDeserializedObject*/) = 0;
 	};
 
 	template <typename T, typename ... Args>
@@ -148,7 +156,7 @@ namespace DIRE_NS
 		if (bytes == nullptr)
 			return "";
 
-		DIRE_STRING serializedString((const char*)bytes->data(), (const char*)bytes->data() + bytes->size());
+		DIRE_STRING serializedString(reinterpret_cast<const char*>(bytes->data()), reinterpret_cast<const char*>(bytes->data()) + bytes->size());
 		return serializedString;
 	}
 

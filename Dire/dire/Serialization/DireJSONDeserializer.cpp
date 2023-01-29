@@ -16,7 +16,7 @@
 /* This macro does a cast on the right side of the equal sign to silence warnings about casting char to int for example */
 #define JSON_DESERIALIZE_VALUE_CASE(TypeEnum, JsonFunc) \
 	case MetaType::TypeEnum:\
-	*(FromEnumTypeToActualType<MetaType::TypeEnum>::ActualType *)(pPropPtr) = (FromEnumTypeToActualType<MetaType::TypeEnum>::ActualType) jsonVal->Get##JsonFunc();\
+		*static_cast<FromEnumTypeToActualType<MetaType::TypeEnum>::ActualType *>(pPropPtr) = static_cast<FromEnumTypeToActualType<MetaType::TypeEnum>::ActualType>(jsonVal->Get##JsonFunc());\
 	break;
 
 namespace DIRE_NS
@@ -28,7 +28,7 @@ namespace DIRE_NS
 		if (doc.Parse(pJson).HasParseError())
 		{
 			auto neededSize = snprintf(nullptr, 0, "JSON parse error: %s (%llu)", GetParseError_En(ok.Code()), ok.Offset());
-			DIRE_STRING error(neededSize+1, '\0');
+			DIRE_STRING error(size_t(neededSize+1), '\0');
 			snprintf(error.data(), error.size(), "JSON parse error: %s (%llu)", GetParseError_En(ok.Code()), ok.Offset());
 
 			return { error };
@@ -36,7 +36,7 @@ namespace DIRE_NS
 
 		TypeInfoDatabase::GetSingleton().GetTypeInfo(pDeserializedObject.GetReflectableClassID())->ForEachPropertyInHierarchy([&pDeserializedObject, &doc, this](const PropertyTypeInfo& pProperty)
 		{
-			Reflectable::PropertyAccessor accessor = pDeserializedObject.GetProperty(pProperty.GetName());
+			Reflectable::PropertyAccessor<void> accessor = pDeserializedObject.GetProperty(pProperty.GetName());
 			void* propPtr = const_cast<void*>(accessor.GetPointer());
 			rapidjson::Value const& propValue = doc[pProperty.GetName().data()];
 			DeserializeValue(&propValue, pProperty.GetMetatype(), propPtr, &pProperty.GetDataStructureHandler());
@@ -92,7 +92,7 @@ namespace DIRE_NS
 
 		compTypeInfo->ForEachPropertyInHierarchy([this, &pVal, reflectableProp](const PropertyTypeInfo & pProperty)
 			{
-				Reflectable::PropertyAccessor prop = reflectableProp->GetProperty(pProperty.GetName());
+				Reflectable::PropertyAccessor<void> prop = reflectableProp->GetProperty(pProperty.GetName());
 				void* propPtr = const_cast<void*>(prop.GetPointer());
 				const rapidjson::Value & propValue = pVal[pProperty.GetName().data()];
 				DeserializeValue(&propValue, pProperty.GetMetatype(), propPtr, &pProperty.GetDataStructureHandler());

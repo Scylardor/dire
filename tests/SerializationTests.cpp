@@ -69,7 +69,7 @@ TEST_CASE("JSON objects, arrays, and array of objects", "[Serialization]")
 
 	MegaCompound megaDeserialized;
 	deserializer.DeserializeInto(serialized.data(), megaDeserialized);
-	REQUIRE(memcmp(&megaDeserialized.toto, &megaSerialized.toto, sizeof(megaSerialized.toto)) == 0);
+	REQUIRE(memcmp((const void*) &megaDeserialized.toto, (const void*)&megaSerialized.toto, sizeof(megaSerialized.toto)) == 0);
 }
 
 TEST_CASE("JSON std::vector (and other things)", "[Serialization]")
@@ -97,8 +97,8 @@ TEST_CASE("JSON std::vector (and other things)", "[Serialization]")
 
 	REQUIRE((memcmp(&serializedC.anArray, &deSerializedC.anArray, sizeof(serializedC.anArray)) == 0
 	&& memcmp(&serializedC.aMultiArray, &deSerializedC.aMultiArray, sizeof(serializedC.aMultiArray)) == 0
-	&& memcmp(&serializedC.mega, &deSerializedC.mega, sizeof(serializedC.mega)) == 0
-	&& memcmp(&serializedC.ultra, &deSerializedC.ultra, sizeof(serializedC.ultra)) == 0
+	&& serializedC.mega == deSerializedC.mega
+	&& serializedC.ultra == deSerializedC.ultra
 	&& serializedC.aVector == deSerializedC.aVector
 	&& serializedC.ctoto == deSerializedC.ctoto));
 }
@@ -197,13 +197,13 @@ TEST_CASE("JSON Serialize Metadatas", "[Serialization]")
 #  include "dire/Serialization/DireBinarySerializer.h"
 
 /* Utility function to print the output of binary generators */
-auto writeBinaryVec = [](const std::vector<std::byte>& binarized)
-{
-	std::cout << "\"";
-	for (int i = 0; i < binarized.size(); ++i)
-		std::cout << "\\x" << std::hex << std::setfill('0') << std::setw(2) << unsigned(binarized[i]);
-	std::cout << "\"" << std::endl;
-};
+//auto writeBinaryVec = [](const std::vector<std::byte>& binarized)
+//{
+//	std::cout << "\"";
+//	for (int i = 0; i < binarized.size(); ++i)
+//		std::cout << "\\x" << std::hex << std::setfill('0') << std::setw(2) << unsigned(binarized[i]);
+//	std::cout << "\"" << std::endl;
+//};
 
 TEST_CASE("Binary simple object", "[Serialization]")
 {
@@ -322,8 +322,8 @@ TEST_CASE("Binary std::vector (and other things)", "[Serialization]")
 	deserializer.DeserializeInto((const char*)binarized.data(), deSerializedC);
 	REQUIRE((memcmp(&serializedC.anArray, &deSerializedC.anArray, sizeof(serializedC.anArray)) == 0
 	&& memcmp(&serializedC.aMultiArray, &deSerializedC.aMultiArray, sizeof(serializedC.aMultiArray)) == 0
-	&& memcmp(&serializedC.mega, &deSerializedC.mega, sizeof(serializedC.mega)) == 0
-	&& memcmp(&serializedC.ultra, &deSerializedC.ultra, sizeof(serializedC.ultra)) == 0
+	&& serializedC.mega == deSerializedC.mega
+	&& serializedC.ultra == deSerializedC.ultra
 	&& serializedC.aVector == deSerializedC.aVector
 	&& serializedC.ctoto == deSerializedC.ctoto));
 }

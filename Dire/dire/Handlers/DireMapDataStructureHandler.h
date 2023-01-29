@@ -12,7 +12,11 @@ namespace DIRE_NS
 	class Dire_EXPORT IMapDataStructureHandler
 	{
 	public:
+
+		IMapDataStructureHandler() = default;
 		virtual ~IMapDataStructureHandler() = default;
+		IMapDataStructureHandler(const IMapDataStructureHandler&) = default;
+		IMapDataStructureHandler& operator=(const IMapDataStructureHandler&) = default;
 
 		virtual const void*				Read(const void*, const DIRE_STRING_VIEW&) const = 0;
 		virtual void					Update(void*, const DIRE_STRING_VIEW&, const void*) const = 0;

@@ -22,16 +22,14 @@ if(${UPPER_PROJECT_NAME}_TESTS_ENABLED)
 	add_executable(${PROJECT_NAME}::Tests ALIAS ${PROJECT_NAME}_UnitTests)
 
 # Add more flags than default CMake
-target_compile_options(${PROJECT_NAME}_UnitTests PRIVATE
-	$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
-		-Wall -Wextra -Werror -pedantic-errors -Wconversion -Wsign-conversion>
-	$<$<CXX_COMPILER_ID:MSVC>:
-		/WX /W4>)
+target_compile_options(${PROJECT_NAME} PRIVATE
+	$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:
+		-Wall -Wextra -Werror -Wconversion -Wsign-conversion -Wno-c++98-compat-pedantic -Wno-switch-enum -Wno-exit-time-destructors>
+	$<$<CXX_COMPILER_ID:GNU>: -Wall -Wextra -Werror -Wconversion -Wsign-conversion -Wno-non-template-friend>
+	$<$<CXX_COMPILER_ID:MSVC>: /WX /W4>)
+
 
 	target_link_libraries(${PROJECT_NAME}_UnitTests PRIVATE ${PROJECT_NAME})
-
-	set(UNIT_TESTS_DEFINE ${UPPER_PROJECT_NAME}_UNIT_TESTS)
-	target_compile_definitions(${PROJECT_NAME}_UnitTests PRIVATE ${UNIT_TESTS_DEFINE}=1)
 
 	# Only try to copy DLLs if we are on a DLL type of system (ie. Windows) and if we are building shared libs
 	if (CMAKE_IMPORT_LIBRARY_SUFFIX AND ${${UPPER_PROJECT_NAME}_BUILD_SHARED_LIB})

@@ -7,6 +7,7 @@ namespace DIRE_NS
 	class IntrusiveListNode
 	{
 	public:
+		virtual ~IntrusiveListNode() = default;
 		IntrusiveListNode() = default;
 
 		IntrusiveListNode(IntrusiveListNode& pNext);

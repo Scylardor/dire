@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.12) # HOMEPAGE_URL is not supported until CMake
 set(PROJECT_NAME Dire)
 string(TOUPPER ${PROJECT_NAME} UPPER_PROJECT_NAME)
 
-
 project(${PROJECT_NAME}
   VERSION 0.1
   LANGUAGES CXX
@@ -52,12 +51,12 @@ set(${PROJECT_NAME}_SOURCES
 	${DIRE_SOURCE_DIR}/Handlers/DireEnumDataStructureHandler.h
 	${DIRE_SOURCE_DIR}/Serialization/DireSerialization.h
 	${DIRE_SOURCE_DIR}/Serialization/DireJSONSerializer.h
-	${DIRE_SOURCE_DIR}/Serialization/DireJSONDeserializer.h
 	${DIRE_SOURCE_DIR}/Serialization/DireJSONSerializer.cpp
+	${DIRE_SOURCE_DIR}/Serialization/DireJSONDeserializer.h
 	${DIRE_SOURCE_DIR}/Serialization/DireJSONDeserializer.cpp
 	${DIRE_SOURCE_DIR}/Serialization/DireBinarySerializer.h
-	${DIRE_SOURCE_DIR}/Serialization/DireBinaryDeserializer.h
 	${DIRE_SOURCE_DIR}/Serialization/DireBinarySerializer.cpp
+	${DIRE_SOURCE_DIR}/Serialization/DireBinaryDeserializer.h
 	${DIRE_SOURCE_DIR}/Serialization/DireBinaryDeserializer.cpp
 	${DIRE_SOURCE_DIR}/Serialization/DireBinaryHeaders.h
 	${DIRE_SOURCE_DIR}/Types/DireTypes.h
@@ -68,7 +67,6 @@ set(${PROJECT_NAME}_SOURCES
 	${DIRE_SOURCE_DIR}/Types/DireTypeInfo.cpp
 	${DIRE_SOURCE_DIR}/Utils/DireMacros.h
 	${DIRE_SOURCE_DIR}/Utils/DireTypeTraits.h
-	${DIRE_SOURCE_DIR}/Utils/DireSingleton.h
 	${DIRE_SOURCE_DIR}/Utils/DireIntrusiveList.h
 	${DIRE_SOURCE_DIR}/Utils/DireIntrusiveList.inl
 	${DIRE_SOURCE_DIR}/Utils/DireString.h
@@ -100,10 +98,10 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 # Add more flags than default CMake
 target_compile_options(${PROJECT_NAME} PRIVATE
-	$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
-		-Wall -Wextra -Werror -pedantic-errors -Wconversion -Wsign-conversion>
-	$<$<CXX_COMPILER_ID:MSVC>:
-		/WX /W4>)
+	$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:
+		-Wall -Wextra -Werror -Wconversion -Wsign-conversion -Wno-c++98-compat-pedantic -Wno-switch-enum -Wno-exit-time-destructors>
+	$<$<CXX_COMPILER_ID:GNU>: -Wall -Wextra -Werror -Wconversion -Wsign-conversion -Wno-non-template-friend>
+	$<$<CXX_COMPILER_ID:MSVC>: /WX /W4>)
 
 # On Windows, set a different name for the import library to not be confused with a static build of the library
 # (both have .lib extension)
@@ -126,6 +124,9 @@ endif()
 if(${${UPPER_PROJECT_NAME}_STRING} STREQUAL "std")
 	set(${UPPER_PROJECT_NAME}_USE_STANDARD_STRING TRUE)
 endif()
+
+# Unit tests
+add_subdirectory(tests)
 
 # Generate the final defines file and add include directories so that clients can find it
 configure_file(${DIRE_SOURCE_DIR}/DireDefines.h.in ${DIRE_GENERATED_INCLUDES_DIR}/DireDefines.h)
@@ -156,8 +157,12 @@ endif()
 
 # Use a generator expression so that the install interface redirects to the right folder after installation.
 target_include_directories(${PROJECT_NAME}
-    PUBLIC
+    SYSTEM INTERFACE # Avoid users of the library who have more warnings than us to collect our warnings too (cf. https://www.foonathan.net/2018/10/cmake-warnings/)
         $<INSTALL_INTERFACE:include>
+		"$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME};${CMAKE_CURRENT_BINARY_DIR}/${DIRE_GENERATED_INCLUDES_DIR}>"
+)
+target_include_directories(${PROJECT_NAME}
+    PRIVATE
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME};${CMAKE_CURRENT_BINARY_DIR}/${DIRE_GENERATED_INCLUDES_DIR}>"
 )
 
@@ -210,5 +215,3 @@ export(EXPORT ${PROJECT_NAME}Targets
 set(CMAKE_EXPORT_PACKAGE_REGISTRY ON)
 export(PACKAGE ${PROJECT_NAME})
 
-# Unit tests
-add_subdirectory(tests)

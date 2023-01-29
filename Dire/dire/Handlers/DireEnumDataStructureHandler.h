@@ -11,7 +11,11 @@ namespace DIRE_NS
 		virtual void				SetFromString(const char*, void*) const = 0;
 		virtual MetaType::Values	EnumMetaType() const = 0;
 
+		IEnumDataStructureHandler() = default;
 		virtual ~IEnumDataStructureHandler() = default;
+		IEnumDataStructureHandler(const IEnumDataStructureHandler&) = default;
+		IEnumDataStructureHandler& operator=(const IEnumDataStructureHandler&) = default;
+
 	};
 
 	template <class T>

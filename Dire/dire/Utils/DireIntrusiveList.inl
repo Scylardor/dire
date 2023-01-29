@@ -32,7 +32,7 @@ namespace DIRE_NS
 	template <typename T>
 	T& IntrusiveLinkedList<T>::iterator::operator*() const
 	{
-		return *((T*)myNode);
+		return *(reinterpret_cast<T*>(myNode));
 	}
 
 	template <typename T>
@@ -65,7 +65,7 @@ namespace DIRE_NS
 	template <typename T>
 	T const& IntrusiveLinkedList<T>::const_iterator::operator*() const
 	{
-		return *((T const*)myNode);
+		return *(reinterpret_cast<T const*>(myNode));
 	}
 
 	template <typename T>

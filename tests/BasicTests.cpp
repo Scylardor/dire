@@ -1,6 +1,7 @@
 #include <sstream> // ostringstream
 #include <catch2/catch_test_macros.hpp>
 #include "Dire/Dire.h"
+#include <cmath> // NAN
 
 struct BasicTest
 {
@@ -26,7 +27,7 @@ TEST_CASE("Test DIRE_PROPERTY sets values", "[Basic Properties]")
 		&& test.aUChar == 2 && test.aShort == 3
 		&& test.aUShort == 4 && test.anInt == 5
 		&& test.anInt64 == 6 && test.anUInt == 7 && test.anUInt64 == 8
-		&& isnan(test.aFloat) && isnan(test.aDouble)));
+		&& std::isnan(test.aFloat) && std::isnan(test.aDouble)));
 }
 
 TEST_CASE("GetPropertyList with DECLARE_REFLECTABLE_INFO and basic types", "[Basic Properties]")

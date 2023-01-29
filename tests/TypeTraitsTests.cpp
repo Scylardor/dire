@@ -31,6 +31,9 @@ static_assert(dire::HasArraySemantics_v<int[10]>);
 static_assert(dire::HasArraySemantics_v<std::vector<int>>);
 static_assert(dire::HasArraySemantics_v<std::string>);
 
+//HasKeyType_v<T>&& HasValueType_v<T>&& HasMappedType_v<T>&& has_MapBrackets_v<T>;
+
+static_assert(dire::has_MapBrackets_v<std::map<int, bool>>);
 static_assert(dire::HasMapSemantics_v<std::map<int, bool>>);
 static_assert(dire::HasMapSemantics_v<std::unordered_map<int, bool>>);
 

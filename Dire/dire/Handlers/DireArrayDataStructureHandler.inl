@@ -1,5 +1,6 @@
 #pragma once
-
+#include "DireEnumDataStructureHandler.h"
+#include "DireMapDataStructureHandler.h"
 
 namespace DIRE_NS
 {

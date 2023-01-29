@@ -37,7 +37,7 @@ namespace DIRE_NS
 
 		const auto* nextPropertyHeader = &ReadFromBytes<BinarySerializationHeaders::Property>();
 
-		char* objectPtr = (char*)&pDeserializedObject;
+		char* objectPtr = reinterpret_cast<char*>(&pDeserializedObject);
 		unsigned iProp = 0;
 
 		objTypeInfo->ForEachPropertyInHierarchy([&](const PropertyTypeInfo& pProperty)
@@ -60,6 +60,7 @@ namespace DIRE_NS
 		return &pDeserializedObject;
 	}
 
+
 	void BinaryReflectorDeserializer::DeserializeArrayValue(void* pPropPtr, const IArrayDataStructureHandler * pArrayHandler) const
 	{
 		if (pArrayHandler != nullptr)
@@ -71,7 +72,7 @@ namespace DIRE_NS
 			&& pArrayHandler->ElementSize() == arrayHeader.SizeofElement);
 			if (arrayHeader.ElementType != MetaType::Unknown)
 			{
-				for (auto iElem = 0; iElem < arrayHeader.ArraySize; ++iElem)
+				for (size_t iElem = 0; iElem < arrayHeader.ArraySize; ++iElem)
 				{
 					void* elemVal = const_cast<void*>(pArrayHandler->Read(pPropPtr, iElem));
 					DeserializeValue(arrayHeader.ElementType, elemVal, &elemHandler);
@@ -94,7 +95,7 @@ namespace DIRE_NS
 		DIRE_ASSERT(valueType == mapHeader.ValueType && mapHeader.SizeofValueType == pMapHandler->SizeofValue()
 			&& mapHeader.KeyType == pMapHandler->KeyMetaType() && mapHeader.SizeofKeyType == sizeofKeyType);
 
-		for (int i = 0; i < mapHeader.MapSize; ++i)
+		for (size_t i = 0; i < mapHeader.MapSize; ++i)
 		{
 			const char* keyData = ReadBytes(sizeofKeyType);
 			void* createdValue = pMapHandler->BinaryCreate(pPropPtr, keyData, nullptr);
@@ -126,7 +127,7 @@ namespace DIRE_NS
 		if (!deserializedTypeInfo->IsParentOf(objTypeInfo->GetID()))
 			return;
 
-		char* objectPtr = (char*)pPropPtr;
+		char* objectPtr = reinterpret_cast<char*>(pPropPtr);
 
 		const auto* nextPropertyHeader = &ReadFromBytes<BinarySerializationHeaders::Property>();
 		unsigned iProp = 0;
@@ -153,16 +154,16 @@ namespace DIRE_NS
 		switch (pPropType.Value)
 		{
 			BINARY_DESERIALIZE_VALUE_CASE(Bool)
-				BINARY_DESERIALIZE_VALUE_CASE(Char)
-				BINARY_DESERIALIZE_VALUE_CASE(UChar)
-				BINARY_DESERIALIZE_VALUE_CASE(Short)
-				BINARY_DESERIALIZE_VALUE_CASE(UShort)
-				BINARY_DESERIALIZE_VALUE_CASE(Int)
-				BINARY_DESERIALIZE_VALUE_CASE(Uint)
-				BINARY_DESERIALIZE_VALUE_CASE(Int64)
-				BINARY_DESERIALIZE_VALUE_CASE(Uint64)
-				BINARY_DESERIALIZE_VALUE_CASE(Float)
-				BINARY_DESERIALIZE_VALUE_CASE(Double)
+			BINARY_DESERIALIZE_VALUE_CASE(Char)
+			BINARY_DESERIALIZE_VALUE_CASE(UChar)
+			BINARY_DESERIALIZE_VALUE_CASE(Short)
+			BINARY_DESERIALIZE_VALUE_CASE(UShort)
+			BINARY_DESERIALIZE_VALUE_CASE(Int)
+			BINARY_DESERIALIZE_VALUE_CASE(Uint)
+			BINARY_DESERIALIZE_VALUE_CASE(Int64)
+			BINARY_DESERIALIZE_VALUE_CASE(Uint64)
+			BINARY_DESERIALIZE_VALUE_CASE(Float)
+			BINARY_DESERIALIZE_VALUE_CASE(Double)
 		case MetaType::Array:
 			if (pHandler != nullptr)
 			{

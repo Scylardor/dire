@@ -95,7 +95,7 @@ dire_reflectable(struct MegaCompound)
 	bool operator==(const MegaCompound& other)
 	{
 		return compint == other.compint && compleet.leet == other.compleet.leet && compleet.copyable.aUselessProp == other.compleet.copyable.aUselessProp
-			&& memcmp(&toto, &other.toto, sizeof(toto)) == 0;
+			&& memcmp((const void*) & toto, (const void*) & other.toto, sizeof(toto)) == 0;
 	}
 };
 
@@ -106,6 +106,11 @@ dire_reflectable(struct UltraCompound)
 	DIRE_PROPERTY(MegaCompound, mega)
 
 	UltraCompound() = default;
+
+	bool operator==(const UltraCompound & other)
+	{
+		return mega == other.mega;
+	}
 };
 
 dire_reflectable(struct a)
@@ -178,6 +183,7 @@ dire_reflectable(struct c, b)
 	c(int, bool)
 	{
 	}
+
 
 };
 
@@ -276,7 +282,9 @@ public:
 
 class noncopyable_int : public noncopyable
 {
+public:
 	const int theAnswer = 42;
+
 };
 
 class emptyObject

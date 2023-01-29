@@ -12,13 +12,21 @@
 
 #include "dire/Types/DireTypes.h"
 
+
+/* Export the whole class with GCC, otherwise it won't export the vtable and user will fail linking */
+#ifdef __GNUG__
+#define DIRE_GNU_EXPORT Dire_EXPORT
+#else
+#define DIRE_GNU_EXPORT
+#endif
+
 namespace DIRE_NS
 {
-	class RapidJsonReflectorSerializer : public ISerializer
+	class DIRE_GNU_EXPORT RapidJsonReflectorSerializer : public ISerializer
 	{
 	public:
 
-		Dire_EXPORT virtual Result Serialize(const Reflectable & serializedObject) override;
+		 virtual Result Dire_EXPORT Serialize(const Reflectable & serializedObject) override;
 
 		virtual bool	SerializesMetadata() const override
 		{
@@ -52,7 +60,7 @@ namespace DIRE_NS
 
 	void RapidJsonReflectorSerializer::SerializeString(DIRE_STRING_VIEW pSerializedString)
 	{
-		myJsonWriter.String(pSerializedString.data(), (rapidjson::SizeType)pSerializedString.size());
+		myJsonWriter.String(pSerializedString.data(), rapidjson::SizeType(pSerializedString.size()));
 	}
 
 	void RapidJsonReflectorSerializer::SerializeInt(int32_t pSerializedInt)
@@ -62,7 +70,7 @@ namespace DIRE_NS
 
 	void RapidJsonReflectorSerializer::SerializeFloat(float pSerializedFloat)
 	{
-		myJsonWriter.Double(pSerializedFloat);
+		myJsonWriter.Double(double(pSerializedFloat));
 	}
 
 	void RapidJsonReflectorSerializer::SerializeBool(bool pSerializedBool)
@@ -72,7 +80,7 @@ namespace DIRE_NS
 
 	void RapidJsonReflectorSerializer::SerializeValuesForObject(DIRE_STRING_VIEW pObjectName, SerializedValueFiller pFillerFunction)
 	{
-		myJsonWriter.String(pObjectName.data(), (rapidjson::SizeType)pObjectName.size());
+		myJsonWriter.String(pObjectName.data(), rapidjson::SizeType(pObjectName.size()));
 
 		myJsonWriter.StartObject();
 

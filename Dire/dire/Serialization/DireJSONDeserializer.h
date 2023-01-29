@@ -14,10 +14,10 @@ namespace DIRE_NS
 	class IMapDataStructureHandler;
 	class IArrayDataStructureHandler;
 
-	class RapidJsonReflectorDeserializer : public IDeserializer
+	class Dire_EXPORT RapidJsonReflectorDeserializer : public IDeserializer
 	{
 	public:
-		Dire_EXPORT virtual Result	DeserializeInto(char const* pJson, Reflectable& pDeserializedObject) override;
+		 virtual Result	DeserializeInto(char const* pJson, Reflectable& pDeserializedObject) override;
 
 	private:
 

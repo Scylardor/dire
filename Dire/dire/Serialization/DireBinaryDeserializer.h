@@ -11,10 +11,10 @@ namespace DIRE_NS
 	class IMapDataStructureHandler;
 	class IArrayDataStructureHandler;
 
-	class BinaryReflectorDeserializer : public IDeserializer
+	class Dire_EXPORT BinaryReflectorDeserializer : public IDeserializer
 	{
 	public:
-		Dire_EXPORT virtual Result	DeserializeInto(const char * pSerialized, Reflectable& pDeserializedObject) override;
+		virtual Result	DeserializeInto(const char * pSerialized, Reflectable& pDeserializedObject) override;
 
 	private:
 
@@ -22,7 +22,7 @@ namespace DIRE_NS
 		const T& ReadFromBytes() const
 		{
 			auto Tptr = reinterpret_cast<const T*>(mySerializedBytes + myReadingOffset);
-			myReadingOffset += sizeof T;
+			myReadingOffset += sizeof(T);
 			return *Tptr;
 		}
 

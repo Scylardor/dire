@@ -20,30 +20,31 @@ namespace DIRE_NS
 		using CopyConstructorPtr = void (*)(void* pDestAddr, const void * pOther, size_t pOffset);
 
 	public:
-		Dire_EXPORT PropertyTypeInfo(const char * pName, const std::ptrdiff_t pOffset, const size_t pSize, const CopyConstructorPtr pCopyCtor = nullptr) :
+
+		PropertyTypeInfo(const char * pName, const std::ptrdiff_t pOffset, const size_t pSize, const CopyConstructorPtr pCopyCtor = nullptr) :
 			myName(pName), myMetatype(MetaType::Unknown), myOffset(pOffset), mySize(pSize), myCopyCtor(pCopyCtor)
 		{}
 
-		Dire_EXPORT [[nodiscard]] const IArrayDataStructureHandler* GetArrayHandler() const
+		[[nodiscard]] const IArrayDataStructureHandler* GetArrayHandler() const
 		{
 			return myDataStructurePropertyHandler.GetArrayHandler();
 		}
 
-		Dire_EXPORT [[nodiscard]] const IMapDataStructureHandler* GetMapHandler() const
+		[[nodiscard]] const IMapDataStructureHandler* GetMapHandler() const
 		{
 			return myDataStructurePropertyHandler.GetMapHandler();
 		}
 
-		Dire_EXPORT [[nodiscard]] const DataStructureHandler& GetDataStructureHandler() const
+		[[nodiscard]] const DataStructureHandler& GetDataStructureHandler() const
 		{
 			return myDataStructurePropertyHandler;
 		}
 
 		[[nodiscard]] const DIRE_STRING_VIEW&	GetName() const { return myName; }
 
-		[[nodiscard]] MetaType					GetMetatype() const { return myMetatype; }
+		[[nodiscard]] const MetaType&			GetMetatype() const { return myMetatype; }
 
-		[[nodiscard]] size_t					GetOffset() const { return myOffset; }
+		[[nodiscard]] size_t					GetOffset() const { return size_t(myOffset); }
 
 		[[nodiscard]] size_t					GetSize() const { return mySize; }
 
@@ -286,7 +287,7 @@ namespace DIRE_NS
 #define DIRE_UNPAREN(...) DIRE_EVALUATING_PASTE(DIRE_NOTHING_, DIRE_EXTRACT __VA_ARGS__)
 
 #define DIRE_FUNCTION_TYPEINFO(Name) \
-	inline static DIRE_NS::TypedFunctionInfo<decltype(&Name)> Name##_TYPEINFO{ &Name, DIRE_STRINGIZE(Name)};
+	inline static DIRE_NS::TypedFunctionInfo<decltype(&Self::Name)> Name##_TYPEINFO{ &Self::Name, DIRE_STRINGIZE(Name)};
 
 #define DIRE_FUNCTION(RetType, Name, ...) \
 	RetType Name DIRE_LPAREN DIRE_UNPAREN(__VA_ARGS__) DIRE_RPAREN ; \
@@ -294,8 +295,9 @@ namespace DIRE_NS
 
 
 #define DIRE_DECLARE_TYPEINFO() \
-	typedef auto DIRE_SelfDetector() -> std::remove_reference<decltype(*this)>::type;\
-    using Self = decltype(((DIRE_SelfDetector*)0)());\
+	struct DIRE_SelfTypeTag{}; \
+    constexpr auto DIRE_SelfTypeHelper() -> decltype(::DIRE_NS::SelfType::Writer<DIRE_SelfTypeTag, decltype(this)>{}, void()) {} \
+    using Self = ::DIRE_NS::SelfType::Read<DIRE_SelfTypeTag>;\
 	inline static DIRE_NS::TypedTypeInfo<Self, false>	DIRE_TypeInfo{""};\
 	static DIRE_NS::TypeInfo const&	GetTypeInfo()\
 	{\

@@ -37,6 +37,26 @@ namespace DIRE_NS
 		static const MetaType::Values EnumType = MetaType::Unknown;
 	};
 
+	template <typename T>
+	constexpr MetaType::Values	FromEnumToUnderlyingType()
+	{
+		static_assert(IsEnum<T>);
+
+		switch (sizeof(T))
+		{
+		case sizeof(int8_t):
+			return MetaType::Char;
+		case sizeof(int16_t):
+			return MetaType::Short;
+		case sizeof(int32_t):
+			return MetaType::Int;
+		case sizeof(int64_t):
+			return MetaType::Int64;
+		default:
+			return MetaType::Unknown;
+		}
+	}
+
 #define DECLARE_TYPE_TRANSLATOR(TheEnumType, TheActualType) \
 	template <> \
 	struct FromEnumTypeToActualType<TheEnumType> \
@@ -76,23 +96,4 @@ namespace DIRE_NS
 	DECLARE_ENABLE_IF_TRANSLATOR(MetaType::Enum, (std::is_base_of_v<Enum, T>))
 	DECLARE_ENABLE_IF_TRANSLATOR(MetaType::Reference, std::is_reference_v<T>)
 
-	template <typename T>
-	constexpr MetaType::Values	FromEnumToUnderlyingType()
-	{
-		static_assert(IsEnum<T>);
-
-		switch (sizeof T)
-		{
-			case sizeof(int8_t):
-				return MetaType::Char;
-			case sizeof(int16_t):
-				return MetaType::Short;
-			case sizeof(int32_t):
-				return MetaType::Int;
-			case sizeof(int64_t):
-				return MetaType::Int64;
-			default:
-				return MetaType::Unknown;
-		}
-	}
 }

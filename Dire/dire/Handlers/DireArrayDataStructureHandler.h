@@ -1,10 +1,9 @@
 #pragma once
 
 #include "DireTypeHandlers.h"
-#include "DireEnumDataStructureHandler.h"
-#include "DireMapDataStructureHandler.h"
 #include "dire/Types/DireTypes.h"
 #include "dire/DireReflectableID.h"
+#include "dire/Utils/DireTypeTraits.h"
 
 namespace DIRE_NS
 {
@@ -17,7 +16,10 @@ namespace DIRE_NS
 	class Dire_EXPORT IArrayDataStructureHandler
 	{
 	public:
+		IArrayDataStructureHandler() = default;
 		virtual ~IArrayDataStructureHandler() = default;
+		IArrayDataStructureHandler(const IArrayDataStructureHandler&) = default;
+		IArrayDataStructureHandler& operator=(const IArrayDataStructureHandler&) = default;
 
 		virtual const void*				Read(const void* pArray, size_t pIndex) const = 0;
 		virtual void					Update(void* pArray, size_t pIndex, const void* pUpdateValue) const = 0;
