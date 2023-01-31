@@ -29,6 +29,10 @@ namespace DIRE_NS
 
 	using ConvertError = DIRE_STRING;
 
+	/**
+	 * \brief Encapsulates the result of a string conversion. It holds either the result in the requested type, or an error.
+	 * \tparam T The type we want to convert a string into
+	 */
 	template <typename T>
 	class ConvertResult
 	{
@@ -68,6 +72,10 @@ namespace DIRE_NS
 	template<typename T, typename = void>
 	struct FromCharsConverter;
 
+	/**
+	 * \brief Specialization used to convert from a string to a Dire Enum
+	 * \tparam T The Dire enum type
+	 */
 	template <typename T>
 	struct FromCharsConverter<T, typename std::enable_if_t<std::is_base_of_v<Enum, T>, void>>
 	{
@@ -78,6 +86,10 @@ namespace DIRE_NS
 		}
 	};
 
+	/**
+	 * \brief Specialization used to convert from a string to a simple number
+	 * \tparam T The number type
+	 */
 	template <typename T>
 	struct FromCharsConverter<T, typename std::enable_if_t<std::is_arithmetic_v<T>, void>>
 	{

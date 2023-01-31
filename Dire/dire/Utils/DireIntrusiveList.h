@@ -3,6 +3,11 @@
 
 namespace DIRE_NS
 {
+	/**
+	 * \brief Basic implementation of an intrusive node, designed to reside in the user class.
+	 * Nodes are bound to each other by an IntrusiveList.
+	 * \tparam T The user class
+	 */
 	template <typename T>
 	class IntrusiveListNode
 	{
@@ -21,6 +26,11 @@ namespace DIRE_NS
 		Next = &pNext;
 	}
 
+	/**
+	 * \brief Basic implementation of an intrusive list keeping a pointer to the head and the tail of the list
+	 * Only allows pushing at the back and traversal front to back.
+	 * \tparam T The type of node we store.
+	 */
 	template <typename T>
 	class IntrusiveLinkedList
 	{

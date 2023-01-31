@@ -22,7 +22,7 @@
 
 namespace DIRE_NS
 {
-	class DIRE_GNU_EXPORT RapidJsonReflectorSerializer : public ISerializer
+	class DIRE_GNU_EXPORT JsonReflectorSerializer : public ISerializer
 	{
 	public:
 
@@ -58,27 +58,27 @@ namespace DIRE_NS
 		Writer			myJsonWriter;
 	};
 
-	void RapidJsonReflectorSerializer::SerializeString(DIRE_STRING_VIEW pSerializedString)
+	void JsonReflectorSerializer::SerializeString(DIRE_STRING_VIEW pSerializedString)
 	{
 		myJsonWriter.String(pSerializedString.data(), rapidjson::SizeType(pSerializedString.size()));
 	}
 
-	void RapidJsonReflectorSerializer::SerializeInt(int32_t pSerializedInt)
+	void JsonReflectorSerializer::SerializeInt(int32_t pSerializedInt)
 	{
 		myJsonWriter.Int(pSerializedInt);
 	}
 
-	void RapidJsonReflectorSerializer::SerializeFloat(float pSerializedFloat)
+	void JsonReflectorSerializer::SerializeFloat(float pSerializedFloat)
 	{
 		myJsonWriter.Double(double(pSerializedFloat));
 	}
 
-	void RapidJsonReflectorSerializer::SerializeBool(bool pSerializedBool)
+	void JsonReflectorSerializer::SerializeBool(bool pSerializedBool)
 	{
 		myJsonWriter.Bool(pSerializedBool);
 	}
 
-	void RapidJsonReflectorSerializer::SerializeValuesForObject(DIRE_STRING_VIEW pObjectName, SerializedValueFiller pFillerFunction)
+	void JsonReflectorSerializer::SerializeValuesForObject(DIRE_STRING_VIEW pObjectName, SerializedValueFiller pFillerFunction)
 	{
 		myJsonWriter.String(pObjectName.data(), rapidjson::SizeType(pObjectName.size()));
 

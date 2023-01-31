@@ -6,9 +6,12 @@
 
 namespace DIRE_NS
 {
-	// This follows a very simple binary serialization process right now. It encodes:
-	// - the reflectable type ID
-	// - the typename string
+	/**
+	 * \brief An internal structure that stores the information we obtain when importing an exported typeinfo database.
+	 * This follows a very simple binary serialization process right now. It encodes:
+	 * - the reflectable type ID
+	 * - the typename string
+	 */
 	struct ExportedTypeInfoData
 	{
 		ReflectableID	ReflectableID;

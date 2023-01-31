@@ -30,6 +30,11 @@ namespace DIRE_NS
 	template <MetaType::Values T>
 	struct FromEnumTypeToActualType;
 
+	/**
+	 * \brief Maps an actual C++ type to its MetaType enum counterpart
+	 * \tparam T The actual type
+	 * \tparam Enable SFINAE parameter used to match a type to its metatype
+	 */
 	template <typename T, typename Enable = void>
 	struct FromActualTypeToEnumType
 	{
@@ -37,6 +42,12 @@ namespace DIRE_NS
 		static const MetaType::Values EnumType = MetaType::Unknown;
 	};
 
+	/**
+	 * \brief Maps an Enum-based type to the metatype of its underlying type based on the size of the enum.
+	 *	It is blind to sign, i.e. char and unsigned char will both map to MetaType::Char.
+	 * \tparam T The enum type.
+	 * \return The underlying metatype.
+	 */
 	template <typename T>
 	constexpr MetaType::Values	FromEnumToUnderlyingType()
 	{

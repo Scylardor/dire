@@ -21,7 +21,7 @@
 
 namespace DIRE_NS
 {
-	IDeserializer::Result RapidJsonReflectorDeserializer::DeserializeInto(char const* pJson, Reflectable& pDeserializedObject)
+	IDeserializer::Result JsonReflectorDeserializer::DeserializeInto(char const* pJson, Reflectable& pDeserializedObject)
 	{
 		rapidjson::Document doc;
 		rapidjson::ParseResult ok = doc.Parse(pJson);
@@ -45,7 +45,7 @@ namespace DIRE_NS
 		return { &pDeserializedObject };
 	}
 
-	void RapidJsonReflectorDeserializer::DeserializeArrayValue(const rapidjson::Value& pVal, void* pPropPtr, const IArrayDataStructureHandler * pArrayHandler) const
+	void JsonReflectorDeserializer::DeserializeArrayValue(const rapidjson::Value& pVal, void* pPropPtr, const IArrayDataStructureHandler * pArrayHandler) const
 	{
 		DIRE_ASSERT(pVal.IsArray());
 
@@ -66,7 +66,7 @@ namespace DIRE_NS
 	}
 
 
-	void RapidJsonReflectorDeserializer::DeserializeMapValue(const rapidjson::Value& pVal, void* pPropPtr, const IMapDataStructureHandler * pMapHandler) const
+	void JsonReflectorDeserializer::DeserializeMapValue(const rapidjson::Value& pVal, void* pPropPtr, const IMapDataStructureHandler * pMapHandler) const
 	{
 		if (pPropPtr == nullptr || pMapHandler == nullptr)
 			return;
@@ -83,7 +83,7 @@ namespace DIRE_NS
 	}
 
 
-	void RapidJsonReflectorDeserializer::DeserializeCompoundValue(const rapidjson::Value& pVal, void* pPropPtr) const
+	void JsonReflectorDeserializer::DeserializeCompoundValue(const rapidjson::Value& pVal, void* pPropPtr) const
 	{
 		DIRE_ASSERT(pVal.IsObject());
 		auto* reflectableProp = static_cast<Reflectable*>(pPropPtr);
@@ -99,7 +99,7 @@ namespace DIRE_NS
 			});
 	}
 
-	void	RapidJsonReflectorDeserializer::DeserializeValue(void const* pSerializedVal, MetaType pPropType, void* pPropPtr, const DataStructureHandler* pHandler) const
+	void	JsonReflectorDeserializer::DeserializeValue(void const* pSerializedVal, MetaType pPropType, void* pPropPtr, const DataStructureHandler* pHandler) const
 	{
 		auto* jsonVal = static_cast<const rapidjson::Value*>(pSerializedVal);
 

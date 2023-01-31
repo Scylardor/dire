@@ -10,7 +10,6 @@ project(${PROJECT_NAME}
   DESCRIPTION "A library for Dynamically Interpreted Reflection Expressions (DIRE)."
 )
 
-# specify the C++ standard
 # Options
 option(${UPPER_PROJECT_NAME}_SERIALIZATION_ENABLED "Enables the Serialization features of the DIRE library." ON)
 option(${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED "Enables the JSON serialization feature of the DIRE library, using RapidJSON." ON)
@@ -96,6 +95,15 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 	VERSION ${PROJECT_VERSION}
 	SOVERSION ${PROJECT_VERSION_MAJOR})
 
+# On Windows, set a different name for the import library to not be confused with a static build of the library
+# (both have .lib extension)
+if (CMAKE_IMPORT_LIBRARY_SUFFIX AND ${${UPPER_PROJECT_NAME}_BUILD_SHARED_LIB})
+	set_target_properties(${PROJECT_NAME} PROPERTIES ARCHIVE_OUTPUT_NAME ${PROJECT_NAME}_imp)
+endif()
+
+# specify the C++ standard
+target_compile_features(${PROJECT_NAME} PUBLIC ${${UPPER_PROJECT_NAME}_CPP_STANDARD})
+
 # Add more flags than default CMake
 target_compile_options(${PROJECT_NAME} PRIVATE
 	$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:
@@ -103,33 +111,9 @@ target_compile_options(${PROJECT_NAME} PRIVATE
 	$<$<CXX_COMPILER_ID:GNU>: -Wall -Wextra -Werror -Wconversion -Wsign-conversion -Wno-non-template-friend>
 	$<$<CXX_COMPILER_ID:MSVC>: /WX /W4>)
 
-# On Windows, set a different name for the import library to not be confused with a static build of the library
-# (both have .lib extension)
-if (CMAKE_IMPORT_LIBRARY_SUFFIX AND ${${UPPER_PROJECT_NAME}_BUILD_SHARED_LIB})
-	SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES ARCHIVE_OUTPUT_NAME ${PROJECT_NAME}_imp)
-endif()
-
-# specify the C++ standard
-target_compile_features(${PROJECT_NAME} PUBLIC ${${UPPER_PROJECT_NAME}_CPP_STANDARD})
-
 if(${${UPPER_PROJECT_NAME}_CPP_STANDARD} STREQUAL "cxx_std_20")
 	set(DIRE_HAS_CPP20 TRUE)
 endif()
-
-# Defines (Warning: do this before configure_file or it won't be setup correctly!)
-if(${${UPPER_PROJECT_NAME}_ASSERT} STREQUAL "assert")
-	set(${UPPER_PROJECT_NAME}_USE_STANDARD_ASSERT TRUE)
-endif()
-
-if(${${UPPER_PROJECT_NAME}_STRING} STREQUAL "std")
-	set(${UPPER_PROJECT_NAME}_USE_STANDARD_STRING TRUE)
-endif()
-
-# Unit tests
-add_subdirectory(tests)
-
-# Generate the final defines file and add include directories so that clients can find it
-configure_file(${DIRE_SOURCE_DIR}/DireDefines.h.in ${DIRE_GENERATED_INCLUDES_DIR}/DireDefines.h)
 
 # Dynamic Library Setup
 include(GenerateExportHeader)
@@ -166,6 +150,21 @@ target_include_directories(${PROJECT_NAME}
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME};${CMAKE_CURRENT_BINARY_DIR}/${DIRE_GENERATED_INCLUDES_DIR}>"
 )
 
+# Defines (Warning: do this before configure_file or it won't be setup correctly!)
+if(${${UPPER_PROJECT_NAME}_ASSERT} STREQUAL "assert")
+	set(${UPPER_PROJECT_NAME}_USE_STANDARD_ASSERT TRUE)
+endif()
+
+if(${${UPPER_PROJECT_NAME}_STRING} STREQUAL "std")
+	set(${UPPER_PROJECT_NAME}_USE_STANDARD_STRING TRUE)
+endif()
+
+# Generate the final defines file and add include directories so that clients can find it
+configure_file(${DIRE_SOURCE_DIR}/DireDefines.h.in ${DIRE_GENERATED_INCLUDES_DIR}/DireDefines.h)
+
+
+# INSTALL INSTRUCTIONS
+######################
 include(GNUInstallDirs) # defines variables like CMAKE_INSTALL_LIBDIR, etc.
 set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/Dire)
 
@@ -215,3 +214,11 @@ export(EXPORT ${PROJECT_NAME}Targets
 set(CMAKE_EXPORT_PACKAGE_REGISTRY ON)
 export(PACKAGE ${PROJECT_NAME})
 
+# UNIT TESTS
+############
+add_subdirectory(tests)
+
+# DOCUMENTATION
+###############
+include(CMake/Doxygen.cmake)
+add_doxygen(${PROJECT_NAME} README.md docs)

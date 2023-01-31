@@ -5,25 +5,40 @@
 
 namespace DIRE_NS
 {
-	// inspired by https://stackoverflow.com/a/4298441/1987466
-
 	template<typename T>
 	struct GetParenthesizedType;
 
+	/**
+	 * \brief Allows to extract the type of the first parameter of a function type.
+	 * Inspired by https://stackoverflow.com/a/4298441/1987466
+	 * \tparam R Return type
+	 * \tparam P1 Type of first parameter
+	 */
 	template<typename R, typename P1>
 	struct GetParenthesizedType<R(P1)>
 	{
 		typedef P1 Type;
 	};
 
-	// inspired by https://stackoverflow.com/questions/53503124/get-a-new-tuple-containing-all-but-first-element-of-a-tuple
+	/**
+	 * \brief Takes a tuple, and returns the same tuple stripped of the first type element.
+	 * Inspired by https://stackoverflow.com/questions/53503124/get-a-new-tuple-containing-all-but-first-element-of-a-tuple
+	 * \tparam T1 First type of the type pack
+	 * \tparam Ts The rest
+	 * \param tuple The tuple to split
+	 * \return The tuple with the first element removed
+	 */
 	template <typename T1, typename... Ts>
 	std::tuple<Ts...> ExtractTupleWithoutFirstType(const std::tuple<T1, Ts...>& tuple)
 	{
 		return std::apply([](auto&&, const auto&... args) {return std::tie(args...); }, tuple);
 	}
 
-	/* Version for any number of parameters, but no Metadata */
+	/**
+	 * \brief A class that is used to extract a tuple from the arguments passed to the constructor of a property.
+	 * 	Version for any number of parameters, but no Metadata.
+	 * \tparam T The tuple type holding all the parameters
+	 */
 	template <typename T>
 	struct ParameterExtractor
 	{
@@ -36,7 +51,13 @@ namespace DIRE_NS
 		}
 	};
 
-	/* Version for when the parameter list includes Metadata */
+	/**
+	 * \brief A class that is used to extract a tuple from the arguments passed to the constructor of a property.
+	 * 	Version for when the parameter list includes Metadata.
+	 *	It's going to strip the first type of the tuple, isolating the Metadata, then repack the tuple with the rest of the arguments.
+	 * \tparam Ts The parameter types of the Metadata
+	 * \tparam Us The rest od the argument types
+	 */
 	template <typename... Ts, typename... Us>
 	struct ParameterExtractor<std::tuple<Metadata<Ts...>, Us...>>
 	{
@@ -52,6 +73,12 @@ namespace DIRE_NS
 	};
 
 
+	/**
+	 * \brief The property template declared by DIRE_PROPERTY. Never use this type directly, use the macro.
+	 * \tparam TOwner The type of the owning class
+	 * \tparam TProp The property type
+	 * \tparam MetadataType The type holding the list of metadatas for this prop
+	 */
 	template <typename TOwner, typename TProp, typename MetadataType>
 	class TypedProperty final : public PropertyTypeInfo
 	{

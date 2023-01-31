@@ -19,6 +19,13 @@ namespace DIRE_NS
 	template <typename T, typename... Us>
 	struct TupleHasType<T, std::tuple<Us...>> : std::disjunction<std::is_same<T, Us>...> {};
 
+	/**
+	 * \brief The holder class for Dire property metadatas.
+	 * Aims to provide a functionality similar to Unity's attributes or Unreal's UMETA (or meta keywords), by tagging each property.
+	 * In its current iteration, Metadata is supposed to be used only with constexpr types and values, which is why it just acts as a holder of a variadic type list.
+	 * It is only useful in the context of serialization, and as of now, is only useful for JSON serializing. Its purposes is not to store in-game data.
+	 * \tparam Ts The list of metadata attributes
+	 */
 	template <typename... Ts>
 	struct Metadata
 	{

@@ -30,7 +30,7 @@ TEST_CASE("Test DIRE_PROPERTY sets values", "[Basic Properties]")
 		&& std::isnan(test.aFloat) && std::isnan(test.aDouble)));
 }
 
-TEST_CASE("GetPropertyList with DECLARE_REFLECTABLE_INFO and basic types", "[Basic Properties]")
+TEST_CASE("GetPropertyList with DIRE_REFLECTABLE_INFO and basic types", "[Basic Properties]")
 {
 	std::ostringstream output;
 	auto& refl = BasicTest::GetTypeInfo();

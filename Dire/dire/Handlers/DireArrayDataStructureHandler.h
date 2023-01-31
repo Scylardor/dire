@@ -13,6 +13,10 @@ namespace DIRE_NS
 	class TypedArrayDataStructureHandler
 	{};
 
+	/**
+	 * \brief Generic interface for type-erased array handlers.
+	 * This class will be derived by handlers for both static arrays and array-like data structures (like std::vector).
+	 */
 	class Dire_EXPORT IArrayDataStructureHandler
 	{
 	public:
@@ -34,18 +38,33 @@ namespace DIRE_NS
 	};
 
 
+	/**
+	 * \brief An intermediate wrapper for functions common to both types of array handlers.
+	 */
 	class Dire_EXPORT AbstractArrayDataStructureHandler : public IArrayDataStructureHandler
 	{
 	protected:
+		/**
+		 * \brief Returns the reflectable ID of the array's element type, or INVALID_REFLECTABLE_ID if this is not a Reflectable.
+		 * \tparam ElementValueType The element type
+		 */
 		template <typename ElementValueType>
 		static ReflectableID	GetElementReflectableID();
 
+		/**
+		 * \brief Populates a DataStructureHandler that will hold the handler matching the data structure of the element type.
+		 * The handler pointer will be null if the type doesn't have any known handler.
+		 * \tparam ElementValueType The element type
+		 */
 		template <typename ElementValueType>
 		static DataStructureHandler	GetTypedElementHandler();
 	};
+	
 
-
-	// Base class for reflectable properties that have brackets operator to be able to make operations on the underlying array
+	/**
+	 * \brief Type-erased array handler for reflectable properties that have all the traits of an Array (e.g. std::vector), but who are not static arrays.
+	 * \tparam T The property type
+	 */
 	template <typename T>
 	class TypedArrayDataStructureHandler<T,
 		typename std::enable_if_t<HasArraySemantics_v<T> && !std::is_array_v<T>>> final : public AbstractArrayDataStructureHandler
@@ -107,7 +126,10 @@ namespace DIRE_NS
 		}
 	};
 
-	// Base class for reflectable properties that are C-arrays to be able to make operations on the underlying array
+	/**
+	 * \brief Type-erased array handler for reflectable properties that are static arrays.
+	 * \tparam T The property type
+	 */
 	template <typename T>
 	class TypedArrayDataStructureHandler<T,
 		typename std::enable_if_t<std::is_array_v<T>>> final : public AbstractArrayDataStructureHandler

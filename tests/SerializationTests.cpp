@@ -15,8 +15,8 @@
 
 TEST_CASE("JSON simple object", "[Serialization]")
 {
-	dire::RapidJsonReflectorSerializer serializer;
-	dire::RapidJsonReflectorDeserializer deserializer;
+	dire::JsonReflectorSerializer serializer;
+	dire::JsonReflectorDeserializer deserializer;
 	std::string serialized;
 
 	testcompound2 clonedComp;
@@ -33,8 +33,8 @@ TEST_CASE("JSON simple object", "[Serialization]")
 
 TEST_CASE("JSON array", "[Serialization]")
 {
-	dire::RapidJsonReflectorSerializer serializer;
-	dire::RapidJsonReflectorDeserializer deserializer;
+	dire::JsonReflectorSerializer serializer;
+	dire::JsonReflectorDeserializer deserializer;
 	std::string serialized;
 
 	SuperCompound seriaArray;
@@ -51,8 +51,8 @@ TEST_CASE("JSON array", "[Serialization]")
 
 TEST_CASE("JSON objects, arrays, and array of objects", "[Serialization]")
 {
-	dire::RapidJsonReflectorSerializer serializer;
-	dire::RapidJsonReflectorDeserializer deserializer;
+	dire::JsonReflectorSerializer serializer;
+	dire::JsonReflectorDeserializer deserializer;
 	std::string serialized;
 
 	MegaCompound megaSerialized;
@@ -74,8 +74,8 @@ TEST_CASE("JSON objects, arrays, and array of objects", "[Serialization]")
 
 TEST_CASE("JSON std::vector (and other things)", "[Serialization]")
 {
-	dire::RapidJsonReflectorSerializer serializer;
-	dire::RapidJsonReflectorDeserializer deserializer;
+	dire::JsonReflectorSerializer serializer;
+	dire::JsonReflectorDeserializer deserializer;
 	std::string serialized;
 
 	c serializedC;
@@ -106,8 +106,8 @@ TEST_CASE("JSON std::vector (and other things)", "[Serialization]")
 
 TEST_CASE("JSON std::map", "[Serialization]")
 {
-	dire::RapidJsonReflectorSerializer serializer;
-	dire::RapidJsonReflectorDeserializer deserializer;
+	dire::JsonReflectorSerializer serializer;
+	dire::JsonReflectorDeserializer deserializer;
 	std::string serialized;
 
 	mapType serializedMap;
@@ -125,8 +125,8 @@ TEST_CASE("JSON std::map", "[Serialization]")
 
 TEST_CASE("JSON Serialize compound, map in map, and compound value in map", "[Serialization]")
 {
-	dire::RapidJsonReflectorSerializer serializer;
-	dire::RapidJsonReflectorDeserializer deserializer;
+	dire::JsonReflectorSerializer serializer;
+	dire::JsonReflectorDeserializer deserializer;
 	std::string serialized;
 
 	d aD;
@@ -143,8 +143,8 @@ TEST_CASE("JSON Serialize compound, map in map, and compound value in map", "[Se
 
 TEST_CASE("JSON Serialize enumerations", "[Serialization]")
 {
-	dire::RapidJsonReflectorSerializer serializer;
-	dire::RapidJsonReflectorDeserializer deserializer;
+	dire::JsonReflectorSerializer serializer;
+	dire::JsonReflectorDeserializer deserializer;
 	std::string serialized;
 
 	enumTestType enums;
@@ -174,7 +174,7 @@ TEST_CASE("JSON Serialize enumerations", "[Serialization]")
 
 TEST_CASE("JSON Serialize Metadatas", "[Serialization]")
 {
-	dire::RapidJsonReflectorSerializer serializer;
+	dire::JsonReflectorSerializer serializer;
 	std::string serialized;
 
 	metadatas testMetadatas;

@@ -2,6 +2,13 @@
 
 namespace DIRE_NS
 {
+	/**
+	 * \brief An equivalent of Unreal's TSubclassOf.
+	 * It lets you store a reflectable ID if the ID'd class is a child of the template class (or this class),
+	 * and gives you a way to instantiate the referenced class if it provided an Instantiator function (see the DECLARE_INSTANTIATOR macro).
+	 * If the Reflectable can not be instantiated, trying to instantiate does nothing and returns nullptr.
+	 * \tparam T The parent class of Reflectables this Subclass can hold.
+	 */
 	template <typename T>
 	struct Subclass
 	{

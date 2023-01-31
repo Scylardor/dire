@@ -22,6 +22,13 @@ namespace DIRE_NS
 		return mem;
 	}
 
+	/**
+	 * \brief This class registers itself to the type info database singleton to let you instantiate a Reflectable-derived type through the generic Reflectable interface,
+	 * by only using the reflectable class ID of the provided type.
+	 * Do not use this class as is; use the DECLARE_INSTANTIATOR macro somewhere in the declaration of your Reflectable-derived type, after DIRE_REFLECTABLE_INFO.
+	 * \tparam T The type of class you want to be instantiated (DECLARE_INSTANTIATOR will use Self)
+	 * \tparam Args The types you want to be able to pass to the instantiator function for constructing the object (usually matches one of the object's constructors).
+	 */
 	template <typename T, typename... Args>
 	struct ClassInstantiator final
 	{
@@ -33,10 +40,10 @@ namespace DIRE_NS
 			TypeInfoDatabase::EditSingleton().RegisterInstantiateFunction(T::GetTypeInfo().GetID(), &Instantiate);
 		}
 
-		static Reflectable* Instantiate(std::any const& pCtorParams)
+		static Reflectable* Instantiate(const std::any & pCtorParams)
 		{
 			using ArgumentPackTuple = std::tuple<Args...>;
-			ArgumentPackTuple const* argsTuple = std::any_cast<ArgumentPackTuple>(&pCtorParams);
+			const ArgumentPackTuple * argsTuple = std::any_cast<ArgumentPackTuple>(&pCtorParams);
 			if (argsTuple == nullptr) // i.e. we were sent garbage
 			{
 				return nullptr;
@@ -53,6 +60,12 @@ namespace DIRE_NS
 #define DECLARE_INSTANTIATOR(...)  \
 	inline static DIRE_NS::ClassInstantiator<Self, __VA_ARGS__> DIRE_INSTANTIATOR;
 
+	/**
+	 * \brief The base class for manipulating reflection data.
+	 * Inherit from it with the dire_reflectable(...) macro.
+	 * Allows you to get, set and clone properties, get member function information, and dynamically test for class relationship.
+	 * Keep in mind this class is virtual and will add a virtual table to any type inheriting from it.
+	 */
 	class Reflectable
 	{
 	public:
@@ -123,18 +136,6 @@ namespace DIRE_NS
 		[[nodiscard]] IntrusiveLinkedList<FunctionInfo> const& GetMemberFunctions() const
 		{
 			return GetReflectableTypeInfo()->GetFunctionList();
-		}
-
-		template <typename T>
-		T const* GetMemberAtOffset(ptrdiff_t pOffset) const
-		{
-			return reinterpret_cast<T const*>(reinterpret_cast<std::byte const*>(this) + pOffset);
-		}
-
-		template <typename T>
-		T* EditMemberAtOffset(ptrdiff_t pOffset)
-		{
-			return reinterpret_cast<T*>(reinterpret_cast<std::byte*>(this) + pOffset);
 		}
 
 		using ParseError = DIRE_STRING;

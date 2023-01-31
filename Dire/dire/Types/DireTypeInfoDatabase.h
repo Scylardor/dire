@@ -18,6 +18,11 @@ namespace DIRE_NS
 	class TypeInfo;
 	class Reflectable;
 
+	/**
+	 * \brief Internal component of the type info database that holds pointers to instantiator functions.
+	 * Each reflectable class can register exactly one instantiator function with the DECLARE_INSTANTIATOR macro.
+	 * These function pointers are stored in this factory and can be used later on to instantiate a Reflectable with only its reflectable ID.
+	 */
 	class ReflectableFactory
 	{
 	public:
@@ -37,7 +42,12 @@ namespace DIRE_NS
 		InstantiatorsHashTable	myInstantiators;
 	};
 
-
+	/**
+	 * \brief The database for every type info in the program.
+	 * It is supposed to be used as a singleton (except for testing purposes), thus you should only have one in your whole program.
+	 * It allows you to fetch any type info or instantiate any Reflectable type, given you provide the matching Reflectable ID.
+	 * It also supports importing and exporting the type info database, which is useful for persistent identification of types across multiple runs of a program.
+	 */
 	class TypeInfoDatabase
 	{
 		inline static const unsigned DATABASE_VERSION = 0;

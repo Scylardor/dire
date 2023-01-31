@@ -94,7 +94,11 @@ namespace DIRE_NS
 	template<typename T>
 	using HasArraySemantics_t = std::enable_if_t<HasArraySemantics_v<T>>;
 
-	// from https://stackoverflow.com/a/70701479/1987466
+	// 
+	/**
+	 * \brief Holds a complicated ADL contraption in order to be able to declare the "Self" type in a Reflectable class.
+	 *	From https://stackoverflow.com/a/70701479/1987466
+	 */
 	namespace SelfType
 	{
 		template <typename T>

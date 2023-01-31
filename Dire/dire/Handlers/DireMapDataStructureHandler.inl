@@ -7,8 +7,7 @@ namespace DIRE_NS
 	template <typename T>
 	const void* TypedMapDataStructureHandler<T, std::enable_if_t<HasMapSemantics_v<T>, void>>::Read(const void* pMap, const std::string_view& pKey) const
 	{
-		const T* thisMap = static_cast<const T*>(pMap);
-		if (thisMap == nullptr)
+		if (pMap == nullptr)
 		{
 			return nullptr;
 		}
@@ -16,12 +15,8 @@ namespace DIRE_NS
 		if (key.HasError())
 			return nullptr;
 
-		auto it = thisMap->find(key.GetValue());
-		if (it == thisMap->end())
-		{
-			return nullptr;
-		}
-		return &it->second;
+		T* thisMap = const_cast<T*>(static_cast<const T*>(pMap));
+		return &(*thisMap)[key.GetValue()];
 	}
 
 	template <typename T>

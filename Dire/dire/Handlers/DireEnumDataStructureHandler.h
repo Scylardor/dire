@@ -4,6 +4,10 @@
 
 namespace DIRE_NS
 {
+	/**
+	 * \brief Generic type-erased handler for properties that inherit Dire::Enum like SequentialEnum or BitmaskEnum.
+	 * In practice we always manipulate instances of its child class, TypedEnumDataStructureHandler.
+	 */
 	class Dire_EXPORT IEnumDataStructureHandler
 	{
 	public:

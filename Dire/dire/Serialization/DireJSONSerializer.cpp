@@ -16,7 +16,7 @@ case MetaType::TypeEnum:\
 	break;
 
 
-	ISerializer::Result RapidJsonReflectorSerializer::Serialize(const Reflectable& serializedObject)
+	ISerializer::Result JsonReflectorSerializer::Serialize(const Reflectable& serializedObject)
 	{
 		myBuffer.Clear(); // to clean any previously written information
 		myJsonWriter.Reset(myBuffer); // to wipe the root of a previously serialized object
@@ -27,7 +27,7 @@ case MetaType::TypeEnum:\
 	}
 
 
-	void RapidJsonReflectorSerializer::SerializeArrayValue(const void * pPropPtr, const IArrayDataStructureHandler * pArrayHandler)
+	void JsonReflectorSerializer::SerializeArrayValue(const void * pPropPtr, const IArrayDataStructureHandler * pArrayHandler)
 	{
 		myJsonWriter.StartArray();
 
@@ -50,7 +50,7 @@ case MetaType::TypeEnum:\
 		myJsonWriter.EndArray();
 	}
 
-	void RapidJsonReflectorSerializer::SerializeMapValue(const void * pPropPtr, const IMapDataStructureHandler * pMapHandler)
+	void JsonReflectorSerializer::SerializeMapValue(const void * pPropPtr, const IMapDataStructureHandler * pMapHandler)
 	{
 		myJsonWriter.StartObject();
 
@@ -59,7 +59,7 @@ case MetaType::TypeEnum:\
 			pMapHandler->SerializeForEachPair(pPropPtr, this, [](void* pSerializer, const void* pKey, const void* pVal, const IMapDataStructureHandler & pMap,
 				const DataStructureHandler & /*pKeyHandler*/, const DataStructureHandler & pValueHandler)
 				{
-					auto* myself = static_cast<RapidJsonReflectorSerializer*>(pSerializer);
+					auto* myself = static_cast<JsonReflectorSerializer*>(pSerializer);
 
 					const DIRE_STRING keyStr = pMap.KeyToString(pKey);
 					myself->myJsonWriter.String(keyStr.data(), rapidjson::SizeType(keyStr.length()));
@@ -72,14 +72,14 @@ case MetaType::TypeEnum:\
 		myJsonWriter.EndObject();
 	}
 
-	void RapidJsonReflectorSerializer::SerializeCompoundValue(const void * pPropPtr)
+	void JsonReflectorSerializer::SerializeCompoundValue(const void * pPropPtr)
 	{
 		DIRE_ASSERT(pPropPtr != nullptr);
 		auto* reflectableProp = static_cast<const Reflectable *>(pPropPtr);
 		SerializeReflectable(*reflectableProp);
 	}
 
-	void RapidJsonReflectorSerializer::SerializeReflectable(const Reflectable& pReflectable)
+	void JsonReflectorSerializer::SerializeReflectable(const Reflectable& pReflectable)
 	{
 		const TypeInfo* typeInfo = pReflectable.GetReflectableTypeInfo();
 
@@ -114,7 +114,7 @@ case MetaType::TypeEnum:\
 	}
 
 
-	void RapidJsonReflectorSerializer::SerializeValue(MetaType pPropType, const void* pPropPtr, const DataStructureHandler* pHandler)
+	void JsonReflectorSerializer::SerializeValue(MetaType pPropType, const void* pPropPtr, const DataStructureHandler* pHandler)
 	{
 		switch (pPropType.Value)
 		{

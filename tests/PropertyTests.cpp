@@ -189,6 +189,12 @@ TEST_CASE("SetProperty", "[Property]")
 	modified = anotherC.SetProperty<int>("aVector[4]", 0x42);
 	REQUIRE((modified && anotherC.aVector.size() == 5 && anotherC.aVector[4] == 0x42));
 
+	// in map
+	mapType evenodds;
+	modified = evenodds.SetProperty<bool>("aEvenOddMap[1]", true);
+	REQUIRE((modified && evenodds.aEvenOddMap[1] == true));
+
+
 	// non existing
 	modified = anotherC.SetProperty<int>("yolo", 0x42);
 	REQUIRE(!modified);

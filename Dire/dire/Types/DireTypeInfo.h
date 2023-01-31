@@ -15,6 +15,10 @@ namespace DIRE_NS
 {
 	class Reflectable;
 
+	/**
+	 * \brief The base class for Dire to store information of properties.
+	 * Never use it directly: it is to be inherited by templated TypedProperty in the DIRE_PROPERTY macro.
+	 */
 	class PropertyTypeInfo : public IntrusiveListNode<PropertyTypeInfo>
 	{
 		using CopyConstructorPtr = void (*)(void* pDestAddr, const void * pOther, size_t pOffset);
@@ -100,7 +104,10 @@ namespace DIRE_NS
 		ReflectableID		myReflectableID = INVALID_REFLECTABLE_ID;
 	};
 
-
+	/**
+	 * \brief The base interface for storing class member function info.
+	 * It provides the Invoke method that allows to dynamically call the bound member function along with any number of parameters.
+	 */
 	class IFunctionTypeInfo
 	{
 	public:
@@ -109,6 +116,11 @@ namespace DIRE_NS
 		virtual std::any	Invoke(void* pObject, const std::any & pInvokeParams) const = 0;
 	};
 
+	/**
+	 * \brief An abstract type that stores data and defines functions common to all types of function infos.
+	 * Never use directly: use DIRE_FUNCTION or DIRE_FUNCTION_TYPEINFO() macros for that.
+	 * These macros actually use a template child class, TypedFunctionInfo.
+	 */
 	class FunctionInfo : public IntrusiveListNode<FunctionInfo>, IFunctionTypeInfo
 	{
 	public:
@@ -118,11 +130,24 @@ namespace DIRE_NS
 			Name(pName), ReturnType(pReturnType)
 		{}
 
-		// Not using perfect forwarding here because std::any cannot hold references: https://stackoverflow.com/questions/70239155/how-to-cast-stdtuple-to-stdany
-		// Sad but true, gotta move forward with our lives.
+		/**
+		 * \brief Allows to invoke the member function while directly providing the arguments of the function (it packs them into std::any for you)
+		 * \tparam Args The arguments variadic pack
+		 * \param pCallerObject The object the member function should use as this
+		 * \param pFuncArgs The arguments
+		 * \return The type-erased return of the function, or empty any if void
+		 */
 		template <typename... Args>
 		std::any	InvokeWithArgs(void* pCallerObject, Args&&... pFuncArgs) const;
 
+		/**
+		 * \brief Allows to invoke the member function while directly providing the arguments of the function (it packs them into std::any for you).
+		 *	By providing the return type, it also allows the function to directly return the return value without handing out a std::any.
+		 * \tparam Args The arguments variadic pack
+		 * \param pCallerObject The object the member function should use as this
+		 * \param pFuncArgs The arguments
+		 * \return The return value of the function
+		 */
 		template <typename Ret, typename... Args>
 		Ret	TypedInvokeWithArgs(void* pCallerObject, Args&&... pFuncArgs) const;
 
@@ -147,6 +172,12 @@ namespace DIRE_NS
 	template <typename Ty >
 	struct TypedFunctionInfo; // not defined
 
+	/**
+	 * \brief The class declared by the DIRE_FUNCTION and DIRE_TYPED_FUNCTION macros. Never use it directly, use the macros instead.
+	 * \tparam Class The owning class of the function
+	 * \tparam Ret The return type
+	 * \tparam Args Types of parameters of the function
+	 */
 	template <typename Class, typename Ret, typename ... Args >
 	struct TypedFunctionInfo<Ret(Class::*)(Args...)> final : FunctionInfo
 	{
@@ -260,6 +291,12 @@ namespace DIRE_NS
 		TypeInfoList	ChildrenClasses;
 	};
 
+	/**
+	 * \brief The metadata type declared by DIRE_TYPE_INFO and DIRE_REFLECTABLE_INFO. Never use directly, always use one these two macros.
+	 * The boolean parameter lets you decide if this class should use its default constructor as an instantiator function. DIRE's default is true.
+	 * \tparam T The type
+	 * \tparam UseDefaultCtorForInstantiate True if this class should register its default constructor as instantiator (true by default)
+	 */
 	template <typename T, bool UseDefaultCtorForInstantiate>
 	class TypedTypeInfo final : public TypeInfo
 	{
