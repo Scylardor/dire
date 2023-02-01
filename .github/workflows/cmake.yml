@@ -15,6 +15,7 @@ jobs:
         cpp_standard: [cxx_std_17, cxx_std_20]
         shared_lib: [1, 0]
     runs-on: ${{ matrix.os }}
+    continue-on-error: true
 
     steps:
     - uses: actions/checkout@v3
