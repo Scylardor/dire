@@ -1,0 +1,121 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # No way to specify "tag using semantic versioning AND on main branch" on github actions as of now, but that's the intention
+      
+jobs:
+  documentation:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install doxygen components
+      run: sudo apt install -y doxygen graphviz # graphviz is needed for awesome doxygen css
+        
+    - name: Run Doxygen
+      run: |
+        cmake -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -B ${{github.workspace}}/build -DDIRE_BUILD_DOCUMENTATION=1
+        cmake --build ${{github.workspace}}/build --target Doxygen
+        
+    - name: Upload Doc artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: doc
+        path: ${{github.workspace}}/build/docs
+
+  parse_tag:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tagName.outputs.tag }}
+    steps:
+      - uses: olegtarasov/get-tag@v2.1.2
+        id: tagName
+    
+      - name: Debug
+        run: |
+          echo ${{ steps.tagName.outputs.tag }}
+        
+        
+  build_matrix:
+    needs: [parse_tag, documentation]
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest] # macos-latest not supported for now
+        include:
+          - os: windows-latest
+            vcpkg_triplet: x64-windows-release
+          - os: ubuntu-latest
+            vcpkg_triplet: x64-linux-release
+
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: vcpkg build
+      uses: johnwason/vcpkg-action@v4
+      id: vcpkg
+      with:
+        manifest-dir: ${{ github.workspace }} # Set to directory containing vcpkg.json
+        triplet: ${{ matrix.vcpkg_triplet }}
+        cache-key: ${{ matrix.config.os }}
+        revision: master
+        token: ${{ github.token }}
+        
+    - name: Create build directory
+      run: |
+        mkdir build
+        mkdir build/Release
+
+    - name: Install Static Lib
+      run: | 
+        cmake -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake -DDIRE_BUILD_SHARED_LIB=0 -B build --preset continuous-delivery
+        cmake  --build ${{github.workspace}}/build --target install --config Release
+
+    - name: Install Shared Lib
+      run: |
+        cmake -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake -DDIRE_BUILD_SHARED_LIB=1 -B build --preset continuous-delivery
+        cmake  --build ${{github.workspace}}/build --target install --config Release
+        
+    - name: Download docs
+      uses: actions/download-artifact@v3
+      with:
+        name: doc
+        path: ${{github.workspace}}/installation/docs
+
+    # Zip release directory (inspired by https://gist.github.com/youhide/121750fc4878801ea8e908080b535beb )
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - uses: jannekem/run-python-script-action@v1
+      with:
+        script: |
+          from shutil import make_archive
+          make_archive("Dire.${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}", 'zip', 'installation')
+
+    - name: Upload platform artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: release_artifacts
+        path: ${{github.workspace}}/Dire.${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}.zip
+    
+  publish_release:
+    needs: [documentation, build_matrix, parse_tag]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Make sure we don't run into permission issues when writing to the repo...
+      
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: release_artifacts
+          path: ${{github.workspace}}/artifacts
+          
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{github.workspace}}/artifacts/*
+          tag_name: ${{needs.parse_tag.outputs.tag}}
+

@@ -28,7 +28,7 @@ namespace DIRE_NS
 		if (header.PropertiesCount == 0)
 			return &pDeserializedObject; // just an empty object. Doesn't count like an error I guess?
 
-		const TypeInfo* deserializedTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(header.ReflectableID);
+		const TypeInfo* deserializedTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(header.ID);
 		const TypeInfo* objTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(pDeserializedObject.GetReflectableClassID());
 
 		// cannot dump properties into incompatible reflectable type
@@ -38,7 +38,7 @@ namespace DIRE_NS
 		const auto* nextPropertyHeader = &ReadFromBytes<BinarySerializationHeaders::Property>();
 
 		char* objectPtr = reinterpret_cast<char*>(&pDeserializedObject);
-		unsigned iProp = 0;
+		unsigned iProp = 0; // cppcheck-suppress variableScope
 
 		objTypeInfo->ForEachPropertyInHierarchy([&](const PropertyTypeInfo& pProperty)
 		{
@@ -121,7 +121,7 @@ namespace DIRE_NS
 		Reflectable& reflectable = *static_cast<Reflectable*>(pPropPtr);
 		const TypeInfo* objTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(reflectable.GetReflectableClassID());
 
-		const TypeInfo* deserializedTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(header.ReflectableID);
+		const TypeInfo* deserializedTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(header.ID);
 
 		// cannot dump properties into incompatible reflectable type
 		if (!deserializedTypeInfo->IsParentOf(objTypeInfo->GetID()))
@@ -130,7 +130,7 @@ namespace DIRE_NS
 		char* objectPtr = reinterpret_cast<char*>(pPropPtr);
 
 		const auto* nextPropertyHeader = &ReadFromBytes<BinarySerializationHeaders::Property>();
-		unsigned iProp = 0;
+		unsigned iProp = 0; // cppcheck-suppress variableScope
 
 		deserializedTypeInfo->ForEachPropertyInHierarchy([&](const PropertyTypeInfo& pProperty)
 		{

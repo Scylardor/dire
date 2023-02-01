@@ -4,9 +4,9 @@ set(PROJECT_NAME Dire)
 string(TOUPPER ${PROJECT_NAME} UPPER_PROJECT_NAME)
 
 project(${PROJECT_NAME}
-  VERSION 0.1
+  VERSION 0.1.0
   LANGUAGES CXX
-  # TODO: HOMEPAGE_URL "DIRE URL"
+  HOMEPAGE_URL "https://github.com/Scylardor/dire"
   DESCRIPTION "A library for Dynamically Interpreted Reflection Expressions (DIRE)."
 )
 
@@ -26,8 +26,10 @@ set(${UPPER_PROJECT_NAME}_ASSERT assert CACHE STRING "Assert expression Dire sho
 set(${UPPER_PROJECT_NAME}_ALLOCATOR std::allocator CACHE STRING "Stateless allocator Dire should use to dynamically allocate memory.")
 set(${UPPER_PROJECT_NAME}_CPP_STANDARD cxx_std_17 CACHE STRING "Set the standard to compile DIRE with. Use cxx_std_20 to enable C++20 features.")
 option(${UPPER_PROJECT_NAME}_BUILD_SHARED_LIB "Type of library DIRE will compile. Use STATIC for archives (.a or .lib on Windows) or SHARED for dynamic (.so or DLL on Windows)." ON)
+option(${UPPER_PROJECT_NAME}_BUILD_DOCUMENTATION "If on, will search for Doxygen on the system to generate docs (for library developers)." OFF)
 
-set(DIRE_SOURCE_DIR ${PROJECT_NAME}/${PROJECT_NAME})
+
+set(DIRE_SOURCE_DIR ${PROJECT_NAME}/dire)
 set(DIRE_GENERATED_INCLUDES_DIR generated-includes/Dire)
 
 # Main target creation
@@ -84,8 +86,20 @@ else()
 endif()
 
 add_library(${PROJECT_NAME} ${${UPPER_PROJECT_NAME}_LIBRARY_TYPE}
-	${${PROJECT_NAME}_SOURCES}
-)
+	${${PROJECT_NAME}_SOURCES})
+
+# Precompiled Headers
+# (this list is taken from DireString.h, probably the most included file of the project)
+target_precompile_headers(${PROJECT_NAME} PRIVATE
+	<type_traits>
+	<charconv>
+	<system_error>
+	<variant>)
+
+# Enable Link-Time Optimization for Release config
+include(CMake/LTO.cmake)
+enable_ipo_for(${PROJECT_NAME} RELEASE)
+
 # Alias target
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 
@@ -94,6 +108,8 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 	DEBUG_POSTFIX _d
 	VERSION ${PROJECT_VERSION}
 	SOVERSION ${PROJECT_VERSION_MAJOR})
+
+include(CMake/StaticAnalysis.cmake)
 
 # On Windows, set a different name for the import library to not be confused with a static build of the library
 # (both have .lib extension)
@@ -134,9 +150,9 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 # RapidJSON dependency setup
 if(${UPPER_PROJECT_NAME}_SERIALIZATION_ENABLED AND ${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED)
-	include(CMake/Rapidjson.cmake)
-	find_rapidjson_dependency(rapidjson ${${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_VERSION})
-	target_link_libraries(${PROJECT_NAME} PUBLIC rapidjson)
+	include(CMake/RapidJSON.cmake)
+	find_rapidjson_dependency()
+	target_link_libraries(${PROJECT_NAME} PUBLIC RapidJSON::RapidJSON)
 endif()
 
 # Use a generator expression so that the install interface redirects to the right folder after installation.
@@ -159,9 +175,13 @@ if(${${UPPER_PROJECT_NAME}_STRING} STREQUAL "std")
 	set(${UPPER_PROJECT_NAME}_USE_STANDARD_STRING TRUE)
 endif()
 
+# UNIT TESTS
+############
+enable_testing()
+add_subdirectory(tests)
+
 # Generate the final defines file and add include directories so that clients can find it
 configure_file(${DIRE_SOURCE_DIR}/DireDefines.h.in ${DIRE_GENERATED_INCLUDES_DIR}/DireDefines.h)
-
 
 # INSTALL INSTRUCTIONS
 ######################
@@ -191,7 +211,7 @@ install(EXPORT ${PROJECT_NAME}Targets
 )
 
 install(FILES
-	#"${CMAKE_CURRENT_LIST_DIR}/CMake/FindRapidJSON.cmake" (do not install it for now, uncomment if one day we vendor Rapidjson)
+	#"${CMAKE_CURRENT_LIST_DIR}/CMake/FindRapidJSON.cmake" (do not install it for now, uncomment if one day we vendor RapidJSON)
 	"${CMAKE_CURRENT_LIST_DIR}/CMake/${PROJECT_NAME}Config.cmake"
 	"${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
 	DESTINATION ${INSTALL_CONFIGDIR}
@@ -214,11 +234,9 @@ export(EXPORT ${PROJECT_NAME}Targets
 set(CMAKE_EXPORT_PACKAGE_REGISTRY ON)
 export(PACKAGE ${PROJECT_NAME})
 
-# UNIT TESTS
-############
-add_subdirectory(tests)
-
 # DOCUMENTATION
 ###############
-include(CMake/Doxygen.cmake)
-add_doxygen(${PROJECT_NAME} README.md docs)
+if (${UPPER_PROJECT_NAME}_BUILD_DOCUMENTATION)
+	include(CMake/Doxygen.cmake)
+	add_doxygen(${PROJECT_NAME} README.md docs)
+endif()

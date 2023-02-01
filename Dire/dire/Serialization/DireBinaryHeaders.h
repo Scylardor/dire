@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include "dire/Types/DireTypes.h"
+#include "dire/DireReflectableID.h"
 
 namespace DIRE_NS
 {
@@ -14,11 +15,11 @@ namespace DIRE_NS
 
 		struct Object
 		{
-			Object(const uint32_t pID) :
-				ReflectableID(pID)
+			explicit Object(const ReflectableID pID) :
+				ID(pID)
 			{}
 
-			ReflectableID	ReflectableID = 0;
+			ReflectableID	ID = 0;
 			uint32_t		PropertiesCount = 0;
 		};
 

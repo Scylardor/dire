@@ -89,7 +89,6 @@ namespace DIRE_NS
 #if !DIRE_TESTS_ENABLED
 	protected:
 		TypeInfoDatabase() = default;
-		friend Singleton<TypeInfoDatabase>;
 
 	private:
 #endif

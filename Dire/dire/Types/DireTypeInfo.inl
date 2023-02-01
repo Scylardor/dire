@@ -20,7 +20,7 @@ namespace DIRE_NS
 		}
 		else
 		{
-			std::any result = funcInfo->InvokeWithArgs(&pObject, std::forward<Args>(pArgs)...);
+			std::any result = funcInfo->InvokeWithArgs(&pObject, std::forward<Args>(pArgs)...); // cppcheck-suppress redundantInitialization
 			return std::any_cast<Ret>(result);
 		}
 	}
@@ -156,15 +156,15 @@ namespace DIRE_NS
 	void TypeInfo::ForEachPropertyInHierarchy(F&& pVisitorFunction) const
 	{
 		// Iterate on the parents list in reverse order so that we traverse the class hierarchy top to bottom.
-		for (auto rit = ParentClasses.rbegin(); rit != ParentClasses.rend(); ++rit)
+		for (auto rit = myParentClasses.rbegin(); rit != myParentClasses.rend(); ++rit)
 		{
-			for (auto const& prop : (*rit)->Properties)
+			for (auto const& prop : (*rit)->myProperties)
 			{
 				pVisitorFunction(prop);
 			}
 		}
 
-		for (auto const& prop : Properties)
+		for (auto const& prop : myProperties)
 		{
 			pVisitorFunction(prop);
 		}

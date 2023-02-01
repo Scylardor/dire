@@ -1,0 +1,169 @@
+{
+    "version": 3,
+    "configurePresets": [
+      {
+        "name": "base",
+        "description": "For more information: http://aka.ms/cmakepresetsvs",
+        "hidden": true,
+        "generator": "Ninja",
+        "binaryDir": "${sourceDir}/build/${presetName}",
+        "installDir": "${sourceDir}/install/${presetName}",
+        "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "environment": {
+          "VCPKG_FEATURE_FLAGS": "manifests,versions,binarycaching,registries"
+        },
+        "architecture": {
+            "value": "x64",
+            "strategy": "external"
+          }
+      },
+      {
+        "name": "windows-base",
+        "hidden": true,
+        "inherits": "base",
+        "condition": {
+          "type": "equals",
+          "lhs": "${hostSystemName}",
+          "rhs": "Windows"
+        }
+      },
+      {
+        "name": "linux-base",
+        "inherits": "base",
+        "hidden": true,
+        "condition": {
+          "type": "equals",
+          "lhs": "${hostSystemName}",
+          "rhs": "Linux"
+        }
+      },
+      {
+        "name": "windows-debug",
+        "displayName": "x64 Debug",
+        "description": "x64 Debug Build",
+        "inherits": "windows-base",
+
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Debug"
+        }
+      },
+      {
+        "name": "windows-release",
+        "displayName": "x64 Release",
+        "description": "x64 Release Build",
+        "inherits": "windows-debug",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Release"
+        }
+      },
+      {
+        "name": "linux-debug",
+        "displayName": "Debug",
+        "description": "Debug Build using GCC",
+        "inherits": "linux-base",
+        "cacheVariables": {
+          "CMAKE_C_COMPILER": "gcc",
+          "CMAKE_CXX_COMPILER": "g++",
+          "CMAKE_BUILD_TYPE": "Debug"
+        }
+      },
+      {
+        "name": "linux-release",
+        "displayName": "Release",
+        "description": "Release Build using GCC",
+        "inherits": "linux-debug",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Release"
+        }
+      },
+	  {
+        "name": "windows-debug-unity",
+        "displayName": "x64 Debug (Unity build)",
+        "description": "x64 Debug Unity Build",
+        "inherits": "windows-debug",
+        "cacheVariables": {
+           "CMAKE_UNITY_BUILD": "1"
+        }
+      },
+      {
+        "name": "windows-release-unity",
+        "displayName": "x64 Release (Unity build)",
+        "description": "x64 Release Unity Build",
+        "inherits": "windows-release",
+        "cacheVariables": {
+           "CMAKE_UNITY_BUILD": "1"
+        }
+      },
+      {
+        "name": "linux-debug-unity",
+        "displayName": "Debug (Unity Build)",
+        "description": "Debug Unity Build using GCC",
+        "inherits": "linux-debug",
+        "cacheVariables": {
+          "CMAKE_UNITY_BUILD": "1"
+        }
+      },
+      {
+        "name": "linux-release-unity",
+        "displayName": "Release (Unity Build)",
+        "description": "Release Unity Build using GCC",
+        "inherits": "linux-release",
+        "cacheVariables": {
+          "CMAKE_UNITY_BUILD": "1"
+        }
+      },
+      {
+        "name": "continuous-delivery",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Release",
+          "DIRE_TESTS_ENABLED": "0",
+          "CMAKE_ARCHIVE_OUTPUT_DIRECTORY": "Release",
+          "CMAKE_LIBRARY_OUTPUT_DIRECTORY": "Release",
+          "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "Release",
+          "CMAKE_INSTALL_PREFIX": "installation"
+        }
+      }
+    ],
+    "buildPresets": [
+      {
+        "name": "default-build-linux",
+        "displayName": "Default",
+        "configurePreset": "linux-debug",
+        "description": "Vanilla build"
+      },
+      {
+        "name": "default-build-windows",
+        "displayName": "Default",
+        "configurePreset": "windows-debug",
+        "description": "Vanilla build"
+      },
+      {
+        "name": "verbose-build-linux",
+        "displayName": "Verbose Build",
+        "description": "Passes -v to Ninja",
+        "configurePreset": "linux-debug",
+        "nativeToolOptions": [ "-v" ]
+      },
+      {
+        "name": "verbose-build-windows",
+        "displayName": "Verbose Build",
+        "configurePreset": "windows-debug",
+        "inherits": "verbose-build-linux"
+      }
+    ],
+    "testPresets": [
+      {
+        "name": "core-test-linux",
+        "description": "Enable output on failure",
+        "configurePreset": "linux-debug",
+        "output": {
+          "outputOnFailure": true
+        }
+      },
+      {
+        "name": "core-test-windows",
+        "inherits": "core-test-linux",
+        "configurePreset": "windows-debug"
+      }
+    ]
+  }

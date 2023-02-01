@@ -8,6 +8,8 @@
 
 #include "DireTypeInfoDatabase.h"
 
+#include "dire/DireReflectableID.h"
+
 #include <any>
 #include <vector>
 
@@ -201,29 +203,29 @@ namespace DIRE_NS
 	public:
 		using TypeInfoList = std::vector<TypeInfo*, DIRE_ALLOCATOR<TypeInfo*>>;
 
-		TypeInfo(const char* pTypename) :
-			ReflectableID(TypeInfoDatabase::EditSingleton().RegisterTypeInfo(this)),
-			TypeName(pTypename)
+		explicit TypeInfo(const char* pTypename) :
+			myReflectableID(TypeInfoDatabase::EditSingleton().RegisterTypeInfo(this)),
+			myTypeName(pTypename)
 		{}
 
 		void	PushTypeInfo(PropertyTypeInfo& pNewTypeInfo)
 		{
-			Properties.PushBackNewNode(pNewTypeInfo);
+			myProperties.PushBackNewNode(pNewTypeInfo);
 		}
 
 		void	PushFunctionInfo(FunctionInfo& pNewFunctionInfo)
 		{
-			MemberFunctions.PushBackNewNode(pNewFunctionInfo);
+			myMemberFunctions.PushBackNewNode(pNewFunctionInfo);
 		}
 
 		void	AddParentClass(TypeInfo* pParent)
 		{
-			ParentClasses.push_back(pParent);
+			myParentClasses.push_back(pParent);
 		}
 
 		void	AddChildClass(TypeInfo* pChild)
 		{
-			ChildrenClasses.push_back(pChild);
+			myChildrenClasses.push_back(pChild);
 		}
 
 		[[nodiscard]] Dire_EXPORT bool					IsParentOf(const ReflectableID pChildClassID, bool pIncludingMyself = true) const;
@@ -245,17 +247,17 @@ namespace DIRE_NS
 
 		[[nodiscard]] const DIRE_STRING_VIEW& GetName() const
 		{
-			return TypeName;
+			return myTypeName;
 		}
 
 		void	SetID(const ReflectableID pNewID)
 		{
-			ReflectableID = pNewID;
+			myReflectableID = pNewID;
 		}
 
 		[[nodiscard]] ReflectableID	GetID() const
 		{
-			return ReflectableID;
+			return myReflectableID;
 		}
 
 		Dire_EXPORT void	CloneHierarchyPropertiesOf(Reflectable& pNewClone, const Reflectable& pCloned) const;
@@ -264,31 +266,31 @@ namespace DIRE_NS
 
 		[[nodiscard]] const IntrusiveLinkedList<PropertyTypeInfo>& GetPropertyList() const
 		{
-			return Properties;
+			return myProperties;
 		}
 
 		[[nodiscard]] const IntrusiveLinkedList<FunctionInfo>& GetFunctionList() const
 		{
-			return MemberFunctions;
+			return myMemberFunctions;
 		}
 
 		[[nodiscard]] const TypeInfoList& GetParentClasses() const
 		{
-			return ParentClasses;
+			return myParentClasses;
 		}
 
 		[[nodiscard]] const TypeInfoList& GetChildrenClasses() const
 		{
-			return ChildrenClasses;
+			return myChildrenClasses;
 		}
 
 	protected:
-		ReflectableID							ReflectableID = INVALID_REFLECTABLE_ID;
-		DIRE_STRING_VIEW						TypeName;
-		IntrusiveLinkedList<PropertyTypeInfo>	Properties;
-		IntrusiveLinkedList<FunctionInfo>		MemberFunctions;
-		TypeInfoList	ParentClasses;
-		TypeInfoList	ChildrenClasses;
+		ReflectableID							myReflectableID = INVALID_REFLECTABLE_ID;
+		DIRE_STRING_VIEW						myTypeName;
+		IntrusiveLinkedList<PropertyTypeInfo>	myProperties;
+		IntrusiveLinkedList<FunctionInfo>		myMemberFunctions;
+		TypeInfoList							myParentClasses;
+		TypeInfoList							myChildrenClasses;
 	};
 
 	/**
@@ -301,7 +303,7 @@ namespace DIRE_NS
 	class TypedTypeInfo final : public TypeInfo
 	{
 	public:
-		TypedTypeInfo(char const* pTypename);
+		explicit TypedTypeInfo(char const* pTypename);
 
 	private:
 		template <typename TParent>

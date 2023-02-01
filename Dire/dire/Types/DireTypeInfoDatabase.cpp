@@ -14,7 +14,7 @@ namespace DIRE_NS
 	 */
 	struct ExportedTypeInfoData
 	{
-		ReflectableID	ReflectableID;
+		ReflectableID	ID; // cppcheck-suppress unusedStructMember
 		DIRE_STRING		TypeName;
 	};
 
@@ -210,7 +210,7 @@ bool	DIRE_NS::TypeInfoDatabase::ImportFromBinaryFile(DIRE_STRING_VIEW pReadSetti
 		ExportedTypeInfoData& curData = theReadData[iTypeInfo];
 
 		ReflectableID& storedReflectableID = *reinterpret_cast<ReflectableID*>(readBuffer.data() + offset);
-		curData.ReflectableID = storedReflectableID;
+		curData.ID = storedReflectableID;
 		offset += sizeof(storedReflectableID);
 
 		const char* typeName = readBuffer.data() + offset;
@@ -239,9 +239,9 @@ bool	DIRE_NS::TypeInfoDatabase::ImportFromBinaryFile(DIRE_STRING_VIEW pReadSetti
 		if (it != theReadData.end())
 		{
 			// we found it in the read data. Fix its ID if necessary
-			if (it->ReflectableID != registeredTypeInfo->GetID())
+			if (it->ID != registeredTypeInfo->GetID())
 			{
-				registeredTypeInfo->SetID(it->ReflectableID);
+				registeredTypeInfo->SetID(it->ID);
 			}
 		}
 		else

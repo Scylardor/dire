@@ -1,7 +1,7 @@
 
 #include "catch2/catch_test_macros.hpp"
-#include "Dire/Types/DireTypeInfo.h"
-#include "Dire/Types/DireTypeInfoDatabase.h"
+#include "dire/Types/DireTypeInfo.h"
+#include "dire/Types/DireTypeInfoDatabase.h"
 
 #include <iomanip>
 
@@ -168,7 +168,7 @@ TEST_CASE("Binary Import", "[TypeInfoDatabase]")
 		aDatabase.myReflectableTypeInfos.insert(aDatabase.myReflectableTypeInfos.begin() + 7, &teetee);
 
 
-		for (int i = 1; i < aDatabase.myReflectableTypeInfos.size(); ++i)
+		for (unsigned i = 1; i < aDatabase.myReflectableTypeInfos.size(); ++i)
 		{
 			if (aDatabase.myReflectableTypeInfos[i] != &toutou && aDatabase.myReflectableTypeInfos[i] != &teetee)
 				aDatabase.myReflectableTypeInfos[i]->SetID(i);

@@ -1,6 +1,6 @@
 #include <sstream> // ostringstream
 #include <catch2/catch_test_macros.hpp>
-#include "Dire/Dire.h"
+#include "dire/Dire.h"
 #include <cmath> // NAN
 
 struct BasicTest

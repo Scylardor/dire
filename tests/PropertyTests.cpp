@@ -1,10 +1,9 @@
-#define _CRT_SECURE_NO_WARNINGS // shut up about sprintf, MSVC!
 
 #include <catch2/catch_test_macros.hpp>
 
 #include "catch2/matchers/catch_matchers.hpp"
 #include "catch2/matchers/catch_matchers_floating_point.hpp"
-#include "Dire/Dire.h"
+#include "dire/Dire.h"
 #include "dire/DireProperty.h"
 #include "dire/DireReflectable.h"
 
@@ -13,7 +12,6 @@
 TEST_CASE("GetProperty Simple", "[Property]")
 {
 	c superC;
-
 
 	// direct property
 	const unsigned * compu = superC.GetProperty<unsigned>("ctoto");
@@ -58,11 +56,11 @@ TEST_CASE("GetProperty Array", "[Property]")
 	// direct property
 	for (int i = 0; i < 10; i++)
 	{
-		char buf[64]{};
-		sprintf(buf, "anArray[%d]", i);
-		const int* ai = superC.GetProperty<int>(buf);
+		std::string buf(64, '\0');
+		std::snprintf(buf.data(), 64, "anArray[%d]", i);
+		const int* ai = superC.GetProperty<int>(buf.data());
 		REQUIRE(*ai == i);
-		int compu2 = superC.GetSafeProperty<int>(buf);
+		int compu2 = superC.GetSafeProperty<int>(buf.data());
 		REQUIRE(compu2 == i);
 	}
 

@@ -143,11 +143,11 @@ namespace DIRE_NS
 		template <typename T>
 		struct PropertyAccessor
 		{
-			PropertyAccessor(const T* pPropAddr) :
+			explicit PropertyAccessor(const T* pPropAddr) :
 				myValue(pPropAddr)
 			{}
 
-			PropertyAccessor(ParseError&& pError) :
+			explicit PropertyAccessor(ParseError&& pError) :
 				myValue(std::move(pError))
 			{}
 
@@ -259,7 +259,7 @@ namespace DIRE_NS
 				Address(pAddr), TypeInfo(pInfo)
 			{}
 
-			GetPropertyResult(const ParseError& pError) :
+			explicit GetPropertyResult(const ParseError& pError) :
 				Error(pError)
 			{}
 
@@ -313,15 +313,10 @@ namespace DIRE_NS
 	{\
 		static const DIRE_STRING fullyQualifiedName = []{\
 			DIRE_STRING funcName = DIRE_FUNCTION_FULLNAME;\
-			std::size_t found = funcName.rfind("::");\
-			found = funcName.rfind("::", found-1);\
-			found = funcName.rfind("::", found-1);\
+			std::size_t found = funcName.rfind("::DIRE_GetFullyQualifiedName");\
 			if (found != DIRE_STRING::npos)\
 			{\
 				funcName = funcName.substr(0, found);\
-				auto startIdx = funcName.find(' ');\
-				if (startIdx != funcName.npos)\
-					funcName = funcName.substr(startIdx+1, found - startIdx);\
 			}\
 			return funcName;\
 		}(); \
