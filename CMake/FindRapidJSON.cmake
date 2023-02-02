@@ -13,13 +13,13 @@ set( _RAPIDJSON_HEADER_SEARCH_DIRS
 "/usr/include"
 "/usr/local/include"
 "${CMAKE_SOURCE_DIR}/include"
-"C:\Program Files (x86)"
+"C:/Program Files (x86)/RapidJSON/include"
 )
 set( _RAPIDJSON_LIB_SEARCH_DIRS
 "/usr/lib"
 "/usr/local/lib"
 "${CMAKE_SOURCE_DIR}/lib"
-"C:\Program Files (x86)")
+"C:/Program Files (x86)/RapidJSON/lib")
 
 # Check environment for root search directory
 set( _RAPIDJSON_ENV_ROOT $ENV{RAPIDJSON_ROOT} )

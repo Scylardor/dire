@@ -1,10 +1,10 @@
 function(FIND_RAPIDJSON_DEPENDENCY DOWNLOAD_PREFIX GIT_VERSION)
-	find_package(RapidJSON QUIET)
+	find_package(RapidJSON CONFIG QUIET)
 
 	# Not found? Try again using our FindRapidJSON.cmake just in case
 	if(NOT RapidJSON_FOUND)
 		list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_CURRENT_SOURCE_DIR}/CMake)
-		find_package(RapidJSON QUIET)
+		find_package(RapidJSON CONFIG QUIET)
 	endif()
 
 	if(RapidJSON_FOUND AND NOT TARGET RapidJSON::RapidJSON)
