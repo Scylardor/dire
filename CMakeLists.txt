@@ -134,9 +134,9 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 # RapidJSON dependency setup
 if(${UPPER_PROJECT_NAME}_SERIALIZATION_ENABLED AND ${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED)
-	include(CMake/Rapidjson.cmake)
-	find_rapidjson_dependency(rapidjson ${${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_VERSION})
-	target_link_libraries(${PROJECT_NAME} PUBLIC rapidjson)
+	include(CMake/RapidJSON.cmake)
+	find_rapidjson_dependency(RapidJSON ${${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_VERSION})
+	target_link_libraries(${PROJECT_NAME} PUBLIC RapidJSON::RapidJSON)
 endif()
 
 # Use a generator expression so that the install interface redirects to the right folder after installation.
@@ -191,7 +191,7 @@ install(EXPORT ${PROJECT_NAME}Targets
 )
 
 install(FILES
-	#"${CMAKE_CURRENT_LIST_DIR}/CMake/FindRapidJSON.cmake" (do not install it for now, uncomment if one day we vendor Rapidjson)
+	#"${CMAKE_CURRENT_LIST_DIR}/CMake/FindRapidJSON.cmake" (do not install it for now, uncomment if one day we vendor RapidJSON)
 	"${CMAKE_CURRENT_LIST_DIR}/CMake/${PROJECT_NAME}Config.cmake"
 	"${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
 	DESTINATION ${INSTALL_CONFIGDIR}

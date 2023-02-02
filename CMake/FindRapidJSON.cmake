@@ -12,11 +12,14 @@
 set( _RAPIDJSON_HEADER_SEARCH_DIRS
 "/usr/include"
 "/usr/local/include"
-"${CMAKE_SOURCE_DIR}/include")
+"${CMAKE_SOURCE_DIR}/include"
+"C:\Program Files (x86)"
+)
 set( _RAPIDJSON_LIB_SEARCH_DIRS
 "/usr/lib"
 "/usr/local/lib"
-"${CMAKE_SOURCE_DIR}/lib" )
+"${CMAKE_SOURCE_DIR}/lib"
+"C:\Program Files (x86)")
 
 # Check environment for root search directory
 set( _RAPIDJSON_ENV_ROOT $ENV{RAPIDJSON_ROOT} )
@@ -30,9 +33,16 @@ if( RAPIDJSON_ROOT )
 endif()
 
 # Search for the header
-FIND_PATH(RapidJSON_INCLUDE_DIR "rapidjson/rapidjson.h"
+find_path(RapidJSON_INCLUDE_DIR "rapidjson/rapidjson.h"
 PATHS ${_RAPIDJSON_HEADER_SEARCH_DIRS} )
 
 
 INCLUDE(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(RapidJSON DEFAULT_MSG RapidJSON_INCLUDE_DIR)
+find_package_handle_standard_args(RapidJSON DEFAULT_MSG RapidJSON_INCLUDE_DIR)
+
+if(RapidJSON_FOUND AND NOT TARGET RapidJSON::RapidJSON)
+    add_library(RapidJSON::RapidJSON INTERFACE IMPORTED)
+    set_target_properties(RapidJSON::RapidJSON PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${RapidJSON_INCLUDE_DIRS}"
+    )
+endif()
