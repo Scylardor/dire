@@ -313,15 +313,10 @@ namespace DIRE_NS
 	{\
 		static const DIRE_STRING fullyQualifiedName = []{\
 			DIRE_STRING funcName = DIRE_FUNCTION_FULLNAME;\
-			std::size_t found = funcName.rfind("::");\
-			found = funcName.rfind("::", found-1);\
-			found = funcName.rfind("::", found-1);\
+			std::size_t found = funcName.rfind("::DIRE_GetFullyQualifiedName");\
 			if (found != DIRE_STRING::npos)\
 			{\
 				funcName = funcName.substr(0, found);\
-				auto startIdx = funcName.find(' ');\
-				if (startIdx != funcName.npos)\
-					funcName = funcName.substr(startIdx+1, found - startIdx);\
 			}\
 			return funcName;\
 		}(); \

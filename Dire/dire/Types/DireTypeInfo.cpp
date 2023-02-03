@@ -13,15 +13,15 @@ bool dire::TypeInfo::IsParentOf(const dire::ReflectableID pChildClassID, bool pI
 
 	auto predicate = [pChildClassID](const TypeInfo* pChildTypeInfo)
 	{
-		return pChildTypeInfo->ReflectableID == pChildClassID;
+		return pChildTypeInfo->myReflectableID == pChildClassID;
 	};
 
-	return std::find_if(ChildrenClasses.begin(), ChildrenClasses.end(), predicate) != ChildrenClasses.end();
+	return std::find_if(myChildrenClasses.begin(), myChildrenClasses.end(), predicate) != myChildrenClasses.end();
 }
 
 dire::TypeInfo::ParentPropertyInfo dire::TypeInfo::FindParentClassProperty(const std::string_view& pName) const
 {
-	for (const TypeInfo* parentClass : ParentClasses)
+	for (const TypeInfo* parentClass : myParentClasses)
 	{
 		const PropertyTypeInfo* foundProp = parentClass->FindProperty(pName);
 		if (foundProp != nullptr)
@@ -35,7 +35,7 @@ dire::TypeInfo::ParentPropertyInfo dire::TypeInfo::FindParentClassProperty(const
 
 const dire::PropertyTypeInfo* dire::TypeInfo::FindProperty(const std::string_view& pName) const
 {
-	for (const auto& prop : Properties)
+	for (const auto& prop : myProperties)
 	{
 		if (prop.GetName() == pName)
 		{
@@ -48,7 +48,7 @@ const dire::PropertyTypeInfo* dire::TypeInfo::FindProperty(const std::string_vie
 
 const dire::PropertyTypeInfo* dire::TypeInfo::FindPropertyInHierarchy(const std::string_view& pName) const
 {
-	for (auto const& prop : Properties)
+	for (auto const& prop : myProperties)
 	{
 		if (prop.GetName() == pName)
 		{
@@ -68,7 +68,7 @@ const dire::PropertyTypeInfo* dire::TypeInfo::FindPropertyInHierarchy(const std:
 
 dire::FunctionInfo const* dire::TypeInfo::FindFunction(const std::string_view& pFuncName) const
 {
-	for (FunctionInfo const& aFuncInfo : MemberFunctions)
+	for (FunctionInfo const& aFuncInfo : myMemberFunctions)
 	{
 		if (aFuncInfo.GetName() == pFuncName)
 		{
@@ -81,7 +81,7 @@ dire::FunctionInfo const* dire::TypeInfo::FindFunction(const std::string_view& p
 
 dire::TypeInfo::ParentFunctionInfo dire::TypeInfo::FindParentFunction(const std::string_view& pFuncName) const
 {
-	for (const TypeInfo* parentClass : ParentClasses)
+	for (const TypeInfo* parentClass : myParentClasses)
 	{
 		const FunctionInfo* foundFunc = parentClass->FindFunction(pFuncName);
 		if (foundFunc != nullptr)
@@ -95,7 +95,7 @@ dire::TypeInfo::ParentFunctionInfo dire::TypeInfo::FindParentFunction(const std:
 
 void DIRE_NS::TypeInfo::CloneHierarchyPropertiesOf(Reflectable& pNewClone, const Reflectable& pCloned) const
 {
-	for (auto rit = ParentClasses.rbegin(); rit != ParentClasses.rend(); ++rit)
+	for (auto rit = myParentClasses.rbegin(); rit != myParentClasses.rend(); ++rit)
 	{
 		(*rit)->ClonePropertiesOf(pNewClone, pCloned);
 	}
@@ -105,7 +105,7 @@ void DIRE_NS::TypeInfo::CloneHierarchyPropertiesOf(Reflectable& pNewClone, const
 
 void DIRE_NS::TypeInfo::ClonePropertiesOf(Reflectable& pNewClone, const Reflectable& pCloned) const
 {
-	for (const PropertyTypeInfo& prop : Properties)
+	for (const PropertyTypeInfo& prop : myProperties)
 	{
 		Reflectable::PropertyAccessor<void> accessor = pCloned.GetProperty(prop.GetName());
 		const void* propPtr = accessor.GetPointer();

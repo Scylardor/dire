@@ -1,5 +1,5 @@
 #pragma once
-#include "Dire/DireProperty.h"
+#include "dire/DireProperty.h"
 #include "dire/DireReflectable.h"
 
 #include <map>

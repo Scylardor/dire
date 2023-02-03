@@ -1,5 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
-#include "Dire/DireEnums.h"
+#include "dire/DireEnums.h"
 #include <cstring> // strcmp
 
 TEST_CASE("FindFirstSetBit", "[Enums]")

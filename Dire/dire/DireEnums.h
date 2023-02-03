@@ -152,27 +152,29 @@ namespace DIRE_NS
 	// https://clang.llvm.org/docs/LanguageExtensions.html
 	// TODO: untested
 	template <typename T>
-	constexpr ::std::enable_if_t<::std::is_integral_v<T>, unsigned long>
+	constexpr ::std::enable_if_t<::std::is_integral_v<T>, unsigned>
 	FindFirstSetBit(T value)
 	{
 		if (value == 0)
 			return UINT32_MAX;
 
-		unsigned long firstSetBitIndex = 0;
+		unsigned firstSetBitIndex = 0;
 		if constexpr (sizeof(T) <= sizeof(int))
 		{
-			firstSetBitIndex = (unsigned long)__builtin_ffs((int)value);
+			firstSetBitIndex = (unsigned)__builtin_ffs((int)value);
 		}
 		else if constexpr (sizeof(T) <= sizeof(long)) // probably useless nowadays
 		{
-			firstSetBitIndex = (unsigned long)__builtin_ffsl((long)value);
+			firstSetBitIndex = (unsigned)__builtin_ffsl((long)value);
 		}
 		else
 		{
-			firstSetBitIndex = (unsigned long)__builtin_ffsll((long long)value);
+			firstSetBitIndex = (unsigned)__builtin_ffsll((long long)value);
 		}
 
-		return firstSetBitIndex;
+		// GCC builtins work differently than MSVC, and e.g. return 1 for the first bit set but we want to return 0 in that case.
+		DIRE_ASSERT(firstSetBitIndex > 0);
+		return firstSetBitIndex - 1;
 	}
 #endif
 }
@@ -199,6 +201,10 @@ namespace DIRE_NS
 		EnumName(Underlying pInitVal) :\
 			Value((Values)pInitVal)\
 		{}\
+		constexpr EnumName(const EnumName& pOther) :\
+			Value(pOther.Value)\
+		{}\
+		\
 		EnumName& operator=(const EnumName & pOther)\
 		{\
 			Value = pOther.Value;\

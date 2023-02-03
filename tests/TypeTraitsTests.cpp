@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-#include "Dire/DireProperty.h"
+#include "dire/DireProperty.h"
 #include "dire/DireReflectable.h"
 #include "dire/Utils/DireTypeTraits.h"
 #include <unordered_map>

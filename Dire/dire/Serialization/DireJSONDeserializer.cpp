@@ -27,9 +27,9 @@ namespace DIRE_NS
 		rapidjson::ParseResult ok = doc.Parse(pJson);
 		if (doc.Parse(pJson).HasParseError())
 		{
-			auto neededSize = snprintf(nullptr, 0, "JSON parse error: %s (%llu)", GetParseError_En(ok.Code()), ok.Offset());
+			auto neededSize = snprintf(nullptr, 0, "JSON parse error: %s (%zu)", GetParseError_En(ok.Code()), ok.Offset());
 			DIRE_STRING error(size_t(neededSize+1), '\0');
-			snprintf(error.data(), error.size(), "JSON parse error: %s (%llu)", GetParseError_En(ok.Code()), ok.Offset());
+			snprintf(error.data(), error.size(), "JSON parse error: %s (%zu)", GetParseError_En(ok.Code()), ok.Offset());
 
 			return { error };
 		}
