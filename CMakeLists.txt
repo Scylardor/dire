@@ -215,6 +215,7 @@ export(PACKAGE ${PROJECT_NAME})
 
 # UNIT TESTS
 ############
+enable_testing()
 add_subdirectory(tests)
 
 # DOCUMENTATION

@@ -17,7 +17,7 @@ if(${UPPER_PROJECT_NAME}_TESTS_ENABLED)
 		TypeInfoDatabaseTests.cpp
 		TestClasses.h
 	)
-
+	
 	# Alias TARGET
 	add_executable(${PROJECT_NAME}::Tests ALIAS ${PROJECT_NAME}_UnitTests)
 
@@ -40,7 +40,7 @@ if(${UPPER_PROJECT_NAME}_TESTS_ENABLED)
 	# Catch2 dependency setup (Do it AFTER the DLL copy command, or the Catch test run will fail if the DLL has not been copied beforehand!)
 	include(CMake/Catch2.cmake)
 	add_catch2_dependency(catch2 ${${UPPER_PROJECT_NAME}_TESTS_CATCH_VERSION} ${PROJECT_NAME}_UnitTests PRIVATE Catch2::Catch2WithMain 17) # (force using at least C++17)
-	
+
 	enable_testing()
 	add_test(NAME ${PROJECT_NAME}_UnitTests COMMAND ${PROJECT_NAME}_UnitTests)
 
