@@ -27,7 +27,7 @@ set(${UPPER_PROJECT_NAME}_ALLOCATOR std::allocator CACHE STRING "Stateless alloc
 set(${UPPER_PROJECT_NAME}_CPP_STANDARD cxx_std_17 CACHE STRING "Set the standard to compile DIRE with. Use cxx_std_20 to enable C++20 features.")
 option(${UPPER_PROJECT_NAME}_BUILD_SHARED_LIB "Type of library DIRE will compile. Use STATIC for archives (.a or .lib on Windows) or SHARED for dynamic (.so or DLL on Windows)." ON)
 
-set(DIRE_SOURCE_DIR ${PROJECT_NAME}/${PROJECT_NAME})
+set(DIRE_SOURCE_DIR ${PROJECT_NAME}/dire)
 set(DIRE_GENERATED_INCLUDES_DIR generated-includes/Dire)
 
 # Main target creation
@@ -135,7 +135,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 # RapidJSON dependency setup
 if(${UPPER_PROJECT_NAME}_SERIALIZATION_ENABLED AND ${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_ENABLED)
 	include(CMake/RapidJSON.cmake)
-	find_rapidjson_dependency(RapidJSON ${${UPPER_PROJECT_NAME}_SERIALIZATION_RAPIDJSON_VERSION})
+	find_rapidjson_dependency()
 	target_link_libraries(${PROJECT_NAME} PUBLIC RapidJSON::RapidJSON)
 endif()
 
@@ -161,7 +161,6 @@ endif()
 
 # Generate the final defines file and add include directories so that clients can find it
 configure_file(${DIRE_SOURCE_DIR}/DireDefines.h.in ${DIRE_GENERATED_INCLUDES_DIR}/DireDefines.h)
-
 
 # INSTALL INSTRUCTIONS
 ######################
