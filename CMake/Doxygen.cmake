@@ -18,7 +18,7 @@ endmacro()
 
 
 function(ADD_DOXYGEN sourceDir readmeFile docsDir)
-	find_package(Doxygen)
+	find_package(Doxygen REQUIRED dot)
 	if (NOT DOXYGEN_FOUND)
 		add_custom_target(Doxygen COMMAND false
 			COMMENT "Doxygen not found")
@@ -36,5 +36,4 @@ function(ADD_DOXYGEN sourceDir readmeFile docsDir)
 		${CMAKE_CURRENT_SOURCE_DIR}/${readmeFile}
 		COMMENT "Generate HTML documentation"
 	)
-	
 endfunction()
