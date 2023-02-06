@@ -14,13 +14,12 @@ jobs:
         build_type: [Debug, Release]
         cpp_standard: [cxx_std_17, cxx_std_20]
         shared_lib: [1, 0]
-        config:
-          - os: ubuntu-latest
-            vcpkg_triplet: x64-linux-release
+        include:
           - os: windows-latest
             vcpkg_triplet: x64-windows-release
-            
-            
+          - os: ubuntu-latest
+            vcpkg_triplet: x64-linux-release
+  
     runs-on: ${{ matrix.os }}
     continue-on-error: true
 
@@ -32,7 +31,7 @@ jobs:
       id: vcpkg
       with:
         manifest-dir: ${{ github.workspace }} # Set to directory containing vcpkg.json
-        triplet: ${{ matrix.config.vcpkg_triplet }}
+        triplet: ${{ matrix.vcpkg_triplet }}
         cache-key: ${{ matrix.config.os }}
         revision: master
         token: ${{ github.token }}
