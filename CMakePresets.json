@@ -58,7 +58,7 @@
       },
       {
         "name": "linux-debug",
-        "displayName": "Linux Debug",
+        "displayName": "Debug",
         "description": "Debug Build using GCC",
         "inherits": "linux-base",
         "cacheVariables": {
@@ -69,7 +69,7 @@
       },
       {
         "name": "linux-release",
-        "displayName": "Linux Release",
+        "displayName": "Release",
         "description": "Release Build using GCC",
         "inherits": "linux-debug",
         "cacheVariables": {
