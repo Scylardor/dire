@@ -160,6 +160,11 @@ if(${${UPPER_PROJECT_NAME}_STRING} STREQUAL "std")
 	set(${UPPER_PROJECT_NAME}_USE_STANDARD_STRING TRUE)
 endif()
 
+# UNIT TESTS
+############
+enable_testing()
+add_subdirectory(tests)
+
 # Generate the final defines file and add include directories so that clients can find it
 configure_file(${DIRE_SOURCE_DIR}/DireDefines.h.in ${DIRE_GENERATED_INCLUDES_DIR}/DireDefines.h)
 
@@ -213,11 +218,6 @@ export(EXPORT ${PROJECT_NAME}Targets
 # Export it to CMake Package Registry too
 set(CMAKE_EXPORT_PACKAGE_REGISTRY ON)
 export(PACKAGE ${PROJECT_NAME})
-
-# UNIT TESTS
-############
-enable_testing()
-add_subdirectory(tests)
 
 # DOCUMENTATION
 ###############
