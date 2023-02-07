@@ -24,8 +24,6 @@ jobs:
     continue-on-error: true
 
     steps:
-    - uses: actions/checkout@v3
-    
     - name: vcpkg build
       uses: johnwason/vcpkg-action@v4
       id: vcpkg
@@ -58,6 +56,7 @@ jobs:
     permissions:
       contents: write # Make sure we don't run into permission issues when writing to the repo...
     steps:
+      - uses: actions/checkout@v3
       - name: Install doxygen components
         run: sudo apt install -y doxygen graphviz # graphviz is needed for awesome doxygen css
         
