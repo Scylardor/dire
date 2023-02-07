@@ -18,13 +18,13 @@ endmacro()
 
 
 function(ADD_DOXYGEN sourceDir readmeFile docsDir)
-	find_package(Doxygen REQUIRED dot)
+	find_package(Doxygen REQUIRED COMPONENTS dot)
 	if (NOT DOXYGEN_FOUND)
 		add_custom_target(Doxygen COMMAND false
 			COMMENT "Doxygen not found")
 		return()
 	endif()
-
+	
 	set(DOXYGEN_GENERATE_HTML YES)
 	set(DOXYGEN_HTML_OUTPUT
 		${CMAKE_CURRENT_BINARY_DIR}/${docsDir})

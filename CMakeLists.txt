@@ -26,6 +26,7 @@ set(${UPPER_PROJECT_NAME}_ASSERT assert CACHE STRING "Assert expression Dire sho
 set(${UPPER_PROJECT_NAME}_ALLOCATOR std::allocator CACHE STRING "Stateless allocator Dire should use to dynamically allocate memory.")
 set(${UPPER_PROJECT_NAME}_CPP_STANDARD cxx_std_17 CACHE STRING "Set the standard to compile DIRE with. Use cxx_std_20 to enable C++20 features.")
 option(${UPPER_PROJECT_NAME}_BUILD_SHARED_LIB "Type of library DIRE will compile. Use STATIC for archives (.a or .lib on Windows) or SHARED for dynamic (.so or DLL on Windows)." ON)
+option(${UPPER_PROJECT_NAME}_BUILD_DOCUMENTATION "If on, will search for Doxygen on the system to generate docs (for library developers)." OFF)
 
 set(DIRE_SOURCE_DIR ${PROJECT_NAME}/dire)
 set(DIRE_GENERATED_INCLUDES_DIR generated-includes/Dire)
@@ -220,5 +221,7 @@ add_subdirectory(tests)
 
 # DOCUMENTATION
 ###############
-include(CMake/Doxygen.cmake)
-add_doxygen(${PROJECT_NAME} README.md docs)
+if (${UPPER_PROJECT_NAME}_BUILD_DOCUMENTATION)
+	include(CMake/Doxygen.cmake)
+	add_doxygen(${PROJECT_NAME} README.md docs)
+endif()
