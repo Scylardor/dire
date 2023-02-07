@@ -51,3 +51,25 @@ jobs:
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ctest --test-dir tests/ -C ${{ matrix.build_type }}
 
+
+  documentation:
+    needs: build_matrix
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Make sure we don't run into permission issues when writing to the repo...
+    steps:
+      - name: Install doxygen components
+        run: sudo apt install -y doxygen graphviz # graphviz is needed for awesome doxygen css
+        
+      - name: Run Doxygen
+        run: |
+          cmake -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake -B ${{github.workspace}}/build
+          cmake --build ${{github.workspace}}/build --target Doxygen
+          
+      - name: Deploy Documentation
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: build/docs # The folder the action should deploy.
+          branch: gh-pages
+          target-folder: docs/ # Folder in the target branch to put the Doxygen output into
+  
