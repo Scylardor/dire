@@ -1,0 +1,5 @@
+<map id="DIRE_NS::TypedArrayDataStructureHandler&lt; T, typename std::enable_if_t&lt; HasArraySemantics_v&lt; T &gt; &amp;&amp;!std::is_array_v&lt; T &gt; &gt; &gt;" name="DIRE_NS::TypedArrayDataStructureHandler&lt; T, typename std::enable_if_t&lt; HasArraySemantics_v&lt; T &gt; &amp;&amp;!std::is_array_v&lt; T &gt; &gt; &gt;">
+<area shape="rect" id="node1" title="Type&#45;erased array handler for reflectable properties that have all the traits of an Array (e...." alt="" coords="5,184,272,255"/>
+<area shape="rect" id="node2" href="$classDIRE__NS_1_1AbstractArrayDataStructureHandler.html" title="An intermediate wrapper for functions common to both types of array handlers." alt="" coords="35,95,242,136"/>
+<area shape="rect" id="node3" href="$classDIRE__NS_1_1IArrayDataStructureHandler.html" title="Generic interface for type&#45;erased array handlers. This class will be derived by handlers for both sta..." alt="" coords="31,5,246,47"/>
+</map>

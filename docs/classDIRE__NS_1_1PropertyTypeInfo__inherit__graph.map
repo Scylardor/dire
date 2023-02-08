@@ -1,0 +1,5 @@
+<map id="DIRE_NS::PropertyTypeInfo" name="DIRE_NS::PropertyTypeInfo">
+<area shape="rect" id="node1" title="The base class for Dire to store information of properties. Never use it directly: it is to be inheri..." alt="" coords="31,95,227,121"/>
+<area shape="rect" id="node3" href="$classDIRE__NS_1_1TypedProperty.html" title="The property template declared by DIRE_PROPERTY. Never use this type directly, use the macro." alt="" coords="5,169,252,211"/>
+<area shape="rect" id="node2" href="$classDIRE__NS_1_1IntrusiveListNode.html" title=" " alt="" coords="29,5,229,47"/>
+</map>

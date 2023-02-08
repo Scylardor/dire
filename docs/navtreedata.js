@@ -25,9 +25,21 @@
 var NAVTREE =
 [
   [ "Dire", "index.html", [
-    [ "What is DIRE?", "index.html", "index" ],
+    [ "What is DIRE?", "index.html", [
+      [ "Examples", "index.html#autotoc_md1", [
+        [ "Bitmask enums", "index.html#autotoc_md2", null ],
+        [ "Regular sequential enums (with superpowers)", "index.html#autotoc_md3", null ],
+        [ "Property manipulation", "index.html#autotoc_md4", null ],
+        [ "Type introspection", "index.html#autotoc_md5", null ],
+        [ "Serialization", "index.html#autotoc_md6", null ]
+      ] ],
+      [ "What does it need?", "index.html#autotoc_md7", null ],
+      [ "What are the limitations?", "index.html#autotoc_md8", null ],
+      [ "License", "index.html#autotoc_md9", null ],
+      [ "But... Why?", "index.html#autotoc_md10", null ]
+    ] ],
     [ "Namespaces", "namespaces.html", [
-      [ "Namespace List", "namespaces.html", null ]
+      [ "Namespace List", "namespaces.html", "namespaces_dup" ]
     ] ],
     [ "Classes", "annotated.html", [
       [ "Class List", "annotated.html", "annotated_dup" ],
@@ -46,7 +58,8 @@ var NAVTREE =
 
 var NAVTREEINDEX =
 [
-"_dire_8h_source.html"
+"",
+"classDIRE__NS_1_1TypedMapDataStructureHandler_3_01T_00_01typename_01std_1_1enable__if__t_3_01Has628338ba013a7d05b4c4f79d5461043c.html"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

@@ -1,0 +1,4 @@
+<map id="DIRE_NS::AbstractArrayDataStructureHandler" name="DIRE_NS::AbstractArrayDataStructureHandler">
+<area shape="rect" id="node1" title="An intermediate wrapper for functions common to both types of array handlers." alt="" coords="9,95,216,136"/>
+<area shape="rect" id="node2" href="$classDIRE__NS_1_1IArrayDataStructureHandler.html" title="Generic interface for type&#45;erased array handlers. This class will be derived by handlers for both sta..." alt="" coords="5,5,220,47"/>
+</map>

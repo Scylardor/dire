@@ -1,0 +1,7 @@
+<map id="DIRE_NS::TypedFunctionInfo&lt; Ret(Class::*)(Args...)&gt;" name="DIRE_NS::TypedFunctionInfo&lt; Ret(Class::*)(Args...)&gt;">
+<area shape="rect" id="node1" title="The class declared by the DIRE_FUNCTION and DIRE_TYPED_FUNCTION macros. Never use it directly,..." alt="" coords="182,185,386,227"/>
+<area shape="rect" id="node2" href="$classDIRE__NS_1_1FunctionInfo.html" title="An abstract type that stores data and defines functions common to all types of function infos...." alt="" coords="134,96,301,123"/>
+<area shape="rect" id="node3" href="$classDIRE__NS_1_1IntrusiveListNode.html" title=" " alt="" coords="5,5,205,47"/>
+<area shape="rect" id="node4" href="$classDIRE__NS_1_1IFunctionTypeInfo.html" title="The base interface for storing class member function info. It provides the Invoke method that allows ..." alt="" coords="229,13,429,39"/>
+<area shape="rect" id="node5" title=" " alt="" coords="325,96,376,123"/>
+</map>

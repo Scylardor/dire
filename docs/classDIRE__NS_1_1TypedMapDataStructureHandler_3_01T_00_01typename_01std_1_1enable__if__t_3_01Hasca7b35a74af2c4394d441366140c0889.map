@@ -1,0 +1,4 @@
+<map id="DIRE_NS::TypedMapDataStructureHandler&lt; T, typename std::enable_if_t&lt; HasMapSemantics_v&lt; T &gt; &gt; &gt;" name="DIRE_NS::TypedMapDataStructureHandler&lt; T, typename std::enable_if_t&lt; HasMapSemantics_v&lt; T &gt; &gt; &gt;">
+<area shape="rect" id="node1" title="Template class for reflectable properties that have all the traits of an associative array (e...." alt="" coords="5,95,248,165"/>
+<area shape="rect" id="node2" href="$classDIRE__NS_1_1IMapDataStructureHandler.html" title="Generic interface for type&#45;erased map handlers. This class will be derived by the TypedMapDataStructu..." alt="" coords="23,5,231,47"/>
+</map>

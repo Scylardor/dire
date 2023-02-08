@@ -1,0 +1,4 @@
+<map id="DIRE_NS::IMapDataStructureHandler" name="DIRE_NS::IMapDataStructureHandler">
+<area shape="rect" id="node1" title="Generic interface for type&#45;erased map handlers. This class will be derived by the TypedMapDataStructu..." alt="" coords="5,20,213,61"/>
+<area shape="rect" id="node2" href="$classDIRE__NS_1_1TypedMapDataStructureHandler_3_01T_00_01typename_01std_1_1enable__if__t_3_01Has628338ba013a7d05b4c4f79d5461043c.html" title="Template class for reflectable properties that have all the traits of an associative array (e...." alt="" coords="261,5,504,76"/>
+</map>

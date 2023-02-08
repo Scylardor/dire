@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['notserializable_0',['NotSerializable',['../struct_d_i_r_e___n_s_1_1_not_serializable.html',1,'DIRE_NS']]]
+  ['notserializable_41',['NotSerializable',['../structDIRE__NS_1_1NotSerializable.html',1,'DIRE_NS']]]
 ];
