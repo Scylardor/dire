@@ -64,7 +64,7 @@ jobs:
         
       - name: Run Doxygen
         run: |
-          cmake -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake -B ${{github.workspace}}/build
+          cmake -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -B ${{github.workspace}}/build
           cmake --build ${{github.workspace}}/build --target Doxygen
           
       - name: Deploy Documentation
