@@ -38,9 +38,7 @@ jobs:
             vcpkg_triplet: x64-linux-release
   
     runs-on: ${{ matrix.os }}
-    env:
-      ARTIFACT: Dire.${{github.ref_name}}.bin.${{ runner.os }}.zip
-
+    
     steps:
     - uses: actions/checkout@v3
     
@@ -69,14 +67,18 @@ jobs:
       with:
         name: doc
         path: ${{github.workspace}}/build/Release/docs
+        
+    - name: Set artifact name
+      run: |
+        echo "ARTIFACT=Dire.${{github.ref_name}}.bin.${{ runner.os }}.zip" >> $GITHUB_ENV
       
     # Zip release directory (inspired by https://gist.github.com/youhide/121750fc4878801ea8e908080b535beb )
     - if: runner.os == 'Windows'
       run: |
-        powershell Compress-Archive ${{github.workspace}}/build/Release $ARTIFACT 
+        powershell Compress-Archive ${{github.workspace}}/build/Release ${{ env.ARTIFACT }} 
     - if: runner.os != 'Windows'
       run: |
-        zip -r ${{github.workspace}}/build/Release $ARTIFACT 
+        zip -r ${{github.workspace}}/build/Release ${{ env.ARTIFACT }}
     
     - name: Upload platform artifact
       uses: actions/upload-artifact@v3
