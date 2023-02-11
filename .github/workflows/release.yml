@@ -81,16 +81,16 @@ jobs:
     # Zip release directory (inspired by https://gist.github.com/youhide/121750fc4878801ea8e908080b535beb )
     - if: runner.os == 'Windows'
       run: |
-        powershell Compress-Archive ${{github.workspace}}/build/Release/* -DestinationPath ${{ env.ARTIFACT }}
+        powershell Compress-Archive ${{github.workspace}}/build/Release/* -DestinationPath Dire.${{github.ref_name}}.bin.${{ runner.os }}.zip
     - if: runner.os != 'Windows'
       run: |
-        zip -ry ${{ env.ARTIFACT }} ${{github.workspace}}/build/Release/*
+        zip -ry Dire.${{github.ref_name}}.bin.${{ runner.os }}.zip ${{github.workspace}}/build/Release/*
     
     - name: Upload platform artifact
       uses: actions/upload-artifact@v3
       with:
         name: release_artifacts
-        path: ${{ env.ARTIFACT }}
+        path: Dire.${{github.ref_name}}.bin.${{ runner.os }}.zip
     
   publish_release:
     needs: build_matrix
