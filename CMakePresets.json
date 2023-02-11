@@ -75,6 +75,16 @@
         "cacheVariables": {
           "CMAKE_BUILD_TYPE": "Release"
         }
+      },
+      {
+        "name": "continuous-delivery",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Release",
+          "DIRE_TESTS_ENABLED": "0",
+          "CMAKE_ARCHIVE_OUTPUT_DIRECTORY": "Release",
+          "CMAKE_LIBRARY_OUTPUT_DIRECTORY": "Release",
+          "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "Release"
+        }
       }
     ],
     "buildPresets": [

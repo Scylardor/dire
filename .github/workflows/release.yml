@@ -39,6 +39,7 @@ jobs:
   
     runs-on: ${{ matrix.os }}
     
+    
     steps:
     - uses: actions/checkout@v3
     
@@ -51,15 +52,20 @@ jobs:
         cache-key: ${{ matrix.config.os }}
         revision: master
         token: ${{ github.token }}
+        
+    - name: Create build directory
+      run: |
+        mkdir build
+        mkdir build/Release
 
     - name: Build Static Lib
       run: | 
-        cmake -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake -DDIRE_BUILD_SHARED_LIB=0 -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DDIRE_TESTS_ENABLED=0
+        cmake -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake -DDIRE_BUILD_SHARED_LIB=0 -B build --preset continuous-delivery
         cmake  --build ${{github.workspace}}/build --config Release
 
     - name: Build Shared Lib
       run: |
-        cmake -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake -DDIRE_BUILD_SHARED_LIB=1 -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DDIRE_TESTS_ENABLED=0
+        cmake -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake -DDIRE_BUILD_SHARED_LIB=1 -B build --preset continuous-delivery
         cmake  --build ${{github.workspace}}/build --config Release
         
     - name: Download docs
@@ -75,10 +81,10 @@ jobs:
     # Zip release directory (inspired by https://gist.github.com/youhide/121750fc4878801ea8e908080b535beb )
     - if: runner.os == 'Windows'
       run: |
-        powershell Compress-Archive ${{github.workspace}}/build/Release ${{ env.ARTIFACT }} 
+        powershell Compress-Archive ${{github.workspace}}/build/Release ${{ env.ARTIFACT }}
     - if: runner.os != 'Windows'
       run: |
-        zip -r ${{github.workspace}}/build/Release ${{ env.ARTIFACT }}
+        zip -ry ${{ env.ARTIFACT }} ${{github.workspace}}/build/Release/*
     
     - name: Upload platform artifact
       uses: actions/upload-artifact@v3
