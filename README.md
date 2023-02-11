@@ -239,7 +239,7 @@ Since the TypeInfo database and Reflectables are two separate entities, it shoul
 - Using DIRE could also increase the program's startup time, because of the static initialization machinery needed to initialize everything.
 Granted, it's also going to make your executable size bigger, because more static memory will have to be bundled into it.
 
-- DIRE relies a lot on virtual function calls. Yhose are known for being more expensive to call than regular functions.
+- DIRE relies a lot on virtual function calls. Those are known for being more expensive to call than regular functions.
 Modern compilers are however getting better at devirtualizing virtual function calls, so: YMMV.
 
 - DIRE uses a fair amount of macros and complex templates to work. As a result, I've seen measurable increases in compile time by using it.
