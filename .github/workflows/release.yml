@@ -81,7 +81,7 @@ jobs:
     # Zip release directory (inspired by https://gist.github.com/youhide/121750fc4878801ea8e908080b535beb )
     - if: runner.os == 'Windows'
       run: |
-        powershell Compress-Archive ${{github.workspace}}/build/Release ${{ env.ARTIFACT }}
+        powershell Compress-Archive ${{github.workspace}}/build/Release/* -DestinationPath ${{ env.ARTIFACT }}
     - if: runner.os != 'Windows'
       run: |
         zip -ry ${{ env.ARTIFACT }} ${{github.workspace}}/build/Release/*
