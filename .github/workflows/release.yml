@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  push:
+    branches: [ "main" ]
+    tags:
+      - 'v*.*.*'
+      
+
+jobs:
+  documentation:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install doxygen components
+      run: sudo apt install -y doxygen graphviz # graphviz is needed for awesome doxygen css
+        
+    - name: Run Doxygen
+      run: |
+        cmake -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -B ${{github.workspace}}/build -DDIRE_BUILD_DOCUMENTATION=1
+        cmake --build ${{github.workspace}}/build --target Doxygen
+        
+    - name: Upload Doc artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: doc
+        path: ${{github.workspace}}/build/docs
+
+  build_matrix:
+    needs: documentation
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest] # macos-latest not supported for now
+        include:
+          - os: windows-latest
+            vcpkg_triplet: x64-windows-release
+          - os: ubuntu-latest
+            vcpkg_triplet: x64-linux-release
+  
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: vcpkg build
+      uses: johnwason/vcpkg-action@v4
+      id: vcpkg
+      with:
+        manifest-dir: ${{ github.workspace }} # Set to directory containing vcpkg.json
+        triplet: ${{ matrix.vcpkg_triplet }}
+        cache-key: ${{ matrix.config.os }}
+        revision: master
+        token: ${{ github.token }}
+
+    - name: Build Static Lib
+      run: | 
+        cmake -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake -DDIRE_BUILD_SHARED_LIB=0 -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DDIRE_TESTS_ENABLED=0
+        cmake  --build ${{github.workspace}}/build --config Release
+
+    - name: Build Shared Lib
+      run: |
+        cmake -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake -DDIRE_BUILD_SHARED_LIB=1 -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DDIRE_TESTS_ENABLED=0
+        cmake  --build ${{github.workspace}}/build --config Release
+        
+    - name: Download docs
+      uses: actions/download-artifact@v3
+      with:
+        name: doc
+        path: ${{github.workspace}}/build/Release/docs
+      
+      
+    - name: Set platform artifact name
+      env:
+        ARTIFACT: Dire.${{github.ref_name}}.bin.${{ runner.os }}.zip
+        
+    # Zip release directory (inspired by https://gist.github.com/youhide/121750fc4878801ea8e908080b535beb )
+    - if: runner.os == 'Windows'
+      run: |
+        powershell Compress-Archive ${{github.workspace}}/build/Release $ARTIFACT 
+    - if: runner.os != 'Windows'
+      run: |
+        zip -r ${{github.workspace}}/build/Release $ARTIFACT 
+    
+    - name: Upload platform artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: release_artifacts
+        path: ${{ env.ARTIFACT }}
+    
+  publish_release:
+    needs: build_matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: release_artifacts
+          path: ${{github.workspace}}/artifacts
+          
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{github.workspace}}/artifacts/*
+    
+    
