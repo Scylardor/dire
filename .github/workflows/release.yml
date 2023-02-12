@@ -35,9 +35,9 @@ jobs:
       id: parse_tag
       shell: bash
       run: |
-        arr=($(echo ${{ github.ref }} | tr "/" " "))
-        echo "Tag name: ${{ arr[2] }}"
-        echo "::set-output name=tag_name::${{ arr[2] }}"
+        tag=$(echo ${{ github.ref }} | cut -d "/" -f 3)
+        echo "Tag name: $tag"
+        echo "::set-output name=tag_name::$tag"
 
   build_matrix:
     needs: parse_tag
