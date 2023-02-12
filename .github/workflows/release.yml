@@ -106,5 +106,5 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: ${{github.workspace}}/artifacts/*
-    
-    
+          tag_name: ${{github.ref_name}}
+
