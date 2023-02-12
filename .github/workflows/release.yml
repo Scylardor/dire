@@ -29,20 +29,13 @@ jobs:
   parse_tag:
     runs-on: ubuntu-latest
     steps:
-    - name: Debug
-      run: |
-        echo ${{ github.ref }}
-        echo ${{ github.ref_name }}
+      - uses: olegtarasov/get-tag@v2.1.2
+        id: tagName
+    
+      - name: Debug
+        run: |
+          echo ${{ steps.tagName.outputs.tag }}
         
-    - if: startsWith(github.ref, 'refs/tags/')
-      name: Get the Git tag name
-      id: parse_tag
-      shell: bash
-      run: |
-        tag=$(echo ${{ github.ref }} | cut -d "/" -f 3)
-        echo "Tag name: $tag"
-        echo "::set-output name=tag_name::$tag"
-
   build_matrix:
     needs: parse_tag
     strategy:
