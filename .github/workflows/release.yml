@@ -94,7 +94,7 @@ jobs:
         echo "Artifact name: Dire.${{ steps.parse_tag.parse_tag.outputs.git_tag }}.bin.${{ runner.os }}.zip"
       
     # Zip release directory (inspired by https://gist.github.com/youhide/121750fc4878801ea8e908080b535beb )
-      - if: runner.os == 'Windows'
+    - if: runner.os == 'Windows'
       run: |
         powershell Compress-Archive ${{github.workspace}}/build/Release/* -DestinationPath Dire.${{ steps.parse_tag.parse_tag.outputs.git_tag }}.bin.${{ runner.os }}.zip
     - if: runner.os != 'Windows'
