@@ -83,14 +83,14 @@ jobs:
         name: doc
         path: ${{github.workspace}}/build/Release/docs
         
-    - name: Display artifact name
+    - name: Debug print artifact name
       run: |
-        echo "Artifact name: Dire.${{ steps.parse_tag.outputs.tag_name }}.bin.${{ runner.os }}.zip"
+        echo "Artifact name: Dire.${{ steps.tagName.outputs.tag }}.bin.${{ runner.os }}.zip"
       
     # Zip release directory (inspired by https://gist.github.com/youhide/121750fc4878801ea8e908080b535beb )
     - if: runner.os == 'Windows'
       run: |
-        powershell Compress-Archive ${{github.workspace}}/build/Release/* -DestinationPath Dire.${{ steps.parse_tag.outputs.tag_name }}.bin.${{ runner.os }}.zip
+        powershell Compress-Archive ${{github.workspace}}/build/Release/* -DestinationPath Dire.${{ steps.tagName.outputs.tag }}.bin.${{ runner.os }}.zip
     - if: runner.os != 'Windows'
       run: |
         zip -ry Dire.${{ steps.parse_tag.outputs.tag_name }}.bin.${{ runner.os }}.zip ${{github.workspace}}/build/Release/*
@@ -99,7 +99,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: release_artifacts
-        path: Dire.${{ steps.parse_tag.outputs.tag_name }}.bin.${{ runner.os }}.zip
+        path: Dire.${{ steps.tagName.outputs.tag }}.bin.${{ runner.os }}.zip
     
   publish_release:
     needs: [documentation, build_matrix]
@@ -115,5 +115,5 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: ${{github.workspace}}/artifacts/*
-          tag_name: ${{ steps.parse_tag.outputs.tag_name }}
+          tag_name: ${{ steps.tagName.outputs.tag }}
 
