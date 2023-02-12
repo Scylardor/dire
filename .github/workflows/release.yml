@@ -33,9 +33,13 @@ jobs:
     - name: Get the Git tag name
     - id: parse_tag
       if: startsWith(github.ref, 'refs/tags/')
-      run: echo "Parsing tag name as: ${{ substring(github.ref, 10) }}"
+      shell: bash
+      run: |
+        arr=($(echo ${{ github.ref }} | tr "/" " "))
+        echo "Tag name: ${{ arr[2] }}"
+        echo "::set-output name=tag_name::${{ arr[2] }}"
       outputs:
-        git_tag: ${{ substring(github.ref, 10) }}
+        git_tag: ${{ steps.parse_tag.outputs.tag_name }}
 
   build_matrix:
     needs: parse_tag
