@@ -27,9 +27,13 @@ jobs:
         path: ${{github.workspace}}/build/docs
 
   parse_tag:
-    needs: documentation
     runs-on: ubuntu-latest
     steps:
+    - name: Debug
+      run: |
+        echo ${{ github.ref }}
+        echo ${{ github.ref_name }}
+        
     - if: startsWith(github.ref, 'refs/tags/')
       name: Get the Git tag name
       id: parse_tag
@@ -106,7 +110,7 @@ jobs:
         path: Dire.${{ steps.parse_tag.outputs.tag_name }}.bin.${{ runner.os }}.zip
     
   publish_release:
-    needs: build_matrix
+    needs: [documentation, build_matrix]
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
