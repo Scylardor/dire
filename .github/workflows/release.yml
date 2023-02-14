@@ -92,9 +92,6 @@ jobs:
       with:
         python-version: '3.x'
 
-    - name: Set zip file name
-      run: echo "ZIPFILE=${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}" >> $GITHUB_ENV
-
     - uses: jannekem/run-python-script-action@v1
       with:
         script: |
@@ -105,8 +102,8 @@ jobs:
           copytree('../../Dire', 'include', ignore=ignore_patterns('*.cpp', '*.in'))
           copytree('../generated-includes/Dire', 'include', dirs_exist_ok=True)
           os.chdir('..')
-          make_archive("${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}", 'zip', 'Release')
-          copyfile("${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}" + '.zip', 'Release/' + "${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}" + '.zip')
+          make_archive("Dire.${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}", 'zip', 'Release')
+          copyfile("Dire.${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}" + '.zip', 'Release/' + "Dire.${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}" + '.zip')
 
     - name: Upload platform artifact
       uses: actions/upload-artifact@v3
