@@ -99,13 +99,14 @@ jobs:
       with:
         script: |
           import os
-          from shutil import make_archive, copytree, ignore_patterns
+          from shutil import make_archive, copytree, ignore_patterns, copyfile
 
           os.chdir('build/Release')
           copytree('../../Dire', 'include', ignore=ignore_patterns('*.cpp', '*.in'))
           copytree('../generated-includes/Dire', 'include', dirs_exist_ok=True)
           os.chdir('..')
           make_archive(os.environ['ZIPFILE'], 'zip', 'Release')
+          copyfile(os.environ['ZIPFILE'] + '.zip', 'Release/' + os.environ['ZIPFILE'] + '.zip')
 
     - name: Upload platform artifact
       uses: actions/upload-artifact@v3
