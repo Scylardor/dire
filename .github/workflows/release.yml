@@ -105,8 +105,8 @@ jobs:
           copytree('../../Dire', 'include', ignore=ignore_patterns('*.cpp', '*.in'))
           copytree('../generated-includes/Dire', 'include', dirs_exist_ok=True)
           os.chdir('..')
-          make_archive(os.environ['ZIPFILE'], 'zip', 'Release')
-          copyfile(os.environ['ZIPFILE'] + '.zip', 'Release/' + os.environ['ZIPFILE'] + '.zip')
+          make_archive("${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}", 'zip', 'Release')
+          copyfile("${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}" + '.zip', 'Release/' + "${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}" + '.zip')
 
     - name: Upload platform artifact
       uses: actions/upload-artifact@v3
