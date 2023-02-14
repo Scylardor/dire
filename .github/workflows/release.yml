@@ -3,9 +3,8 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v*.*.*' # No way to specify "tag using semantic versioning AND on main branch" on github actions as of now, but that's the intention
       
-
 jobs:
   documentation:
     runs-on: ubuntu-latest
@@ -27,6 +26,8 @@ jobs:
 
   parse_tag:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tagName.outputs.tag }}
     steps:
       - uses: olegtarasov/get-tag@v2.1.2
         id: tagName
@@ -34,6 +35,7 @@ jobs:
       - name: Debug
         run: |
           echo ${{ steps.tagName.outputs.tag }}
+        
         
   build_matrix:
     needs: parse_tag
@@ -45,10 +47,8 @@ jobs:
             vcpkg_triplet: x64-windows-release
           - os: ubuntu-latest
             vcpkg_triplet: x64-linux-release
-  
+
     runs-on: ${{ matrix.os }}
-    
-    
     steps:
     - uses: actions/checkout@v3
     
@@ -85,25 +85,28 @@ jobs:
         
     - name: Debug print artifact name
       run: |
-        echo "Artifact name: Dire.${{ steps.parse_tag.tagName.outputs.tag }}.bin.${{ runner.os }}.zip"
+        echo "Artifact name: Dire.${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}.zip"
       
     # Zip release directory (inspired by https://gist.github.com/youhide/121750fc4878801ea8e908080b535beb )
     - if: runner.os == 'Windows'
       run: |
-        powershell Compress-Archive ${{github.workspace}}/build/Release/* -DestinationPath Dire.${{ steps.parse_tag.tagName.outputs.tag }}.bin.${{ runner.os }}.zip
+        powershell Compress-Archive ${{github.workspace}}/build/Release/* -DestinationPath Dire.${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}.zip
     - if: runner.os != 'Windows'
       run: |
-        zip -ry Dire.${{ steps.parse_tag.tagName.outputs.tag }}.bin.${{ runner.os }}.zip ${{github.workspace}}/build/Release/*
+        zip -ry Dire.${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}.zip ${{github.workspace}}/build/Release/*
     
     - name: Upload platform artifact
       uses: actions/upload-artifact@v3
       with:
         name: release_artifacts
-        path: Dire.${{ steps.parse_tag.tagName.outputs.tag }}.bin.${{ runner.os }}.zip
+        path: Dire.${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}.zip
     
   publish_release:
-    needs: [documentation, build_matrix]
+    needs: [documentation, build_matrix, parse_tag]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Make sure we don't run into permission issues when writing to the repo...
+      
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v3
@@ -115,5 +118,5 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: ${{github.workspace}}/artifacts/*
-          tag_name: ${{ steps.parse_tag.tagName.outputs.tag}}
+          tag_name: ${{needs.parse_tag.outputs.tag}}
 
