@@ -92,6 +92,9 @@ jobs:
       with:
         python-version: '3.x'
 
+    - name: Set zip file name
+      run: echo "ZIPFILE=${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}" >> $GITHUB_ENV
+
     - uses: jannekem/run-python-script-action@v1
       with:
         script: |
