@@ -38,7 +38,7 @@ jobs:
         
         
   build_matrix:
-    needs: parse_tag
+    needs: [parse_tag, documentation]
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest] # macos-latest not supported for now
