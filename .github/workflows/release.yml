@@ -91,7 +91,7 @@ jobs:
     - uses: jannekem/run-python-script-action@v1
       with:
         script: |
-          import make_archive
+          from shutil import make_archive
           make_archive("Dire.${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}", 'zip', 'installation')
 
     - name: Upload platform artifact
