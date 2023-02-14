@@ -4,9 +4,9 @@ set(PROJECT_NAME Dire)
 string(TOUPPER ${PROJECT_NAME} UPPER_PROJECT_NAME)
 
 project(${PROJECT_NAME}
-  VERSION 0.1
+  VERSION 0.1.0
   LANGUAGES CXX
-  # TODO: HOMEPAGE_URL "DIRE URL"
+  HOMEPAGE_URL "https://github.com/Scylardor/dire"
   DESCRIPTION "A library for Dynamically Interpreted Reflection Expressions (DIRE)."
 )
 

@@ -90,10 +90,18 @@ jobs:
     # Zip release directory (inspired by https://gist.github.com/youhide/121750fc4878801ea8e908080b535beb )
     - if: runner.os == 'Windows'
       run: |
-        powershell Compress-Archive ${{github.workspace}}/build/Release/* -DestinationPath Dire.${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}.zip
+        cd ${{github.workspace}}\build\Release
+        mkdir include
+        robocopy ..\..\Dire include /S *.h *.inl
+        copy ..\generated-includes\Dire\*.h include
+        powershell Compress-Archive .\* -DestinationPath Dire.${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}.zip
     - if: runner.os != 'Windows'
       run: |
-        zip -ry Dire.${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}.zip ${{github.workspace}}/build/Release/*
+        cd ${{github.workspace}}/build/Release/
+        mkdir include
+        rsync -avh --include='*/' --include='*.h' --include='*.inl' --exclude='*' ../../Dire/ include/
+        cp ../generated-includes/Dire/*.h include
+        zip -ry Dire.${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}.zip ./*
     
     - name: Upload platform artifact
       uses: actions/upload-artifact@v3
