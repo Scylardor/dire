@@ -290,3 +290,5 @@ so that I can write generic serialization code that only relies on the Reflectab
 DIRE is able to do that in two formats: JSON (mostly useful to communicate back and forth with a game editor) and binary (mostly useful for packaged games).
 
 Hence, DIRE was born.
+
+
