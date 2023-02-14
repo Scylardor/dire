@@ -93,6 +93,9 @@ jobs:
         cd ${{github.workspace}}\build\Release
         mkdir include
         robocopy ..\..\Dire include /S *.h *.inl
+        dir ..
+        dir ..\generated-includes
+        dir ..\generated-includes\Dire
         Copy-Item ..\generated-includes\Dire\*.h include
         Compress-Archive .\* -DestinationPath Dire.${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}.zip
     - if: runner.os != 'Windows'
