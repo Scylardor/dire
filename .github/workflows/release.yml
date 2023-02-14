@@ -90,12 +90,12 @@ jobs:
     # Zip release directory (inspired by https://gist.github.com/youhide/121750fc4878801ea8e908080b535beb )
     - if: runner.os == 'Windows'
       shell: cmd
-      run: >
+      run: |
         cd ${{github.workspace}}\build\Release
-        && mkdir include
-        && robocopy ..\..\Dire include /S *.h *.inl
-        && copy ..\generated-includes\Dire\*.h include
-        && powershell Compress-Archive .\* -DestinationPath Dire.${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}.zip
+        mkdir include
+        robocopy ..\..\Dire include /S *.h *.inl
+        copy ..\generated-includes\Dire\*.h include
+        powershell Compress-Archive .\* -DestinationPath Dire.${{needs.parse_tag.outputs.tag}}.bin.${{ runner.os }}.zip
     - if: runner.os != 'Windows'
       run: |
         cd ${{github.workspace}}/build/Release/
