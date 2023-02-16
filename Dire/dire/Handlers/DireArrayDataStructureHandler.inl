@@ -206,7 +206,7 @@ namespace DIRE_NS
 		if (ARRAY_SIZE <= pIndex)
 		{
 			char buffer[256]{ 0 };
-			std::snprintf(buffer, sizeof(buffer), "Static Array handler was used with an index out of range (index: %llu vs. array size: %llu)", pIndex, ARRAY_SIZE);
+			std::snprintf(buffer, sizeof(buffer), "Static Array handler was used with an index out of range (index: %zu vs. array size: %zu)", pIndex, ARRAY_SIZE);
 			throw std::out_of_range(buffer);
 		}
 	}

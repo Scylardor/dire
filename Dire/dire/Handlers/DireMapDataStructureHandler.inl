@@ -27,7 +27,8 @@ namespace DIRE_NS
 			return;
 		}
 
-		ValueType* valuePtr = const_cast<ValueType*>((const ValueType*)Read(pMap, pKey));
+		const ValueType* constVal = static_cast<const ValueType*>(Read(pMap, pKey));
+		ValueType* valuePtr = const_cast<ValueType*>(constVal);
 		if (valuePtr == nullptr) // key not found
 		{
 			return;

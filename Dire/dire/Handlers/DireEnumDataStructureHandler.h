@@ -35,7 +35,7 @@ namespace DIRE_NS
 
 		virtual void	SetFromString(const char* pEnumStr, void* pEnumAddr) const override
 		{
-			T* theEnum = (T*)pEnumAddr;
+			T* theEnum = static_cast<T*>(pEnumAddr);
 			if (theEnum != nullptr)
 			{
 				const typename T::Values enumValue = T::GetValueFromSafeString(pEnumStr);

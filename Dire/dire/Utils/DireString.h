@@ -38,7 +38,7 @@ namespace DIRE_NS
 	{
 	public:
 
-		ConvertResult(T pVal) :
+		explicit ConvertResult(T pVal) :
 			Value(pVal)
 		{}
 
@@ -116,7 +116,7 @@ namespace DIRE_NS
 				}
 			}
 
-			return value;
+			return ConvertResult<T>(value);
 		}
 	};
 

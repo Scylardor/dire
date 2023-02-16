@@ -15,7 +15,7 @@ namespace DIRE_NS
 
 		struct Object
 		{
-			Object(const ReflectableID pID) :
+			explicit Object(const ReflectableID pID) :
 				ID(pID)
 			{}
 

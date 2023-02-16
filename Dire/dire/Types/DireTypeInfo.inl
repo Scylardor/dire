@@ -20,7 +20,7 @@ namespace DIRE_NS
 		}
 		else
 		{
-			std::any result = funcInfo->InvokeWithArgs(&pObject, std::forward<Args>(pArgs)...);
+			std::any result = funcInfo->InvokeWithArgs(&pObject, std::forward<Args>(pArgs)...); // cppcheck-suppress redundantInitialization
 			return std::any_cast<Ret>(result);
 		}
 	}

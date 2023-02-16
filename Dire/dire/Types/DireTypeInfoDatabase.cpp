@@ -14,7 +14,7 @@ namespace DIRE_NS
 	 */
 	struct ExportedTypeInfoData
 	{
-		ReflectableID	ID;
+		ReflectableID	ID; // cppcheck-suppress unusedStructMember
 		DIRE_STRING		TypeName;
 	};
 

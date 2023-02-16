@@ -203,7 +203,7 @@ namespace DIRE_NS
 	public:
 		using TypeInfoList = std::vector<TypeInfo*, DIRE_ALLOCATOR<TypeInfo*>>;
 
-		TypeInfo(const char* pTypename) :
+		explicit TypeInfo(const char* pTypename) :
 			myReflectableID(TypeInfoDatabase::EditSingleton().RegisterTypeInfo(this)),
 			myTypeName(pTypename)
 		{}
@@ -303,7 +303,7 @@ namespace DIRE_NS
 	class TypedTypeInfo final : public TypeInfo
 	{
 	public:
-		TypedTypeInfo(char const* pTypename);
+		explicit TypedTypeInfo(char const* pTypename);
 
 	private:
 		template <typename TParent>

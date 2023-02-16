@@ -143,11 +143,11 @@ namespace DIRE_NS
 		template <typename T>
 		struct PropertyAccessor
 		{
-			PropertyAccessor(const T* pPropAddr) :
+			explicit PropertyAccessor(const T* pPropAddr) :
 				myValue(pPropAddr)
 			{}
 
-			PropertyAccessor(ParseError&& pError) :
+			explicit PropertyAccessor(ParseError&& pError) :
 				myValue(std::move(pError))
 			{}
 
@@ -259,7 +259,7 @@ namespace DIRE_NS
 				Address(pAddr), TypeInfo(pInfo)
 			{}
 
-			GetPropertyResult(const ParseError& pError) :
+			explicit GetPropertyResult(const ParseError& pError) :
 				Error(pError)
 			{}
 

@@ -25,7 +25,7 @@ namespace DIRE_NS
 			// or there is nothing between the two brackets, the expression has to be ill-formed!
 			if (rightBrackPos == pFullPath.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 1)
 			{
-				return {"Syntax error: Mismatched bracket or empty brackets."};
+				return GetPropertyResult{"Syntax error: Mismatched bracket or empty brackets."};
 			}
 
 			DIRE_STRING_VIEW propName = DIRE_STRING_VIEW(pFullPath.data(), leftBrackPos);
@@ -36,7 +36,7 @@ namespace DIRE_NS
 				{
 					const ConvertResult<int> propIndex = FromCharsConverter<int>::Convert((pFullPath.data() + leftBrackPos + 1));
 					if (propIndex.HasError())
-						return { propIndex.GetError() };
+						return GetPropertyResult{ propIndex.GetError() };
 
 					pFullPath.remove_prefix(rightBrackPos + 1);
 					return GetArrayProperty(thisTypeInfo, propName, pFullPath, propIndex.GetValue(), propertyAddr);
@@ -152,7 +152,7 @@ namespace DIRE_NS
 			const TypeInfo * arrayElemTypeInfo = TypeInfoDatabase::GetSingleton().GetTypeInfo(pArrayHandler->ElementReflectableID());
 			if (arrayElemTypeInfo == nullptr) // compound type that is not Reflectable...
 			{
-				return {"Not a Reflectable"};
+				return GetPropertyResult{"Not a Reflectable"};
 			}
 			pRemainingPath.remove_prefix(1); // strip the leading dot
 			// Lookup the next dot (if any) to know if we should search for a compound or an array.
@@ -168,11 +168,11 @@ namespace DIRE_NS
 				const size_t rightBrackPos = pRemainingPath.find(']');
 				if (rightBrackPos == pRemainingPath.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 2) //+2 because leftBrackPos is off by 1
 				{
-					return { "Syntax error: Mismatched bracket or empty brackets." };
+					return GetPropertyResult{ "Syntax error: Mismatched bracket or empty brackets." };
 				}
 				ConvertResult<int> propIndex = FromCharsConverter<int>::Convert(pRemainingPath.data() + leftBrackPos);
 				if (propIndex.HasError())
-					return { propIndex.GetError() };
+					return GetPropertyResult{ propIndex.GetError() };
 
 				pName = DIRE_STRING_VIEW(pRemainingPath.data(), pRemainingPath.length() - suffixPos + 1);
 				pRemainingPath.remove_prefix(rightBrackPos + 1);
@@ -186,19 +186,19 @@ namespace DIRE_NS
 			// or there is no number between the two brackets, the expression has to be ill-formed!
 			if (rightBrackPos == pRemainingPath.npos || rightBrackPos < leftBrackPos || rightBrackPos == leftBrackPos + 1)
 			{
-				return { "Syntax error: Mismatched bracket or empty brackets." };
+				return GetPropertyResult{ "Syntax error: Mismatched bracket or empty brackets." };
 			}
 
 			IArrayDataStructureHandler const* elementHandler = pArrayHandler->ElementHandler().GetArrayHandler();
 
 			if (elementHandler == nullptr)
 			{
-				return { "This type doesn't support array indexing." }; // Tried to access a property type that is not an array or not a Reflectable
+				return GetPropertyResult{ "This type doesn't support array indexing." }; // Tried to access a property type that is not an array or not a Reflectable
 			}
 
 			ConvertResult<int> propIndex = FromCharsConverter<int>::Convert(pRemainingPath.data() + leftBrackPos + 1);
 			if (propIndex.HasError())
-				return { propIndex.GetError() };
+				return GetPropertyResult{ propIndex.GetError() };
 
 			pRemainingPath.remove_prefix(rightBrackPos + 1);
 			return RecurseFindArrayProperty(elementHandler, pName, pRemainingPath, propIndex.GetValue(), pPropPtr);
@@ -220,7 +220,7 @@ namespace DIRE_NS
 		{
 			ConvertResult<size_t> index = FromCharsConverter<size_t>::Convert(pKey);
 			if (index.HasError())
-				return { index.GetError() };
+				return GetPropertyResult{ index.GetError() };
 
 			value = pProperty->GetArrayHandler()->Read(pPropPtr, index.GetValue());
 		}
@@ -304,7 +304,7 @@ namespace DIRE_NS
 
 		ConvertResult<size_t> index = FromCharsConverter<size_t>::Convert(pKey);
 		if (index.HasError())
-			return { index.GetError() };
+			return GetPropertyResult{ index.GetError() };
 
 		value = pArrayHandler->Read(pPropPtr, index.GetValue());
 
@@ -343,7 +343,7 @@ namespace DIRE_NS
 				size_t rightBracketPos = pRemainingPath.find(']', 1);
 				if (rightBracketPos == pRemainingPath.npos || rightBracketPos == 1)
 				{
-					return { "Syntax error: Mismatched bracket or empty brackets." }; // syntax error: no right bracket or nothing between the brackets
+					return GetPropertyResult{ "Syntax error: Mismatched bracket or empty brackets." }; // syntax error: no right bracket or nothing between the brackets
 				}
 				pKey = pRemainingPath.substr(nextDelimiterPos + 1, rightBracketPos - nextDelimiterPos - 1);
 				pRemainingPath.remove_prefix(rightBracketPos + 1);
@@ -357,7 +357,7 @@ namespace DIRE_NS
 			size_t rightBracketPos = pRemainingPath.find(']', 1);
 			if (rightBracketPos == pRemainingPath.npos || rightBracketPos == 1)
 			{
-				return { "Syntax error: Mismatched bracket or empty brackets." }; // syntax error: no right bracket or nothing between the brackets
+				return GetPropertyResult{ "Syntax error: Mismatched bracket or empty brackets." }; // syntax error: no right bracket or nothing between the brackets
 			}
 			pKey = pRemainingPath.substr(1, rightBracketPos - 1);
 			pRemainingPath.remove_prefix(rightBracketPos + 1);
@@ -415,7 +415,7 @@ namespace DIRE_NS
 				size_t rightBracketPos = pRemainingPath.find(']', 1);
 				if (rightBracketPos == pRemainingPath.npos || rightBracketPos == 1)
 				{
-					return { "Syntax error: Mismatched bracket or empty brackets." }; // syntax error: no right bracket or nothing between the brackets
+					return GetPropertyResult{ "Syntax error: Mismatched bracket or empty brackets." }; // syntax error: no right bracket or nothing between the brackets
 				}
 				pKey = pRemainingPath.substr(nextDelimiterPos + 1, rightBracketPos - nextDelimiterPos - 1);
 				pRemainingPath.remove_prefix(rightBracketPos + 1);
@@ -429,7 +429,7 @@ namespace DIRE_NS
 			size_t rightBracketPos = pRemainingPath.find(']', 1);
 			if (rightBracketPos == pRemainingPath.npos || rightBracketPos == 1)
 			{
-				return { "Syntax error: Mismatched bracket or empty brackets." }; // syntax error: no right bracket or nothing between the brackets
+				return GetPropertyResult{ "Syntax error: Mismatched bracket or empty brackets." }; // syntax error: no right bracket or nothing between the brackets
 			}
 			pKey = pRemainingPath.substr(1, rightBracketPos - 1);
 			pRemainingPath.remove_prefix(rightBracketPos + 1);
@@ -456,7 +456,7 @@ namespace DIRE_NS
 			int toWrite = std::snprintf(nullptr, 0, "Property %s not found.", pName.data());
 			errorMsg.resize(size_t(toWrite + 1)); // +1 for \0
 			std::snprintf(errorMsg.data(), errorMsg.size(), "Property %s not found.", pName.data());
-			return { errorMsg };
+			return GetPropertyResult{ errorMsg };
 		}
 
 		// We found our compound property: consume its name from the "full path"
@@ -493,7 +493,7 @@ namespace DIRE_NS
 			// or there is no number between the two brackets, the expression has to be ill-formed!
 			if (rightBrackPos == pFullPath.npos || rightBrackPos < nextDelimiterPos || rightBrackPos == nextDelimiterPos + 1)
 			{
-				return { "Syntax error: Mismatched bracket or empty brackets." };
+				return GetPropertyResult{ "Syntax error: Mismatched bracket or empty brackets." };
 			}
 			pName = DIRE_STRING_VIEW(pFullPath.data(), nextDelimiterPos);
 			DIRE_STRING_VIEW key = pFullPath.substr(nextDelimiterPos + 1, rightBrackPos - nextDelimiterPos - 1);
@@ -514,7 +514,7 @@ namespace DIRE_NS
 			int toWrite = std::snprintf(nullptr, 0, "Property %s not found.", pName.data());
 			errorMsg.resize(size_t(toWrite + 1)); // +1 for \0
 			std::snprintf(errorMsg.data(), errorMsg.size(), "Property %s not found.", pName.data());
-			return { errorMsg };
+			return GetPropertyResult{ errorMsg };
 		}
 
 		pPropPtr += thisProp->GetOffset();
@@ -532,7 +532,7 @@ namespace DIRE_NS
 			int toWrite = std::snprintf(nullptr, 0, "Property %s not found.", pName.data());
 			errorMsg.resize(size_t(toWrite + 1)); // +1 for \0
 			std::snprintf(errorMsg.data(), errorMsg.size(), "Property %s not found.", pName.data());
-			return { errorMsg };
+			return GetPropertyResult{ errorMsg };
 		}
 
 		pPropPtr += thisProp->GetOffset();
