@@ -3,7 +3,7 @@
 #include "Types/DireTypeInfo.h"
 #include "DirePropertyMetadata.h"
 
-namespace DIRE_NS
+namespace DIRE_NS 
 {
 	template<typename T>
 	struct GetParenthesizedType;
