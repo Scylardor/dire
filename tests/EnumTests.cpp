@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include "dire/DireEnums.h"
+#include "TestClasses.h"
 #include <cstring> // strcmp
 
 TEST_CASE("FindFirstSetBit", "[Enums]")
@@ -28,8 +29,6 @@ TEST_CASE("FindFirstSetBit", "[Enums]")
 	value = 0b10000000000000000000000000000000;
 	REQUIRE(dire::FindFirstSetBit(value) == 31);
 }
-
-DIRE_BITMASK_ENUM(BitEnum, int, one, two, four, eight);
 
 TEST_CASE("Bitmask enum values", "[Enums]")
 {

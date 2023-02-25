@@ -40,7 +40,7 @@
       {
         "name": "windows-debug",
         "displayName": "x64 Debug",
-        "description": "Sets debug build type and x64 arch",
+        "description": "x64 Debug Build",
         "inherits": "windows-base",
 
         "cacheVariables": {
@@ -50,7 +50,7 @@
       {
         "name": "windows-release",
         "displayName": "x64 Release",
-        "description": "Sets release build type",
+        "description": "x64 Release Build",
         "inherits": "windows-debug",
         "cacheVariables": {
           "CMAKE_BUILD_TYPE": "Release"
@@ -74,6 +74,42 @@
         "inherits": "linux-debug",
         "cacheVariables": {
           "CMAKE_BUILD_TYPE": "Release"
+        }
+      },
+	  {
+        "name": "windows-debug-unity",
+        "displayName": "x64 Debug (Unity build)",
+        "description": "x64 Debug Unity Build",
+        "inherits": "windows-debug",
+        "cacheVariables": {
+           "CMAKE_UNITY_BUILD": "1"
+        }
+      },
+      {
+        "name": "windows-release-unity",
+        "displayName": "x64 Release (Unity build)",
+        "description": "x64 Release Unity Build",
+        "inherits": "windows-release",
+        "cacheVariables": {
+           "CMAKE_UNITY_BUILD": "1"
+        }
+      },
+      {
+        "name": "linux-debug-unity",
+        "displayName": "Debug (Unity Build)",
+        "description": "Debug Unity Build using GCC",
+        "inherits": "linux-debug",
+        "cacheVariables": {
+          "CMAKE_UNITY_BUILD": "1"
+        }
+      },
+      {
+        "name": "linux-release-unity",
+        "displayName": "Release (Unity Build)",
+        "description": "Release Unity Build using GCC",
+        "inherits": "linux-release",
+        "cacheVariables": {
+          "CMAKE_UNITY_BUILD": "1"
         }
       },
       {

@@ -1,4 +1,3 @@
-#define _CRT_SECURE_NO_WARNINGS // shut up about sprintf, MSVC!
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -59,7 +58,7 @@ TEST_CASE("GetProperty Array", "[Property]")
 	for (int i = 0; i < 10; i++)
 	{
 		char buf[64]{};
-		sprintf(buf, "anArray[%d]", i);
+		sprintf_s(buf, "anArray[%d]", i);
 		const int* ai = superC.GetProperty<int>(buf);
 		REQUIRE(*ai == i);
 		int compu2 = superC.GetSafeProperty<int>(buf);
