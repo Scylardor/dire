@@ -79,10 +79,9 @@ namespace DIRE_NS
 	template <typename T>
 	struct FromCharsConverter<T, typename std::enable_if_t<std::is_base_of_v<Enum, T>, void>>
 	{
-		static T Convert(const DIRE_STRING_VIEW& pChars)
+		static ConvertResult<T> Convert(const DIRE_STRING_VIEW& pChars)
 		{
-			T value = T::GetValueFromSafeString(pChars);
-			return value;
+			return ConvertResult<T>(T::GetValueFromSafeString(pChars));
 		}
 	};
 

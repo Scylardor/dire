@@ -2,8 +2,6 @@
 
 namespace DIRE_NS
 {
-
-
 	template <typename T>
 	const void* TypedMapDataStructureHandler<T, std::enable_if_t<HasMapSemantics_v<T>, void>>::Read(const void* pMap, const std::string_view& pKey) const
 	{
