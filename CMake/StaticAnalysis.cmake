@@ -4,7 +4,7 @@ option(LINT_CLANG_TIDY "Enable Clang-Tidy static analysis" OFF)
 if (LINT_CPPCHECK)
 	find_program(CPPCHECK cppcheck)
 	if (CPPCHECK)
-		set(CMAKE_CXX_CPPCHECK ${CPPCHECK} --enable=all)
+		set(CMAKE_CXX_CPPCHECK ${CPPCHECK})
 
       # Append desired arguments to CppCheck
       list(
@@ -14,10 +14,10 @@ if (LINT_CPPCHECK)
           "--template \"{file}({line}): {severity} ({id}): {message}\"" 
 
           # Only show found errors
-          "--quiet" 
+          "--quiet"
 
           # Desired warning level in CppCheck
-          #"--enable=all"
+          "--enable=all"
 
           # Optional: Specified C++ version
           "--std=c++17"
@@ -28,16 +28,20 @@ if (LINT_CPPCHECK)
           # Optional: Use inline suppressions
           "--inline-suppr"
 
-		  "-I${CMAKE_CURRENT_SOURCE_DIR}/Dire"
+		  "-I${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}"
 
           # Run CppCheck from the working directory, as specified in the add_custom_target command below
-          "${CMAKE_CURRENT_SOURCE_DIR}/Dire"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}"
         )
 
-      add_custom_target(CPPCHECK DEPENDS Dire
+      add_custom_target(CPPCHECK DEPENDS ${PROJECT_NAME}
         COMMAND ${CMAKE_CXX_CPPCHECK}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         COMMENT "Static code analysis using ${CPP_CHECK_VERSION}")
+
+        add_custom_command(TARGET ${PROJECT_NAME}
+            POST_BUILD COMMAND ${CMAKE_CXX_CPPCHECK}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 	else()
 		message(SEND_ERROR "CppCheck executable was not found")
 	endif()
@@ -46,7 +50,10 @@ endif()
 if (LINT_CLANG_TIDY)
 	find_program(CLANGTIDY clang-tidy)
 	if (CLANGTIDY)
-		set(CMAKE_CXX_CLANG_TIDY ${CLANGTIDY})
+        set(CLANG_TIDY_COMMAND "${CLANGTIDY}")
+        set(CLANG_TIDY_COMMAND "${CLANGTIDY}" "checks=-*;modernize-*;-prout")
+        message(${CLANG_TIDY_COMMAND})
+        set_target_properties(${PROJECT_NAME} PROPERTIES CXX_CLANG_TIDY "C:/msys64/mingw64/bin/clang-tidy.exe;-checks=*;modernize-*")
 	else()
 		message(SEND_ERROR "Clang-Tidy executable was not found")
 	endif()

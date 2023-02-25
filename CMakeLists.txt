@@ -28,7 +28,6 @@ set(${UPPER_PROJECT_NAME}_CPP_STANDARD cxx_std_17 CACHE STRING "Set the standard
 option(${UPPER_PROJECT_NAME}_BUILD_SHARED_LIB "Type of library DIRE will compile. Use STATIC for archives (.a or .lib on Windows) or SHARED for dynamic (.so or DLL on Windows)." ON)
 option(${UPPER_PROJECT_NAME}_BUILD_DOCUMENTATION "If on, will search for Doxygen on the system to generate docs (for library developers)." OFF)
 
-include(CMake/StaticAnalysis.cmake)
 
 set(DIRE_SOURCE_DIR ${PROJECT_NAME}/dire)
 set(DIRE_GENERATED_INCLUDES_DIR generated-includes/Dire)
@@ -87,8 +86,20 @@ else()
 endif()
 
 add_library(${PROJECT_NAME} ${${UPPER_PROJECT_NAME}_LIBRARY_TYPE}
-	${${PROJECT_NAME}_SOURCES}
-)
+	${${PROJECT_NAME}_SOURCES})
+
+# Precompiled Headers
+# (this list is taken from DireString.h, probably the most included file of the project)
+target_precompile_headers(${PROJECT_NAME} PRIVATE
+	<type_traits>
+	<charconv>
+	<system_error>
+	<variant>)
+
+# Enable Link-Time Optimization for Release config
+include(CMake/LTO.cmake)
+enable_ipo_for(${PROJECT_NAME} RELEASE)
+
 # Alias target
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 
@@ -97,6 +108,8 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 	DEBUG_POSTFIX _d
 	VERSION ${PROJECT_VERSION}
 	SOVERSION ${PROJECT_VERSION_MAJOR})
+
+include(CMake/StaticAnalysis.cmake)
 
 # On Windows, set a different name for the import library to not be confused with a static build of the library
 # (both have .lib extension)

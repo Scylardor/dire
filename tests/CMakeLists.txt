@@ -17,7 +17,14 @@ if(${UPPER_PROJECT_NAME}_TESTS_ENABLED)
 		TypeInfoDatabaseTests.cpp
 		TestClasses.h
 	)
-	
+
+	enable_ipo_for(${PROJECT_NAME}_UnitTests RELEASE)
+
+	# Precompiled Headers
+# (this list is taken from DireString.h, probably the most included file of the project)
+	target_precompile_headers(${PROJECT_NAME}_UnitTests PRIVATE
+		<catch2/catch_test_macros.hpp>)
+
 	# Alias TARGET
 	add_executable(${PROJECT_NAME}::Tests ALIAS ${PROJECT_NAME}_UnitTests)
 
