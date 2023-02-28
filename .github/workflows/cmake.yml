@@ -51,6 +51,28 @@ jobs:
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ctest --test-dir tests/ -C ${{ matrix.build_type }}
 
+  static_analysis:
+    needs: build_matrix
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install cppcheck
+      run: sudo apt install -y cppcheck
+
+    - name: vcpkg build
+      uses: johnwason/vcpkg-action@v4
+      id: vcpkg
+      with:
+        manifest-dir: ${{ github.workspace }} # Set to directory containing vcpkg.json
+        triplet: ${{ matrix.vcpkg_triplet }}
+        cache-key: ${{ matrix.config.os }}
+        revision: master
+        token: ${{ github.token }}
+        
+    - name: Run CppCheck
+      run: |
+        cmake -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -B ${{github.workspace}}/build -DLINT_CPPCHECK=1 -DDIRE_TESTS_ENABLED=0
+        cmake --build ${{github.workspace}}/build --target CPPCHECK
 
   documentation:
     needs: build_matrix
