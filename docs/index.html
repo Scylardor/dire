@@ -27,7 +27,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">Dire
-   &#160;<span id="projectnumber">0.1</span>
+   &#160;<span id="projectnumber">0.1.0</span>
    </div>
    <div id="projectbrief">A library for Dynamically Interpreted Reflection Expressions (DIRE).</div>
   </td>
@@ -306,7 +306,7 @@ What are the limitations?</h1>
 <ul>
 <li>All classes who inherit Reflectable become virtual because of its pure functions. It means that it will make your classes non-standard layout, and a bit heavier because of the virtual table pointer. Since the TypeInfo database and Reflectables are two separate entities, it should be possible to address that issue in the future.</li>
 <li>Using DIRE could also increase the program's startup time, because of the static initialization machinery needed to initialize everything. Granted, it's also going to make your executable size bigger, because more static memory will have to be bundled into it.</li>
-<li>DIRE relies a lot on virtual function calls. Yhose are known for being more expensive to call than regular functions. Modern compilers are however getting better at devirtualizing virtual function calls, so: YMMV.</li>
+<li>DIRE relies a lot on virtual function calls. Those are known for being more expensive to call than regular functions. Modern compilers are however getting better at devirtualizing virtual function calls, so: YMMV.</li>
 <li>DIRE uses a fair amount of macros and complex templates to work. As a result, I've seen measurable increases in compile time by using it. I'm currently trying to address this.</li>
 <li>DIRE does not support template reflectables at the moment (if you try, it's going to cause syntax errors and won't compile).</li>
 <li>The de/serialization API is at the proof-of-concept stage right now, and could use some optimization.</li>
