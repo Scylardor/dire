@@ -10,8 +10,8 @@ if (LINT_CPPCHECK)
       list(
         APPEND CMAKE_CXX_CPPCHECK
           # Using the below template will allow jumping to any found error from inside Visual Studio output window by double click
-		  # (note: template=vs doesn't include the id, which is useful :( )
-          "--template \"{file}({line}): {severity} ({id}): {message}\"" 
+		      # (note: template=vs doesn't include the id, which is useful :( )
+          " --template '{file}({line}): {severity} ({id}): {message}'" 
 
           # Only show found errors
           "--quiet"
@@ -28,16 +28,19 @@ if (LINT_CPPCHECK)
           # Optional: Use inline suppressions
           "--inline-suppr"
 
-		  "-I${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}"
+		      "-I${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}"
 
           # Run CppCheck from the working directory, as specified in the add_custom_target command below
           "${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}"
         )
+    
+        # Check CppCheck version
+        execute_process(COMMAND ${CPPCHECK} --version OUTPUT_VARIABLE CPP_CHECK_VERSION)
 
-      add_custom_target(CPPCHECK DEPENDS ${PROJECT_NAME}
-        COMMAND ${CMAKE_CXX_CPPCHECK}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        COMMENT "Static code analysis using ${CPP_CHECK_VERSION}")
+        add_custom_target(CPPCHECK #DEPENDS ${PROJECT_NAME}
+          COMMAND ${CMAKE_CXX_CPPCHECK}
+          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+          COMMENT "Static code analysis using ${CPP_CHECK_VERSION}")
 
         add_custom_command(TARGET ${PROJECT_NAME}
             POST_BUILD COMMAND ${CMAKE_CXX_CPPCHECK}

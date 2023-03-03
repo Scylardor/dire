@@ -13,7 +13,6 @@ TEST_CASE("GetProperty Simple", "[Property]")
 {
 	c superC;
 
-
 	// direct property
 	const unsigned * compu = superC.GetProperty<unsigned>("ctoto");
 	REQUIRE(*compu == 0xdeadbeef);
@@ -57,11 +56,11 @@ TEST_CASE("GetProperty Array", "[Property]")
 	// direct property
 	for (int i = 0; i < 10; i++)
 	{
-		char buf[64]{};
-		sprintf_s(buf, "anArray[%d]", i);
-		const int* ai = superC.GetProperty<int>(buf);
+		std::string buf(64, '\0');
+		std::snprintf(buf.data(), 64, "anArray[%d]", i);
+		const int* ai = superC.GetProperty<int>(buf.data());
 		REQUIRE(*ai == i);
-		int compu2 = superC.GetSafeProperty<int>(buf);
+		int compu2 = superC.GetSafeProperty<int>(buf.data());
 		REQUIRE(compu2 == i);
 	}
 

@@ -38,7 +38,7 @@ namespace DIRE_NS
 		const auto* nextPropertyHeader = &ReadFromBytes<BinarySerializationHeaders::Property>();
 
 		char* objectPtr = reinterpret_cast<char*>(&pDeserializedObject);
-		unsigned iProp = 0;
+		unsigned iProp = 0; // cppcheck-suppress variableScope
 
 		objTypeInfo->ForEachPropertyInHierarchy([&](const PropertyTypeInfo& pProperty)
 		{
@@ -130,7 +130,7 @@ namespace DIRE_NS
 		char* objectPtr = reinterpret_cast<char*>(pPropPtr);
 
 		const auto* nextPropertyHeader = &ReadFromBytes<BinarySerializationHeaders::Property>();
-		unsigned iProp = 0;
+		unsigned iProp = 0; // cppcheck-suppress variableScope
 
 		deserializedTypeInfo->ForEachPropertyInHierarchy([&](const PropertyTypeInfo& pProperty)
 		{
