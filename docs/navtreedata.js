@@ -58,8 +58,8 @@ var NAVTREE =
 
 var NAVTREEINDEX =
 [
-"",
-"classDIRE__NS_1_1TypedMapDataStructureHandler_3_01T_00_01typename_01std_1_1enable__if__t_3_01Has628338ba013a7d05b4c4f79d5461043c.html"
+"DireArrayDataStructureHandler_8h_source.html",
+"classDIRE__NS_1_1TypedMapDataStructureHandler_3_01T_00_01typename_01std_1_1enable__if__t_3_01Has628338ba013a7d05b4c4f79d5461043c.html#a3827c25defabeef4d839e8a73fac3241"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';
